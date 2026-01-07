@@ -1,0 +1,176 @@
+FUNCTION_BLOCK FB_MachineStateMachine
+
+VAR_INPUT
+    startButton : BOOL;
+    stopButton : BOOL;
+    homeButton : BOOL;
+    manualMode : BOOL;
+    eStopActive : BOOL;
+    resetButton : BOOL;
+	
+	
+	
+END_VAR
+
+VAR_OUTPUT
+    currentStateOut : E_MachineState;  // So HMI and other code can see it
+    isRunning : BOOL;
+    isFaulted : BOOL;
+    isHomed : BOOL;
+END_VAR
+
+VAR
+    currentState : E_MachineState := E_MachineState.INIT;  // Internal state
+	
+	// Motion sequence variables
+	motionSequence 	: FB_MotionSequence;
+    motionStep : E_MotionStep := E_MotionStep.WAIT_FOR_LOAD;
+    subStep : INT := 0;  // For tracking sub-movements within a step
+    
+    // Flags for position confirmation
+    allAxesInPosition : BOOL := FALSE;
+	
+	fbHalt : ARRAY[MOTIF_CONFIG.MIN_AXIS_INDEX..MOTIF_CONFIG.MAX_AXIS_INDEX] OF MC_Halt;
+	i : UINT;
+END_VAR
+
+
+
+/////////////////////////////////////////////////////////////////////
+
+
+// Check for E-stop - can interrupt any state except E_STOPPED itself
+IF eStopActive AND (currentState <> E_MachineState.E_STOPPED) THEN
+    currentState := E_MachineState.E_STOPPED;
+END_IF;
+
+// Main state machine
+CASE currentState OF
+
+    // ------------------------------------------------------------------------
+    E_MachineState.INIT:
+        // Reset all output flags
+        isRunning := FALSE;
+        isFaulted := FALSE;
+        isHomed := TRUE;  // Assume homed since we have absolute encoders
+        
+        // Initialize any other variables you need
+        
+        // Automatically transition to IDLE
+        currentState := E_MachineState.IDLE;
+    
+    // ------------------------------------------------------------------------
+    E_MachineState.IDLE:
+        // Update outputs
+        isRunning := FALSE;
+        
+        // Check for operator commands and transition accordingly
+        IF homeButton THEN
+            currentState := E_MachineState.HOMING;
+            
+        ELSIF manualMode THEN
+            currentState := E_MachineState.MANUAL;
+            
+        ELSIF startButton THEN
+            currentState := E_MachineState.RUNNING;
+            
+        END_IF;
+    
+    // ------------------------------------------------------------------------
+    E_MachineState.HOMING:
+        // TODO: Add actual homing logic for axes here later
+        // For now, we'll just set the flag and return to IDLE
+        
+        isHomed := TRUE;
+        
+        // Return to IDLE (in real code, you'd wait for homing to complete)
+        currentState := E_MachineState.IDLE;
+    
+    // ------------------------------------------------------------------------
+    E_MachineState.MANUAL:
+        // TODO: Manual/jog mode logic goes here
+        // Allow individual axis jogging
+        
+        // Exit manual mode when operator deselects it
+        IF NOT manualMode THEN
+            currentState := E_MachineState.IDLE;
+        END_IF;
+    
+    // ------------------------------------------------------------------------
+    E_MachineState.RUNNING:
+        // Update outputs
+        isRunning := TRUE;
+        
+        // TODO: Motion sequence state machine will go here
+        // This is where your Level 2 state machine (motion steps) will execute
+        motionSequence(
+	enable := startButton
+);
+        // Check for stop button
+        IF stopButton THEN
+            currentState := E_MachineState.STOPPING;
+        END_IF;
+    
+    // ------------------------------------------------------------------------
+    E_MachineState.STOPPING:
+        // Update outputs
+        isRunning := FALSE;
+		startButton := FALSE;
+        
+        // TODO: Command all active axes to decelerate in a controlled manner
+        // In real implementation, you'd use MC_Halt for each axis
+        // and wait for them to reach zero velocity
+        
+        // For now, simplified transition back to IDLE
+        currentState := E_MachineState.IDLE;
+    
+    // ------------------------------------------------------------------------
+    E_MachineState.FAULTED:
+        // Update outputs
+        isRunning := FALSE;
+        isFaulted := TRUE;
+        
+        // TODO: Log which axis faulted, display error message
+        
+        // Wait for operator to acknowledge and reset
+        IF resetButton THEN
+            currentState := E_MachineState.RESETTING;
+        END_IF;
+    
+    // ------------------------------------------------------------------------
+    E_MachineState.E_STOPPED:
+        // Update outputs
+        isRunning := FALSE;
+        isFaulted := TRUE;
+        
+        // TODO: Immediately disable all axes (emergency stop)
+        
+		
+		FOR i := MOTIF_CONFIG.MIN_AXIS_INDEX TO MOTIF_CONFIG.MAX_AXIS_INDEX DO
+            fbHalt[i](
+                Execute := eStopActive,
+				Deceleration := 1,
+				Jerk := 1,
+                Axis := AXIF_CONFIG_INDEXES[i]
+            );
+		END_FOR
+		
+        // Can only exit when E-stop is released AND operator resets
+        IF NOT eStopActive AND resetButton THEN
+            currentState := E_MachineState.RESETTING;
+        END_IF;
+    
+    // ------------------------------------------------------------------------
+    E_MachineState.RESETTING:
+        // Clear fault flags
+        isFaulted := FALSE;
+        
+        // TODO: Reset axis errors, clear alarm buffers, etc.
+        
+        // Return to IDLE
+        currentState := E_MachineState.IDLE;
+
+END_CASE;
+
+// Copy internal state to output so other code/HMI can see it
+currentStateOut := currentState;

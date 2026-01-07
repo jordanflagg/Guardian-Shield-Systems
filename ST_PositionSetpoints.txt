@@ -1,0 +1,92 @@
+TYPE ST_PositionSetpoints :
+STRUCT
+    // Step 2: Axis 1 shifts block
+    axis1_ShiftPosition : LREAL := 1000.0;
+	axis1_HomePosition : LREAL := 0;
+								
+    // Step 3: Axes 2,3,4,5 raise (Axis 2 Master)
+    axis2_RaisePosition : LREAL := 500.0;
+	
+    // Step 4: Axes 6,7 shift block to center (Axis 6 Master)
+	axis6_ShiftPosition : LREAL := 800.0;
+    
+	// Step 5: Axes 2,3,4,5 lower (Axis 2 Master)
+    axis2_LowerPosition : LREAL := 0;
+    
+	// Step 6: Axes 6,7 return (Axis 6 Master)
+	axis6_HomePosition : LREAL := 0;
+	
+	// Step 7: Axes 10,11,12,13 raise (Axis 10 Master)
+	axis10_RaisePosition : LREAL := 500.0;
+	
+	// Step 8: Axes 8,9 shift block to center (Axis 8 Master)
+	axis8_ShiftPosition : LREAL := 800.0;
+   									
+	// Step 9: Wait for suction cups
+							 
+	// Step 10: Axes 8,9 return (Axis 8 Master)
+	axis8_HomePosition : LREAL := 800.0;
+									
+	// Step 11: Axes 10,11,12,13 lower (Axis 10 Master)
+	axis10_LowerPosition : LREAL := 0;
+	
+	// Step 12: Axes (14,16)(18,20)(22,24)(26,28) move to target position 1
+	axis14_TargetPosition_1 : LREAL := 500.0;
+	axis18_TargetPosition_1 : LREAL := 500.0;
+	axis22_TargetPosition_1 : LREAL := 500.0;
+	axis26_TargetPosition_1 : LREAL := 500.0;
+									
+	// Step 13: Axes (15,17)(19,21)(23,25)(27,29) move to target position 1
+	axis15_TargetPosition_1 : LREAL := 500.0;
+	axis19_TargetPosition_1 : LREAL := 500.0;
+	axis23_TargetPosition_1 : LREAL := 500.0;
+	axis27_TargetPosition_1 : LREAL := 500.0;
+	
+									
+	// Step 14: Axes (14,16)(18,20)(22,24)(26,28) move to target position 2
+	axis14_TargetPosition_2 : LREAL := 500.0;
+	axis18_TargetPosition_2 : LREAL := 500.0;
+	axis22_TargetPosition_2 : LREAL := 500.0;
+	axis26_TargetPosition_2 : LREAL := 500.0;
+									
+	// Step 15: Axes (15,17)(19,21)(23,25)(27,29) move to target position 2
+	axis15_TargetPosition_2 : LREAL := 500.0;
+	axis19_TargetPosition_2 : LREAL := 500.0;
+	axis23_TargetPosition_2 : LREAL := 500.0;
+	axis27_TargetPosition_2 : LREAL := 500.0;
+									
+	// Step 16: Axes 14-29 return home
+	axis14_HomePosition : LREAL := 0;
+	axis15_HomePosition : LREAL := 0;
+	axis18_HomePosition : LREAL := 0;
+	axis19_HomePosition : LREAL := 0;
+	axis22_HomePosition : LREAL := 0;
+	axis23_HomePosition : LREAL := 0;
+	axis26_HomePosition : LREAL := 0;
+	axis27_HomePosition : LREAL := 0;
+	
+	// Windows/Doors positions
+axis30_TargetPosition_1 : LREAL := 300.0;  // Initial horizontal position
+axis30_TargetPosition_2 : LREAL := 600.0;  // Final horizontal position
+axis30_TargetPosition_3 : LREAL := 400.0;  // For electrical trough start
+axis30_TargetPosition_4 : LREAL := 700.0;  // For electrical trough cut
+axis30_HomePosition : LREAL := 0.0;
+
+axis31_TargetPosition_1 : LREAL := 200.0;  // Down position
+axis31_TargetPosition_2 : LREAL := 400.0;  // Up position
+axis31_HomePosition : LREAL := 0.0;
+
+// Electrical trough positions
+axis35_TargetPosition_1 : LREAL := 500.0;  // Extend into foam
+axis35_TargetPosition_2 : LREAL := 0.0;    // Retract
+axis35_HomePosition : LREAL := 0.0;
+
+axis36_TargetPosition_1 : LREAL := 500.0;  // Extend into foam
+axis36_TargetPosition_2 : LREAL := 0.0;    // Retract
+axis36_HomePosition : LREAL := 0.0;
+
+// Unload position
+axis8_UnloadPosition : LREAL := 1200.0;  // Shift to unload table
+    
+END_STRUCT
+END_TYPE

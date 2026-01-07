@@ -1,0 +1,9 @@
+TYPE ST_MotionParameters :
+STRUCT
+    defaultVelocity : LREAL := 1.0;
+    defaultAcceleration : LREAL := 5.0;
+    defaultDeceleration : LREAL := 5.0;
+    defaultJerk : LREAL := 1.0;
+    positionTolerance : LREAL := 0.5;
+END_STRUCT
+END_TYPE

@@ -1,0 +1,71 @@
+{attribute 'qualified_only'}
+{attribute 'strict'}
+TYPE E_MotionStep :
+(
+    WAIT_FOR_LOAD := 1,           	// Step 1: Wait for fork truck
+    SHIFT_TO_PROCESSING_AREA := 2,  
+									// Step 2: Axis 1 shifts block, 
+									// Step 3: Axes 2,3,4,5 raise
+       								// Step 4: Axes 6,7 shift block to center
+      								// Step 5: Axes 2,3,4,5 lower
+    								// Step 6: Axes 6,7 return
+    	  							// Step 7: Axes 10,11,12,13 raise
+      								// Step 8: Axes 8,9 shift block to center
+   									// Step 9: Wait for suction cups
+							    	// Step 10: Axes 8,9 return
+									// Step 11: Axes 10,11,12,13 lower
+ 	STUDS := 3,
+       								// Step 12: Axes (14,16)(18,20)(22,24)(26,28) move to target position 1
+									// Step 13: Axes (15,17)(19,21)(23,25)(27,29) move to target position 1
+									// Step 14: Axes (14,16)(18,20)(22,24)(26,28) move to target position 2
+									// Step 15: Axes (15,17)(19,21)(23,25)(27,29) move to target position 2
+									// Step 16: Axes 14-29 return home
+    WINDOWS_DOORS := 11,        	
+									// Step 17: Axes 30,32 move to target position 1
+									// Step 18: Axes 31,33 move to target position 1
+									// Step 19: Axes 30,32 move to target position 2
+									// Step 20: Axes 31,33 move to target position 2
+									// Step 21: Axes 30-33 return home
+    ELECTRICAL	 := 12,            	
+									// Step 22: Axes 30,32 move to target position 1
+									// Step 23: Axes 35,36 move to target position 1
+									// Step 24: Axes 30,32 move to target position 2
+									// Step 25: Axes 35,36 move to target position 2
+									// Step 26: Axes 30,32,35,36 return home
+    SHIFT_TO_UNLOAD_AREA := 13    	
+									// Step 27: Axes 10,11,12,13 raise
+									// Step 28: Axes 8,9 shift block to unload
+									// Step 29: Axes 10,11,12,13 lower
+									// Step 30: Axes 8,9 return home
+);
+END_TYPE
+
+
+
+
+// 
+// 	WAIT_FOR_LOAD := 1,           	// Step 1: Wait for fork truck
+//     SHIFT_TO_FIXED_WALL := 2,       // Step 2: Axis 1 shifts block
+//     RAISE_MOVING_WALL_1 := 3,       // Step 3: Axes 2,3,4,5 raise
+//     SHIFT_WALL_1 := 4,         		// Step 4: Axes 6,7 shift block to center
+//     LOWER_MOVING_WALL_1 := 5,       // Step 5: Axes 2,3,4,5 lower
+//     RETURN_MOVING_WALL := 6,     	// Step 6: Axes 6,7 retract
+//     SHIFT_WALL_2 := 7,     	  		// Step 7: Axes 8,9 extend
+//     RAISE_WALL_2 := 8,       		// Step 8: Axes 10,11,12,13 raise
+//     RETURN_WALL_2 := 9,   			// Step 9: Axes 8,9 move block to center
+//     WAIT_FOR_PROCESSING := 10,    	// Step 10: Wait for block to be processed
+//     LOWER_STUD_WALL := 11,        	// Step 11: Axes 10,11,12,13 lower (get out of way)
+//     CARVE_STUDS := 12,            	// Steps 12-16: Complex stud carving with axes 14-29
+//     RETRACT_STUD_AXES := 13,      	// All axes 14-29 retract
+//     POSITION_HOT_WIRE := 14,      	// Step 17-22: Position and carve window/door
+//     CARVE_WINDOW_DOOR := 15,      	// Axes 30,31,32,33 carve opening
+//     SETUP_TROUGH_CUT := 16,       	// Steps 23-25: Position for trough
+//     CARVE_TROUGH := 17,           	// Steps 26: Cut trough
+//     RETURN_AXES_HOME := 18,       // Step 27: All axes to home
+//     LOWER_UNLOAD_WALL := 19,      // Step 28: Axes 10,11,12,13 lower
+//     EXTEND_UNLOAD := 20,          // Step 29: Axes 8,9 extend
+//     RAISE_UNLOAD_WALL_2 := 21,    // Step 30: Axes 10,11,12,13 raise
+//     PULL_BLOCK_TO_UNLOAD := 22,   // Step 31: Axes 8,9 pull block
+//     LOWER_UNLOAD_WALL_3 := 23,    // Step 32: Axes 10,11,12,13 lower
+//     SHIFT_FINISHED_BLOCKS := 24,  // Steps 33-36: Axis 34 shifts finished blocks
+//     SEQUENCE_COMPLETE := 25

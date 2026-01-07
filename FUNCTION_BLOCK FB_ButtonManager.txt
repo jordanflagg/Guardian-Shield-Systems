@@ -1,0 +1,113 @@
+FUNCTION_BLOCK FB_ButtonManager
+VAR_INPUT
+    btn_Start_In : BOOL;
+    btn_Stop_In : BOOL;
+    btn_Home_In : BOOL;
+    btn_Manual_In : BOOL;
+    btn_Reset_In : BOOL;
+    btn_EStop_In : BOOL;
+END_VAR
+
+VAR_OUTPUT
+    btn_Start_Out : BOOL;
+    btn_Stop_Out : BOOL;
+    btn_Home_Out : BOOL;
+    btn_Manual_Out : BOOL;
+    btn_Reset_Out : BOOL;
+    btn_EStop_Out : BOOL;
+    activeCommand : E_ActiveCommand;
+END_VAR
+
+VAR
+    trig_Start : R_TRIG;
+    trig_Stop : R_TRIG;
+    trig_Home : R_TRIG;
+    trig_Manual : R_TRIG;
+    trig_Reset : R_TRIG;
+END_VAR
+
+/////////////////////////////////////////////////////////////////
+
+// ============================================================================
+// Edge detection
+// ============================================================================
+trig_Start(CLK := btn_Start_In);
+trig_Stop(CLK := btn_Stop_In);
+trig_Home(CLK := btn_Home_In);
+trig_Manual(CLK := btn_Manual_In);
+trig_Reset(CLK := btn_Reset_In);
+
+// ============================================================================
+// Determine active command based on button presses
+// ============================================================================
+IF btn_EStop_In THEN
+    activeCommand := E_ActiveCommand.CMD_NONE;
+    
+ELSIF trig_Start.Q THEN
+    activeCommand := E_ActiveCommand.CMD_START;
+    
+ELSIF trig_Stop.Q THEN
+    activeCommand := E_ActiveCommand.CMD_STOP;
+    
+ELSIF trig_Home.Q THEN
+    activeCommand := E_ActiveCommand.CMD_HOME;
+    
+ELSIF trig_Manual.Q THEN
+    activeCommand := E_ActiveCommand.CMD_MANUAL;
+    
+ELSIF trig_Reset.Q THEN
+    activeCommand := E_ActiveCommand.CMD_RESET;
+    
+END_IF;
+
+// ============================================================================
+// EXPLICIT: Set outputs based on active command (clear all, set one)
+// ============================================================================
+CASE activeCommand OF
+    
+    E_ActiveCommand.CMD_START:
+        btn_Start_Out := TRUE;
+        btn_Stop_Out := FALSE;   
+        btn_Home_Out := FALSE;   
+        btn_Manual_Out := FALSE; 
+        btn_Reset_Out := FALSE;  // ← Explicitly FALSE
+    
+    E_ActiveCommand.CMD_STOP:
+        btn_Start_Out := FALSE;
+        btn_Stop_Out := TRUE;
+        btn_Home_Out := FALSE;
+        btn_Manual_Out := FALSE;
+        btn_Reset_Out := FALSE;
+    
+    E_ActiveCommand.CMD_HOME:
+        btn_Start_Out := FALSE;
+        btn_Stop_Out := FALSE;
+        btn_Home_Out := TRUE;
+        btn_Manual_Out := FALSE;
+        btn_Reset_Out := FALSE;
+    
+    E_ActiveCommand.CMD_MANUAL:
+        btn_Start_Out := FALSE;
+        btn_Stop_Out := FALSE;
+        btn_Home_Out := FALSE;
+        btn_Manual_Out := TRUE;
+        btn_Reset_Out := FALSE;
+    
+    E_ActiveCommand.CMD_RESET:
+        btn_Start_Out := FALSE;
+        btn_Stop_Out := FALSE;
+        btn_Home_Out := FALSE;
+        btn_Manual_Out := FALSE;
+        btn_Reset_Out := TRUE;
+    
+    E_ActiveCommand.CMD_NONE:
+        btn_Start_Out := FALSE;
+        btn_Stop_Out := FALSE;
+        btn_Home_Out := FALSE;
+        btn_Manual_Out := FALSE;
+        btn_Reset_Out := FALSE;
+        
+END_CASE;
+
+// E-stop passes through directly
+btn_EStop_Out := btn_EStop_In;

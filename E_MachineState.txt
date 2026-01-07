@@ -1,0 +1,16 @@
+{attribute 'qualified_only'}
+{attribute 'strict'}
+TYPE E_MachineState :
+(
+	INIT := 0,
+    IDLE := 1,
+    HOMING := 2,
+    MANUAL := 3,
+    RUNNING := 4,
+    STOPPING := 5,
+    FAULTED := 6,
+    E_STOPPED := 7,
+    RESETTING := 8
+	
+);
+END_TYPE

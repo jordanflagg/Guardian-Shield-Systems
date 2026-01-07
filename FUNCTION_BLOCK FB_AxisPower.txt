@@ -1,0 +1,32 @@
+FUNCTION_BLOCK FB_AxisPower
+VAR_INPUT
+	PowerOn : BOOL;
+	Reset : BOOL;
+END_VAR
+VAR_OUTPUT
+	DrivesReady	: BOOL;
+END_VAR
+VAR
+	fbPower : ARRAY[MOTIF_CONFIG.MIN_AXIS_INDEX..MOTIF_CONFIG.MAX_AXIS_INDEX] OF MC_Power;
+	fbReset : ARRAY[MOTIF_CONFIG.MIN_AXIS_INDEX..MOTIF_CONFIG.MAX_AXIS_INDEX] OF MC_Reset;
+	i : UINT;
+END_VAR
+
+///////////////////////////////////////////////////////////////////
+
+
+FOR i := MOTIF_CONFIG.MIN_AXIS_INDEX TO MOTIF_CONFIG.MAX_AXIS_INDEX DO
+	fbReset[i](
+    	Execute := Reset, 
+        Axis := AXIF_CONFIG_INDEXES[i]
+    );
+END_FOR
+
+
+FOR i := MOTIF_CONFIG.MIN_AXIS_INDEX TO MOTIF_CONFIG.MAX_AXIS_INDEX DO
+	fbPower[i](
+        Enable := PowerOn, 
+    	Axis := AXIF_CONFIG_INDEXES[i]
+    );
+END_FOR
+

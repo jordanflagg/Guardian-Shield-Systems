@@ -1,0 +1,43 @@
+# TwinCAT/Beckhoff PLC Project
+# Compiled outputs
+*.compiled-library
+*.library
+_CompileInfo/
+_Libraries/
+
+# Boot projects
+*.autostart
+*.bootproject
+
+# Temporary files
+*.bak
+*.tmp
+*~
+
+# Log files
+*.log
+
+# TwinCAT generated files
+LineIDs.dbg
+*.tmc
+*.tpy
+
+# Visual Studio / IDE
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Bb]in/
+[Oo]bj/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+Desktop.ini

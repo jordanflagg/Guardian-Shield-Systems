@@ -1,0 +1,66 @@
+PROGRAM PLC_PRG
+VAR
+    // Function blocks
+    buttonManager : FB_ButtonManager;
+    axisPower : FB_AxisPower;
+    stateMachine : FB_MachineStateMachine;
+    motionSequence : FB_MotionSequence;
+    
+    // Raw button inputs (you toggle these for testing)
+    btn_Start : BOOL := FALSE;
+    btn_Stop : BOOL := FALSE;
+    btn_Home : BOOL := FALSE;
+    btn_Manual : BOOL := FALSE;
+    btn_Reset : BOOL := FALSE;
+    btn_EStop : BOOL := FALSE;
+    btn_DriveOn : BOOL := FALSE;
+	
+	
+	MACHINE_STATE : E_MachineState;
+END_VAR
+
+
+/////////////////////////////////////////////////
+
+// ============================================================================
+// BUTTON MANAGEMENT - All logic encapsulated in FB
+// ============================================================================
+buttonManager(
+    btn_Start_In := btn_Start,
+    btn_Stop_In := btn_Stop,
+    btn_Home_In := btn_Home,
+    btn_Manual_In := btn_Manual,
+    btn_Reset_In := btn_Reset,
+    btn_EStop_In := btn_EStop
+);
+
+// ============================================================================
+// AXIS POWER
+// ============================================================================
+axisPower(
+    PowerOn := btn_DriveOn,
+    Reset := buttonManager.btn_Reset_Out
+);
+
+// ============================================================================
+// STATE MACHINE - Uses processed button outputs
+// ============================================================================
+stateMachine(
+    startButton := buttonManager.btn_Start_Out,
+    stopButton := buttonManager.btn_Stop_Out,
+    homeButton := buttonManager.btn_Home_Out,
+    manualMode := buttonManager.btn_Manual_Out,
+    eStopActive := buttonManager.btn_EStop_Out,
+    resetButton := buttonManager.btn_Reset_Out
+);
+
+// ============================================================================
+// MOTION SEQUENCE
+// ============================================================================
+motionSequence(
+    enable := buttonManager.btn_Start_Out
+    
+);
+
+
+MACHINE_STATE := stateMachine.currentStateOut;

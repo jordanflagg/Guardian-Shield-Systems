@@ -1,379 +1,472 @@
 ================================================================================
-                    FOAM BLOCK PROCESSING MACHINE
-                    MOTION CONTROL SYSTEM OVERVIEW
-================================================================================
-
-Project: Automated Foam Block Carving Machine
-Controller: Beckhoff XM42 Motion Controller
-Language: Structured Text (IEC 61131-3)
-Total Axes: 36 servo axes
-Date: January 2026
-
-================================================================================
-MACHINE DESCRIPTION
-================================================================================
-
-This machine processes foam blocks (4-16 ft long, 4 ft high, 8-24 in deep) by:
-1. Loading blocks into the processing area
-2. Carving cavities for studs using hot wire cutting
-3. Carving openings for windows and doors
-4. Carving vertical troughs for electrical conduit
-5. Unloading finished blocks
-
-The machine uses:
-- 36 coordinated servo axes
-- 18 permanent electronic gearing pairs (slave axes follow masters)
-- 6 hot wires controlled by PWM for temperature control
-- Suction cups to hold blocks during processing
-- Accuracy: +/- 1/8 inch (gaps filled with liquid foam later)
-
-================================================================================
-PROGRAM STRUCTURE
-================================================================================
-
-Main Program: PLC_PRG
-├── FB_MachineStateMachine (overall machine control)
-│   ├── States: INIT, IDLE, STARTING, RUNNING, STOPPING, E_STOPPED, FAULTED
-│   └── Manages: Power on/off, start/stop, emergency stop
-│
-├── FB_AxisPower (manages axis enable/disable)
-│   └── Powers all 36 axes on/off
-│
-└── FB_MotionSequence (coordinates all motion)
-    ├── 6 main motion states (see below)
-    └── 34 substeps total across all states
-
-================================================================================
-AXIS CONFIGURATION
-================================================================================
-
-MASTER AXES (18 total - these receive motion commands):
-  Axis 1  - Block shift to left wall
-  Axis 2  - Load table lift (master for axes 3,4,5)
-  Axis 6  - Load table pusher (master for axis 7)
-  Axis 8  - Unload table pusher (master for axis 9)
-  Axis 10 - Unload table lift (master for axes 11,12,13)
-  
-  Stud Carving (8 master pairs):
-  Axis 14 - Vertical stud hot wire (master for axis 16)
-  Axis 15 - Horizontal stud hot wire (master for axis 17)
-  Axis 18 - Vertical stud hot wire (master for axis 20)
-  Axis 19 - Horizontal stud hot wire (master for axis 21)
-  Axis 22 - Vertical stud hot wire (master for axis 24)
-  Axis 23 - Horizontal stud hot wire (master for axis 25)
-  Axis 26 - Vertical stud hot wire (master for axis 28)
-  Axis 27 - Horizontal stud hot wire (master for axis 29)
-  
-  Window/Door & Electrical:
-  Axis 30 - Horizontal rack & pinion (master for axis 32)
-  Axis 31 - Vertical hot wire (master for axis 33)
-  Axis 34 - Unload table shift wall
-  Axis 35 - Electrical trough (independent)
-  Axis 36 - Electrical trough (independent)
-
-SLAVE AXES (18 total - automatically follow their masters via gearing):
-  Axis 3,4,5    - Follow Axis 2  (load table lift)
-  Axis 7        - Follows Axis 6  (load table pusher)
-  Axis 9        - Follows Axis 8  (unload table pusher)
-  Axis 11,12,13 - Follow Axis 10 (unload table lift)
-  Axis 16       - Follows Axis 14 (stud carving)
-  Axis 17       - Follows Axis 15 (stud carving)
-  Axis 20       - Follows Axis 18 (stud carving)
-  Axis 21       - Follows Axis 19 (stud carving)
-  Axis 24       - Follows Axis 22 (stud carving)
-  Axis 25       - Follows Axis 23 (stud carving)
-  Axis 28       - Follows Axis 26 (stud carving)
-  Axis 29       - Follows Axis 27 (stud carving)
-  Axis 32       - Follows Axis 30 (window/door horizontal)
-  Axis 33       - Follows Axis 31 (window/door vertical)
-
-GEARING:
-- All gearing is PERMANENT (always active, hardcoded Execute := TRUE)
-- Ratio: 1:1 for all geared pairs
-- Function blocks: MB_GearInPos (18 instances)
-
-================================================================================
-MOTION SEQUENCE OVERVIEW
-================================================================================
-
-The motion sequence uses a TWO-LEVEL state machine:
-1. MAIN STATES - High-level functional stages (6 states)
-2. SUBSTEPS - Detailed motion choreography within each main state
-
-DESIGN PATTERN:
-- Main states represent WHAT the machine is doing (e.g., "CARVING STUDS")
-- Substeps represent HOW it's doing it (e.g., "position axes, extend, carve, retract")
-- Only MASTER axes are commanded; slaves follow automatically via gearing
-- Multiple axes can move simultaneously within a substep for efficiency
-
-================================================================================
-MAIN MOTION STATES (E_MotionStep)
-================================================================================
-
-1. WAIT_FOR_LOAD
-   Purpose: Wait for operator to load foam block via fork truck
-   Substeps: None (simple wait)
-   Transition: When blockLoaded = TRUE → SHIFT_TO_PROCESSING_AREA
-
-2. SHIFT_TO_PROCESSING_AREA (11 substeps)
-   Purpose: Move block from load table to center processing area
-   Process:
-     Substep 0:  Axis 1 shifts block to left wall
-     Substep 1:  Axes 2,3,4,5 raise (lift block)
-     Substep 2:  Axes 6,7 shift block toward center
-     Substep 3:  Axes 2,3,4,5 lower
-     Substep 4:  Axes 6,7 retract to home
-     Substep 5:  Axes 10,11,12,13 raise
-     Substep 6:  Axes 8,9 shift block to final center position
-     Substep 7:  Enable suction cups to hold block
-     Substep 8:  Axes 8,9 retract to home
-     Substep 9:  Axes 10,11,12,13 lower
-     Substep 10: Complete → STUDS
-   
-3. STUDS (6 substeps)
-   Purpose: Carve cavities for wall studs using hot wire cutting
-   Process:
-     Substep 0: Axes 14,18,22,26 position vertically (4 pairs move together)
-     Substep 1: Axes 15,19,23,27 extend into foam (4 pairs move together)
-     Substep 2: Axes 14,18,22,26 move to carve
-     Substep 3: Axes 15,19,23,27 retract from foam
-     Substep 4: All axes 14-29 return to home positions
-     Substep 5: Complete → WINDOWS_DOORS
-
-4. WINDOWS_DOORS (6 substeps)
-   Purpose: Carve window and door openings
-   Process:
-     Substep 0: Axes 30,32 position horizontally
-     Substep 1: Axes 31,33 move down
-     Substep 2: Axes 30,32 move left/right (cutting)
-     Substep 3: Axes 31,33 move up
-     Substep 4: Axes 30,31,32,33 return home
-     Substep 5: Complete → ELECTRICAL
-
-5. ELECTRICAL (6 substeps)
-   Purpose: Carve vertical trough for electrical conduit
-   Process:
-     Substep 0: Axes 30,32 position for trough
-     Substep 1: Axes 35,36 extend into foam
-     Substep 2: Axes 30,32 move to cut trough
-     Substep 3: Axes 35,36 retract
-     Substep 4: All axes return home
-     Substep 5: Complete → SHIFT_TO_UNLOAD_AREA
-
-6. SHIFT_TO_UNLOAD_AREA (5 substeps)
-   Purpose: Move finished block to unload table
-   Process:
-     Substep 0: Disable suction cups, Axes 10,11,12,13 raise
-     Substep 1: Axes 8,9 shift block to unload table
-     Substep 2: Axes 10,11,12,13 lower
-     Substep 3: Axes 8,9 return home
-     Substep 4: Complete → SEQUENCE_COMPLETE
-
-7. SEQUENCE_COMPLETE
-   Purpose: Signal that processing is complete, ready for unload
-   Action: Sets sequenceComplete := TRUE
-   Operator manually unloads block with fork truck
-
-================================================================================
-FUNCTION BLOCKS
-================================================================================
-
-FB_MachineStateMachine
-  Purpose: Overall machine control and safety
-  States: INIT, IDLE, STARTING, RUNNING, STOPPING, E_STOPPED, FAULTED
-  Inputs: btn_Start, btn_Stop, btn_EStop, btn_ResetFault, btn_DriveOn, btn_DriveOff
-  Outputs: isRunning, isStopped, isFaulted, isHomed, drivesPowered
-  
-FB_AxisPower
-  Purpose: Centralized axis power control
-  Controls: MC_Power function blocks for all 36 axes
-  Inputs: enableAll (from machine state machine)
-  
-FB_MotionSequence
-  Purpose: Coordinates all motion across 6 main states
-  Inputs: enable (TRUE when machine in RUNNING state)
-  Outputs: sequenceComplete, currentStep (current E_MotionStep)
-  Variables: 
-    - motionStep (main state tracker)
-    - subStep (substep tracker within each main state)
-    - 18 execute flags (one per master/independent axis)
-    - 18 target positions (one per master/independent axis)
-  Function Blocks:
-    - 18 MC_MoveAbsolute (one per master/independent axis)
-    - 18 MB_GearInPos (permanent gearing, always active)
-
-================================================================================
-KEY DESIGN DECISIONS
-================================================================================
-
-1. GEARING STRATEGY
-   - All gearing is PERMANENT (hardcoded TRUE)
-   - Eliminates need for explicit gear engagement/disengagement logic
-   - Slaves automatically follow masters in real-time
-   - Simpler code, fewer variables
-
-2. STATE MACHINE PATTERN
-   - Two-level hierarchy: Main states + Substeps
-   - Main states are functional (match machine process)
-   - Substeps are detailed (sequential motion choreography)
-   - Single INT variable (subStep) tracks progress within each state
-   
-3. SEQUENTIAL vs PARALLEL MOTION
-   - Sequential: One axis group completes before next starts (safer, simpler)
-   - Parallel: Multiple axis groups move simultaneously (faster)
-   - Current implementation: Mostly sequential for safety
-   - Within substeps: Groups of axes can move together (e.g., all 4 vertical pairs)
-
-4. POSITION MANAGEMENT
-   - All positions stored in ST_PositionSetpoints structure
-   - Can be loaded from HMI or recipes
-   - Named clearly: axis#_FunctionPosition (e.g., axis2_RaisePosition)
-   - Positions defined for each axis at each step
-
-5. ERROR HANDLING
-   - Each motion command checks for .Done and .Error
-   - Currently: Error stops motion (TODO: add fault handling)
-   - Machine state machine handles overall safety (E-stop, faults)
-
-================================================================================
-CONTROL FLOW
-================================================================================
-
-STARTUP SEQUENCE:
-1. Operator presses "Drive On" button
-   → FB_AxisPower enables all 36 axes
-   → Gearing automatically engages (permanent)
-   
-2. Operator presses "Start" button
-   → FB_MachineStateMachine → RUNNING state
-   → FB_MotionSequence.enable := TRUE
-   → Motion sequence begins at WAIT_FOR_LOAD
-
-NORMAL OPERATION:
-1. Fork truck loads block onto load table
-   → blockLoaded := TRUE (sensor or HMI button)
-   
-2. FB_MotionSequence progresses through states:
-   WAIT_FOR_LOAD → SHIFT_TO_PROCESSING_AREA → STUDS → 
-   WINDOWS_DOORS → ELECTRICAL → SHIFT_TO_UNLOAD_AREA → 
-   SEQUENCE_COMPLETE
-   
-3. Within each state, substeps execute sequentially:
-   subStep 0 → 1 → 2 → ... → final substep → next main state
-   
-4. Each substep:
-   - Sets target position(s)
-   - Sets execute flag(s) to TRUE
-   - Waits for motion complete (.Done)
-   - Clears execute flag(s)
-   - Advances to next substep
-   
-5. Fork truck unloads finished block
-   → Operator presses "Start" for next cycle
-
-SHUTDOWN SEQUENCE:
-1. Operator presses "Stop" button
-   → FB_MachineStateMachine → STOPPING → IDLE
-   → FB_MotionSequence.enable := FALSE
-   → All motion stops
-   → Motion sequence resets to WAIT_FOR_LOAD
-
-EMERGENCY STOP:
-1. Operator presses E-Stop button
-   → FB_MachineStateMachine → E_STOPPED
-   → All axes immediately disabled
-   → Motion sequence frozen
-   → Requires fault reset before restart
-
-================================================================================
-DATA STRUCTURES
-================================================================================
-
-E_MotionStep (enumeration - main motion states):
-  WAIT_FOR_LOAD := 1
-  SHIFT_TO_PROCESSING_AREA := 2
-  STUDS := 3
-  WINDOWS_DOORS := 4
-  ELECTRICAL := 5
-  SHIFT_TO_UNLOAD_AREA := 6
-  SEQUENCE_COMPLETE := 7
-
-ST_PositionSetpoints (structure - all axis positions):
-  axis1_ShiftPosition, axis1_HomePosition
-  axis2_RaisePosition, axis2_LowerPosition
-  axis6_ShiftPosition, axis6_HomePosition
-  axis8_ShiftPosition, axis8_HomePosition, axis8_UnloadPosition
-  axis10_RaisePosition, axis10_LowerPosition
-  axis14-27_TargetPosition_1, axis14-27_TargetPosition_2, axis14-27_HomePosition
-  axis30_TargetPosition_1/2/3/4, axis30_HomePosition
-  axis31_TargetPosition_1/2, axis31_HomePosition
-  axis35-36_TargetPosition_1/2, axis35-36_HomePosition
-
-ST_MotionParameters (structure - motion settings):
-  defaultVelocity
-  defaultAcceleration
-  defaultDeceleration
-  defaultJerk
-  (Can be expanded for axis-specific parameters)
-
-================================================================================
-FUTURE ENHANCEMENTS
-================================================================================
-
-TODO - IMMEDIATE:
-  - Add suction cup I/O (enable output, active feedback input)
-  - Implement error handling and fault recovery logic
-  - Add logic to skip optional steps (windows/doors, electrical)
-  - Implement Axis 34 motion (unload table shift wall)
-  - Add hot wire PWM control (6 outputs with PI temperature control)
-
-TODO - MEDIUM TERM:
-  - Recipe management system (save/load position sets)
-  - HMI integration for operator control and monitoring
-  - Block dimension input validation
-  - Multiple stud configuration (1 vs 2 studs per side)
-  - Multiple window/door cutting in one block
-  - Diagnostic and status displays
-
-TODO - LONG TERM:
-  - Integration with StrutSoft building design software
-  - Automated block loading/unloading
-  - Advanced error recovery with automatic retry
-  - Production tracking and statistics
-  - Predictive maintenance based on axis usage
-
-================================================================================
-DEBUGGING TIPS
-================================================================================
-
-To monitor motion sequence progress:
-1. Watch motionSequence.currentStep (shows main state)
-2. Watch motionSequence.subStep (shows substep within state)
-3. Watch individual executeAxis#Move flags (shows which axes are commanded)
-4. Watch individual fbMoveAxis#.Done flags (shows which moves completed)
-
-Common issues:
-- Motion won't start: Check machine state is RUNNING
-- Stuck in substep: Check corresponding axis .Error flag
-- Gearing not working: Verify slave axis is powered and not faulted
-- Unexpected behavior: Verify position setpoints are correct
-
-Force values for testing:
-- blockLoaded := TRUE (simulate block present)
-- suctionCupsActive := TRUE (simulate suction engaged)
-- Skip to specific state: motionStep := E_MotionStep.STUDS; subStep := 0;
-
-================================================================================
-REVISION HISTORY
-================================================================================
-
-Version 1.0 - January 2026
-  - Initial implementation
-  - 6 main states, 34 substeps
-  - 36 axes with 18 permanent gearing pairs
-  - Basic sequential motion control
-  - Integration with FB_MachineStateMachine and FB_AxisPower
-
-================================================================================
-END OF DOCUMENT
-================================================================================
+//                     FOAM BLOCK PROCESSING MACHINE
+//                     MOTION CONTROL SYSTEM OVERVIEW
+// ================================================================================
+// 
+// Project: Automated Foam Block Carving Machine
+// Controller: Bosch ctrlX CORE
+// Language: Structured Text (IEC 61131-3)
+// Total Axes: 36 servo axes
+// Date: January 2026
+// 
+// ================================================================================
+// MACHINE DESCRIPTION
+// ================================================================================
+// 
+// This machine processes foam blocks (4-16 ft long, 4 ft high, 8-24 in deep) for
+// building panel construction. The process flow is:
+// 
+// 1. Fork truck loads raw foam block onto load table
+// 2. Block is shifted and centered in the processing area
+// 3. Hot wire cutting carves stud cavities (for wall framing)
+// 4. Hot wire cutting carves window/door openings
+// 5. Hot wire cutting carves vertical electrical conduit troughs
+// 6. Finished block is shifted to unload table for fork truck removal
+// 
+// The machine uses:
+// - 36 coordinated servo axes with absolute encoders (no homing required)
+// - 18 permanent electronic gearing pairs (slave axes follow masters 1:1)
+// - 6 hot wires controlled by PWM for temperature regulation
+// - Suction cups to hold blocks during processing
+// - Target accuracy: ±1/8 inch (gaps filled with liquid foam later)
+// 
+// ================================================================================
+// PROGRAM ARCHITECTURE
+// ================================================================================
+// 
+// The program follows a hierarchical structure with clear separation of concerns:
+// 
+// PLC_PRG (Main Program - Orchestrator)
+// │
+// ├── FB_ButtonManager
+// │   └── Handles all operator inputs with edge detection
+// │   └── Outputs: processed button states + activeCommand enum
+// │
+// ├── FB_AxisPower
+// │   └── Centralized power management for all 36 axes
+// │   └── Manages MC_Power and MC_Reset function blocks
+// │   └── Output: DrivesReady status
+// │
+// ├── FB_MachineStateMachine
+// │   └── Top-level machine state control (safety layer)
+// │   └── States: INIT → IDLE → HOMING/MANUAL/RUNNING → STOPPING/FAULTED/E_STOPPED
+// │   └── Contains FB_MotionSequence instance
+// │
+// └── FB_MotionSequence
+//     └── Detailed motion choreography
+//     └── Two-level state machine: Main States + Substeps
+//     └── Commands only master axes; slaves follow via gearing
+// 
+// ================================================================================
+// AXIS CONFIGURATION
+// ================================================================================
+// 
+// MASTER AXES (18 total - receive motion commands):
+// ─────────────────────────────────────────────────
+//   Axis 1   Block shift to left wall (independent)
+//   Axis 2   Load table lift (master for 3, 4, 5)
+//   Axis 6   Load table pusher (master for 7)
+//   Axis 8   Processing/unload table pusher (master for 9)
+//   Axis 10  Processing/unload table lift (master for 11, 12, 13)
+//   
+//   Stud Carving - 4 stations, each with vertical + horizontal pair:
+//   Axis 14  Vertical hot wire station 1 (master for 16)
+//   Axis 15  Horizontal hot wire station 1 (master for 17)
+//   Axis 18  Vertical hot wire station 2 (master for 20)
+//   Axis 19  Horizontal hot wire station 2 (master for 21)
+//   Axis 22  Vertical hot wire station 3 (master for 24)
+//   Axis 23  Horizontal hot wire station 3 (master for 25)
+//   Axis 26  Vertical hot wire station 4 (master for 28)
+//   Axis 27  Horizontal hot wire station 4 (master for 29)
+//   
+//   Window/Door/Electrical:
+//   Axis 30  Horizontal positioning - rack & pinion (master for 32)
+//   Axis 31  Vertical hot wire (master for 33)
+//   Axis 34  Unload table shift wall (independent)
+//   Axis 35  Electrical trough cutter 1 (independent)
+//   Axis 36  Electrical trough cutter 2 (independent)
+// 
+// SLAVE AXES (18 total - follow masters via MB_GearInPos):
+// ────────────────────────────────────────────────────────
+//   Axes 3, 4, 5      Follow Axis 2  (load table - 4 corners)
+//   Axis 7            Follows Axis 6  (load pusher - 2 sides)
+//   Axis 9            Follows Axis 8  (process pusher - 2 sides)
+//   Axes 11, 12, 13   Follow Axis 10 (process lift - 4 corners)
+//   Axis 16           Follows Axis 14 (stud vertical pair)
+//   Axis 17           Follows Axis 15 (stud horizontal pair)
+//   Axis 20           Follows Axis 18 (stud vertical pair)
+//   Axis 21           Follows Axis 19 (stud horizontal pair)
+//   Axis 24           Follows Axis 22 (stud vertical pair)
+//   Axis 25           Follows Axis 23 (stud horizontal pair)
+//   Axis 28           Follows Axis 26 (stud vertical pair)
+//   Axis 29           Follows Axis 27 (stud horizontal pair)
+//   Axis 32           Follows Axis 30 (window horizontal pair)
+//   Axis 33           Follows Axis 31 (window vertical pair)
+// 
+// GEARING NOTES:
+// - All gearing is PERMANENT (Execute := TRUE always)
+// - Ratio: 1:1 for all pairs
+// - Gearing is established in FB_MotionSequence
+// - Slaves automatically track master position in real-time
+// 
+// ================================================================================
+// STATE MACHINES
+// ================================================================================
+// 
+// LEVEL 1: MACHINE STATE (FB_MachineStateMachine)
+// ───────────────────────────────────────────────
+// Controls overall machine behavior and safety.
+// 
+//   ┌──────────┐
+//   │   INIT   │ ──→ Initialize variables, verify system
+//   └────┬─────┘
+//        ↓
+//   ┌──────────┐
+//   │   IDLE   │ ←──────────────────────────────────────┐
+//   └────┬─────┘                                        │
+//        │ ┌─────────────┬─────────────┐                │
+//        ↓ ↓             ↓             ↓                │
+//   ┌────────┐     ┌──────────┐   ┌─────────┐          │
+//   │ HOMING │     │  MANUAL  │   │ RUNNING │          │
+//   └────┬───┘     └────┬─────┘   └────┬────┘          │
+//        │              │              │                │
+//        └──────────────┴──────┬───────┘                │
+//                              ↓                        │
+//                        ┌──────────┐                   │
+//                        │ STOPPING │ ──────────────────┤
+//                        └──────────┘                   │
+//                                                       │
+//   ┌───────────┐    ┌──────────┐    ┌───────────┐     │
+//   │ E_STOPPED │ ──→│ RESETTING│ ──→│  (back)   │ ────┘
+//   └───────────┘    └──────────┘    └───────────┘
+//         ↑
+//         │ (E-stop can interrupt ANY state)
+// 
+// 
+// LEVEL 2: MOTION SEQUENCE (FB_MotionSequence)
+// ────────────────────────────────────────────
+// Runs when machine is in RUNNING state. Each main state contains substeps.
+// 
+//   ┌─────────────────┐
+//   │  WAIT_FOR_LOAD  │  Wait for blockLoaded signal
+//   └────────┬────────┘
+//            ↓
+//   ┌─────────────────────────┐
+//   │ SHIFT_TO_PROCESSING_AREA│  11 substeps - move block to center
+//   └────────┬────────────────┘
+//            ↓
+//   ┌─────────────────┐
+//   │      STUDS      │  6 substeps - carve stud cavities
+//   └────────┬────────┘
+//            ↓
+//   ┌─────────────────┐
+//   │  WINDOWS_DOORS  │  6 substeps - carve openings
+//   └────────┬────────┘
+//            ↓
+//   ┌─────────────────┐
+//   │   ELECTRICAL    │  6 substeps - carve conduit troughs
+//   └────────┬────────┘
+//            ↓
+//   ┌─────────────────────────┐
+//   │  SHIFT_TO_UNLOAD_AREA   │  5 substeps - move to unload table
+//   └────────┬────────────────┘
+//            ↓
+//   ┌─────────────────────────┐
+//   │   SEQUENCE_COMPLETE     │  Signal done, wait for unload
+//   └─────────────────────────┘
+// 
+// ================================================================================
+// MOTION SEQUENCE DETAIL
+// ================================================================================
+// 
+// WAIT_FOR_LOAD
+// ─────────────
+//   • Machine waits for operator to load foam block via fork truck
+//   • Transition: blockLoaded input goes TRUE
+// 
+// SHIFT_TO_PROCESSING_AREA (11 substeps)
+// ──────────────────────────────────────
+//   Substep 0:  Axis 1 shifts block against left reference wall
+//   Substep 1:  Axis 2 (+ 3,4,5) raises - lifts block off load table
+//   Substep 2:  Axis 6 (+ 7) extends - pushes block toward center
+//   Substep 3:  Axis 2 (+ 3,4,5) lowers - sets block down
+//   Substep 4:  Axis 6 (+ 7) retracts to home
+//   Substep 5:  Axis 10 (+ 11,12,13) raises - prepare to receive block
+//   Substep 6:  Axis 8 (+ 9) extends - pushes block to final center
+//   Substep 7:  Enable suction cups (wait for confirmation)
+//   Substep 8:  Axis 8 (+ 9) retracts to home
+//   Substep 9:  Axis 10 (+ 11,12,13) lowers - clears cutting area
+//   Substep 10: Complete → transition to STUDS
+// 
+// STUDS (6 substeps)
+// ──────────────────
+//   4 stud stations operate in parallel for efficiency.
+//   
+//   Substep 0:  Axes 14,18,22,26 (vertical) move to position 1
+//   Substep 1:  Axes 15,19,23,27 (horizontal) extend into foam
+//   Substep 2:  Axes 14,18,22,26 (vertical) move to position 2 (carving)
+//   Substep 3:  Axes 15,19,23,27 (horizontal) retract from foam
+//   Substep 4:  All stud axes (14-29 masters) return to home
+//   Substep 5:  Complete → transition to WINDOWS_DOORS
+// 
+// WINDOWS_DOORS (6 substeps)
+// ──────────────────────────
+//   Substep 0:  Axis 30 (+ 32) moves to horizontal start position
+//   Substep 1:  Axis 31 (+ 33) moves down into foam
+//   Substep 2:  Axis 30 (+ 32) moves horizontally (cutting)
+//   Substep 3:  Axis 31 (+ 33) moves up out of foam
+//   Substep 4:  Axes 30,31 return to home
+//   Substep 5:  Complete → transition to ELECTRICAL
+// 
+// ELECTRICAL (6 substeps)
+// ───────────────────────
+//   Substep 0:  Axis 30 (+ 32) positions for trough start
+//   Substep 1:  Axes 35,36 extend into foam (trough depth)
+//   Substep 2:  Axis 30 (+ 32) moves to cut trough length
+//   Substep 3:  Axes 35,36 retract from foam
+//   Substep 4:  Axes 30,35,36 return to home
+//   Substep 5:  Complete → transition to SHIFT_TO_UNLOAD_AREA
+// 
+// SHIFT_TO_UNLOAD_AREA (5 substeps)
+// ─────────────────────────────────
+//   Substep 0:  Disable suction cups, Axis 10 (+ 11,12,13) raises
+//   Substep 1:  Axis 8 (+ 9) extends - pushes block to unload table
+//   Substep 2:  Axis 10 (+ 11,12,13) lowers - sets block on unload table
+//   Substep 3:  Axis 8 (+ 9) retracts to home
+//   Substep 4:  Complete → transition to SEQUENCE_COMPLETE
+// 
+// ================================================================================
+// DATA STRUCTURES
+// ================================================================================
+// 
+// E_MachineState (enumeration)
+// ────────────────────────────
+//   INIT := 0
+//   IDLE := 1
+//   HOMING := 2
+//   MANUAL := 3
+//   RUNNING := 4
+//   STOPPING := 5
+//   FAULTED := 6
+//   E_STOPPED := 7
+//   RESETTING := 8
+// 
+// E_MotionStep (enumeration)
+// ──────────────────────────
+//   WAIT_FOR_LOAD := 1
+//   SHIFT_TO_PROCESSING_AREA := 2
+//   STUDS := 3
+//   WINDOWS_DOORS := 11
+//   ELECTRICAL := 12
+//   SHIFT_TO_UNLOAD_AREA := 13
+// 
+// E_ActiveCommand (enumeration) - for button manager
+// ──────────────────────────────────────────────────
+//   CMD_NONE := 0
+//   CMD_START := 1
+//   CMD_STOP := 2
+//   CMD_HOME := 3
+//   CMD_MANUAL := 4
+//   CMD_RESET := 5
+// 
+// ST_MotionParameters (structure)
+// ───────────────────────────────
+//   defaultVelocity : LREAL
+//   defaultAcceleration : LREAL
+//   defaultDeceleration : LREAL
+//   defaultJerk : LREAL
+//   positionTolerance : LREAL
+// 
+// ST_PositionSetpoints (structure)
+// ────────────────────────────────
+//   Contains all target positions for every axis at every step.
+//   Positions are named: axis#_FunctionPosition
+//   Example: axis2_RaisePosition, axis30_TargetPosition_1
+//   Values are placeholders - will be loaded from HMI/recipes.
+// 
+// ================================================================================
+// FUNCTION BLOCK DESCRIPTIONS
+// ================================================================================
+// 
+// FB_ButtonManager
+// ────────────────
+//   Purpose: Centralized button input processing
+//   
+//   Inputs:
+//     btn_Start_In, btn_Stop_In, btn_Home_In, 
+//     btn_Manual_In, btn_Reset_In, btn_EStop_In : BOOL
+//   
+//   Outputs:
+//     btn_Start_Out, btn_Stop_Out, btn_Home_Out,
+//     btn_Manual_Out, btn_Reset_Out, btn_EStop_Out : BOOL
+//     activeCommand : E_ActiveCommand
+//   
+//   Behavior:
+//     - Uses R_TRIG for edge detection on all buttons except E-stop
+//     - E-stop is level-sensitive (active while held)
+//     - Only one command can be active at a time
+//     - Outputs are mutually exclusive (CASE statement ensures this)
+// 
+// FB_AxisPower
+// ────────────
+//   Purpose: Centralized axis power and reset management
+//   
+//   Inputs:
+//     PowerOn : BOOL    - Enable all drives
+//     Reset : BOOL      - Reset all drive faults
+//   
+//   Outputs:
+//     DrivesReady : BOOL - All drives powered and ready
+//   
+//   Behavior:
+//     - Loops through all axes using MOTIF_CONFIG index range
+//     - Calls MC_Power for each axis
+//     - Calls MC_Reset for each axis (edge-triggered)
+//     - DrivesReady = TRUE only when ALL axes report ready
+// 
+// FB_MachineStateMachine
+// ──────────────────────
+//   Purpose: Top-level machine control and safety management
+//   
+//   Inputs:
+//     startButton, stopButton, homeButton, 
+//     manualMode, eStopActive, resetButton : BOOL
+//   
+//   Outputs:
+//     currentStateOut : E_MachineState
+//     isRunning, isFaulted, isHomed : BOOL
+//   
+//   Behavior:
+//     - E-stop can interrupt ANY state (highest priority)
+//     - Contains instance of FB_MotionSequence
+//     - Calls motion sequence when in RUNNING state
+//     - Uses MC_Halt for controlled stops in E_STOPPED state
+// 
+// FB_MotionSequence
+// ─────────────────
+//   Purpose: Detailed motion choreography for block processing
+//   
+//   Inputs:
+//     enable : BOOL - TRUE when machine in RUNNING state
+//   
+//   Outputs:
+//     sequenceComplete : BOOL
+//     currentStep : E_MotionStep
+//   
+//   Internal Variables:
+//     - motionStep : current main state
+//     - subStep : current substep within main state
+//     - 18 executeAxis#Move flags (one per master/independent)
+//     - 18 targetPosAxis# values
+//     - 18 MC_MoveAbsolute function blocks
+//     - 18 MB_GearInPos function blocks (permanent gearing)
+//   
+//   Behavior:
+//     - Gearing runs continuously (Execute := TRUE)
+//     - Motion commands only sent to master axes
+//     - Each substep: set target → set execute → wait for Done → clear execute
+//     - Error in any substep clears execute (TODO: transition to fault)
+// 
+// ================================================================================
+// MOTION CONTROL PATTERNS
+// ================================================================================
+// 
+// SINGLE AXIS MOVE:
+//   targetPosAxis# := positions.axis#_Position;
+//   executeAxis#Move := TRUE;
+//   
+//   IF fbMoveAxis#.Done THEN
+//       executeAxis#Move := FALSE;
+//       subStep := subStep + 1;
+//   END_IF;
+//   
+//   IF fbMoveAxis#.Error THEN
+//       executeAxis#Move := FALSE;
+//       // TODO: Handle error
+//   END_IF;
+// 
+// PARALLEL AXIS MOVE (multiple axes, wait for all):
+//   targetPosAxis14 := positions.axis14_Position;
+//   targetPosAxis18 := positions.axis18_Position;
+//   executeAxis14Move := TRUE;
+//   executeAxis18Move := TRUE;
+//   
+//   IF fbMoveAxis14.Done AND fbMoveAxis18.Done THEN
+//       executeAxis14Move := FALSE;
+//       executeAxis18Move := FALSE;
+//       subStep := subStep + 1;
+//   END_IF;
+//   
+//   IF fbMoveAxis14.Error OR fbMoveAxis18.Error THEN
+//       // Clear all and handle error
+//   END_IF;
+// 
+// ================================================================================
+// CONTROL FLOW SUMMARY
+// ================================================================================
+// 
+// STARTUP:
+//   1. Operator presses "Drive On"
+//      → FB_AxisPower enables all 36 axes
+//      → Wait for DrivesReady = TRUE
+//   
+//   2. Operator presses "Start"
+//      → FB_MachineStateMachine → RUNNING
+//      → FB_MotionSequence.enable := TRUE
+//      → Sequence begins at WAIT_FOR_LOAD
+// 
+// NORMAL CYCLE:
+//   1. Fork truck places block, blockLoaded := TRUE
+//   2. Motion sequence executes all states/substeps
+//   3. Block arrives at unload table
+//   4. Fork truck removes block
+//   5. Operator presses "Start" for next cycle
+// 
+// STOP:
+//   1. Operator presses "Stop"
+//      → FB_MachineStateMachine → STOPPING → IDLE
+//      → FB_MotionSequence.enable := FALSE
+//      → All motion halts, sequence resets
+// 
+// EMERGENCY STOP:
+//   1. E-stop pressed
+//      → FB_MachineStateMachine → E_STOPPED immediately
+//      → MC_Halt called on all axes
+//      → Requires E-stop release + Reset button to recover
+// 
+// ================================================================================
+// KNOWN LIMITATIONS / TODO ITEMS
+// ================================================================================
+// 
+// IMMEDIATE:
+//   □ Add suction cup I/O (enable output, active confirmation input)
+//   □ Implement proper error handling with fault identification
+//   □ Add SEQUENCE_COMPLETE state handling (loop back or signal HMI)
+//   □ Add sequence reset on disable (return to WAIT_FOR_LOAD)
+//   □ Implement DrivesReady check before allowing RUNNING state
+//   □ Add hot wire PWM control for temperature regulation
+// 
+// FUTURE:
+//   □ Recipe system for loading position setpoints
+//   □ HMI integration
+//   □ Skip logic for optional steps (windows/doors, electrical)
+//   □ Multiple window/door openings per block
+//   □ Axis 34 implementation (unload table shift)
+//   □ Diagnostic displays and fault logging
+//   □ Production tracking and statistics
+// 
+// ================================================================================
+// REVISION HISTORY
+// ================================================================================
+// 
+// Version 1.0 - January 2026
+//   - Initial implementation
+//   - 6 main motion states with substeps
+//   - 36 axes with 18 permanent gearing pairs
+//   - Basic sequential motion control
+//   - Button management with edge detection
+//   - Machine state machine with E-stop handling
+// 
+// ================================================================================
+// END OF DOCUMENT
+// ================================================================================

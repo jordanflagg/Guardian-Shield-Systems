@@ -54,13 +54,5 @@ stateMachine(
     resetButton := buttonManager.btn_Reset_Out
 );
 
-// ============================================================================
-// MOTION SEQUENCE
-// ============================================================================
-motionSequence(
-    enable := buttonManager.btn_Start_Out
-    
-);
-
 
 MACHINE_STATE := stateMachine.currentStateOut;

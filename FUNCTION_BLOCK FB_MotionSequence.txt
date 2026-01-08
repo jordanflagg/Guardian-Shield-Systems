@@ -100,6 +100,7 @@ VAR
     
 END_VAR
 
+
 ///////////////////////////////////////////////////////////////////////////////
 
 // ============================================================================
@@ -351,7 +352,7 @@ fbMoveAxis18(
 
 // Axis 19 - Stud carving pair 4 master (slave: 21)
 fbMoveAxis19(
-    Axis := Axis_20,
+    Axis := Axis_19,
     Execute := executeAxis19Move,
     Position := targetPosAxis19,
     Velocity := motionParams.defaultVelocity,
@@ -373,7 +374,7 @@ fbMoveAxis22(
 
 // Axis 23 - Stud carving pair 6 master (slave: 25)
 fbMoveAxis23(
-    Axis := Axis_24,
+    Axis := Axis_23,
     Execute := executeAxis23Move,
     Position := targetPosAxis23,
     Velocity := motionParams.defaultVelocity,
@@ -1176,7 +1177,7 @@ CASE motionStep OF
         // ----------------------------------------------------------------
         4: // Complete - block on unload table, ready for fork truck
             // Move to complete state
-            //motionStep := E_MotionStep.SEQUENCE_COMPLETE;
+            motionStep := E_MotionStep.WAIT_FOR_LOAD;
             subStep := 0;
             
     END_CASE;

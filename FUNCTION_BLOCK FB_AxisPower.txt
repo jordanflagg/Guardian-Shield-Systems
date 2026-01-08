@@ -12,7 +12,9 @@ VAR
 	i : UINT;
 END_VAR
 
+
 ///////////////////////////////////////////////////////////////////
+
 
 
 FOR i := MOTIF_CONFIG.MIN_AXIS_INDEX TO MOTIF_CONFIG.MAX_AXIS_INDEX DO
@@ -29,4 +31,6 @@ FOR i := MOTIF_CONFIG.MIN_AXIS_INDEX TO MOTIF_CONFIG.MAX_AXIS_INDEX DO
     	Axis := AXIF_CONFIG_INDEXES[i]
     );
 END_FOR
+
+
 

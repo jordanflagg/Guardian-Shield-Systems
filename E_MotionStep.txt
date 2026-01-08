@@ -20,19 +20,19 @@ TYPE E_MotionStep :
 									// Step 14: Axes (14,16)(18,20)(22,24)(26,28) move to target position 2
 									// Step 15: Axes (15,17)(19,21)(23,25)(27,29) move to target position 2
 									// Step 16: Axes 14-29 return home
-    WINDOWS_DOORS := 11,        	
+    WINDOWS_DOORS := 4,        	
 									// Step 17: Axes 30,32 move to target position 1
 									// Step 18: Axes 31,33 move to target position 1
 									// Step 19: Axes 30,32 move to target position 2
 									// Step 20: Axes 31,33 move to target position 2
 									// Step 21: Axes 30-33 return home
-    ELECTRICAL	 := 12,            	
+    ELECTRICAL	 := 5,            	
 									// Step 22: Axes 30,32 move to target position 1
 									// Step 23: Axes 35,36 move to target position 1
 									// Step 24: Axes 30,32 move to target position 2
 									// Step 25: Axes 35,36 move to target position 2
 									// Step 26: Axes 30,32,35,36 return home
-    SHIFT_TO_UNLOAD_AREA := 13    	
+    SHIFT_TO_UNLOAD_AREA := 6    	
 									// Step 27: Axes 10,11,12,13 raise
 									// Step 28: Axes 8,9 shift block to unload
 									// Step 29: Axes 10,11,12,13 lower

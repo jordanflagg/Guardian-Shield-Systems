@@ -60,34 +60,82 @@ ping ctrlx-core
 
 ---
 
-## Step 3: Enable CORS (Cross-Origin Resource Sharing)
+## Step 3: Deploy HMI to ctrlX CORE
 
-If you plan to host the HMI on a different server (not on ctrlX itself), you need to enable CORS.
+You have three options for hosting your HMI. **Option A is recommended** as it's the easiest and most integrated.
 
-### Option A: Host HMI Directly on ctrlX (Recommended - No CORS Needed!)
+### Option A: ctrlX CORE App Data (Recommended - Easiest!)
 
-1. **Connect to ctrlX via SFTP:**
+The ctrlX CORE App Data app is specifically designed for hosting custom web applications.
+
+1. **Access ctrlX Web Interface:**
+   - Open browser and navigate to: `https://[YOUR-CTRLX-IP]`
+   - Log in with your credentials
+
+2. **Open the App Data App:**
+   - Look for **"App Data"** or **"ctrlX CORE - App Data"** in the sidebar or app menu
+   - If you don't see it, check the app store and install it (it's usually pre-installed)
+
+3. **Create a Folder (Optional but Recommended):**
+   - Click **New Folder** or **Create Directory**
+   - Name it something like `hmi` or `foam-carver-hmi`
+
+4. **Upload Your HMI File:**
+   - Navigate into your new folder
+   - Click **Upload** button or drag-and-drop
+   - Select `index-ctrlx-ready.html` from your computer
+   - Wait for upload to complete
+
+5. **Access Your HMI:**
+   ```
+   https://[YOUR-CTRLX-IP]/app-data/hmi/index-ctrlx-ready.html
+   ```
+
+   Or if uploaded to root:
+   ```
+   https://[YOUR-CTRLX-IP]/app-data/index-ctrlx-ready.html
+   ```
+
+✅ **Benefits:** No CORS issues, no SFTP needed, web-based interface, proper integration
+
+---
+
+### Option B: SFTP to Web Server Directory
+
+Upload directly to the ctrlX web server using SFTP (SSH File Transfer Protocol).
+
+1. **Download an SFTP Client:**
+   - **FileZilla** (free): https://filezilla-project.org/
+   - **WinSCP** (free, Windows): https://winscp.net/
+
+2. **Connect to ctrlX:**
+   - Protocol: `SFTP`
    - Host: `[YOUR-CTRLX-IP]`
    - Port: `22`
    - Username: `boschrexroth`
    - Password: `boschrexroth`
 
-2. **Upload `index.html` to:**
+3. **Upload File:**
+   - Navigate to `/var/www/html/` on the ctrlX (remote side)
+   - Drag-and-drop `index-ctrlx-ready.html` from your PC (local side)
+
+4. **Access HMI:**
    ```
-   /var/www/html/
+   https://[YOUR-CTRLX-IP]/index-ctrlx-ready.html
    ```
 
-3. **Access HMI at:**
-   ```
-   http://[YOUR-CTRLX-IP]/index.html
-   ```
+---
 
-### Option B: Enable CORS for Remote Hosting
+### Option C: Host on Separate Server (Requires CORS)
 
-If hosting elsewhere, configure ctrlX to allow CORS:
+Only use this if you need to host the HMI on a different server (not recommended for most users).
 
-1. SSH into ctrlX or use web terminal
-2. Edit CORS configuration (consult ctrlX documentation for your version)
+**Requirements:**
+1. Configure CORS on ctrlX to allow requests from your server
+2. Consult ctrlX CORE documentation for CORS configuration
+3. May require SSH access or web terminal
+
+**Not recommended** unless you have specific reasons to host externally.
 
 ---
 

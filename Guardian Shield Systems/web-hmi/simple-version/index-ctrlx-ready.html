@@ -544,7 +544,9 @@
         async function readPLCVariable(varPath) {
             if (!authToken) await authenticateCtrlX();
 
-            const fullPath = `plc/app/Application/${varPath}`;
+            // Replace dots with slashes for Data Layer path format
+            const dataLayerPath = varPath.replace(/\./g, '/');
+            const fullPath = `plc/app/Application/sym/${dataLayerPath}`;
             const url = `https://${config.plcAddress}${config.apiBasePath}/data/${fullPath}`;
 
             try {
@@ -578,7 +580,9 @@
         async function writePLCVariable(varPath, value) {
             if (!authToken) await authenticateCtrlX();
 
-            const fullPath = `plc/app/Application/${varPath}`;
+            // Replace dots with slashes for Data Layer path format
+            const dataLayerPath = varPath.replace(/\./g, '/');
+            const fullPath = `plc/app/Application/sym/${dataLayerPath}`;
             const url = `https://${config.plcAddress}${config.apiBasePath}/data/${fullPath}`;
 
             try {

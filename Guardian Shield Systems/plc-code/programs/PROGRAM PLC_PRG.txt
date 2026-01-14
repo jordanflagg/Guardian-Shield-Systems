@@ -14,9 +14,14 @@ VAR
     btn_Reset : BOOL := FALSE;
     btn_EStop : BOOL := FALSE;
     btn_DriveOn : BOOL := FALSE;
-	
-	
-	MACHINE_STATE : E_MachineState;
+
+    // Machine state for HMI
+    MACHINE_STATE : E_MachineState;
+
+    // HMI Status Variables (read by web HMI)
+    isRunning : BOOL;
+    isFaulted : BOOL;
+    isHomed : BOOL;
 END_VAR
 
 
@@ -56,3 +61,11 @@ stateMachine(
 
 
 MACHINE_STATE := stateMachine.currentStateOut;
+
+// ============================================================================
+// UPDATE HMI VARIABLES
+// ============================================================================
+// Expose state machine status to web HMI
+isRunning := stateMachine.isRunning;
+isFaulted := stateMachine.isFaulted;
+isHomed := stateMachine.isHomed;

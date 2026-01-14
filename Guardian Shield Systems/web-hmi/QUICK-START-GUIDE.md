@@ -81,20 +81,30 @@ The ctrlX CORE App Data app is specifically designed for hosting custom web appl
    - Name it something like `hmi` or `foam-carver-hmi`
 
 4. **Upload Your HMI File:**
-   - Navigate into your new folder
+   - Navigate into your new folder (e.g., `HMI`)
    - Click **Upload** button or drag-and-drop
    - Select `index-ctrlx-ready.html` from your computer
    - Wait for upload to complete
 
 5. **Access Your HMI:**
+
+   **Option 1 - Via App Data Interface (File Browser):**
+
+   The App Data interface URL looks like:
    ```
-   https://[YOUR-CTRLX-IP]/app-data/hmi/index-ctrlx-ready.html
+   https://[YOUR-CTRLX-IP]/solutions/configurations/appdata/content?path=HMI%2F
+   ```
+   - Click on your `index-ctrlx-ready.html` file in the file browser
+   - The file will open in a new tab with the direct URL
+
+   **Option 2 - Direct File Access:**
+
+   Once you find your file through the interface, note the direct URL. It typically follows this pattern:
+   ```
+   https://[YOUR-CTRLX-IP]/solutions/activeconfig/[app-name]/[folder]/index-ctrlx-ready.html
    ```
 
-   Or if uploaded to root:
-   ```
-   https://[YOUR-CTRLX-IP]/app-data/index-ctrlx-ready.html
-   ```
+   **Note:** The exact URL structure may vary depending on your ctrlX CORE version. Use the App Data interface to browse to your file and click it to get the correct direct link.
 
 ✅ **Benefits:** No CORS issues, no SFTP needed, web-based interface, proper integration
 

@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Foam Block Carving Machine - HMI</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            padding: 20px 30px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .header h1 {
+            color: #333;
+            font-size: 28px;
+            margin-bottom: 5px;
+        }
+
+        .header .subtitle {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .connection-status {
+            float: right;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ccc;
+            animation: pulse 2s infinite;
+        }
+
+        .status-indicator.connected {
+            background: #10b981;
+        }
+
+        .status-indicator.disconnected {
+            background: #ef4444;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .card {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .card h2 {
+            color: #333;
+            font-size: 18px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .machine-state {
+            text-align: center;
+            padding: 40px 20px;
+        }
+
+        .state-display {
+            font-size: 48px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+        }
+
+        .state-display.INIT { color: #6b7280; }
+        .state-display.IDLE { color: #3b82f6; }
+        .state-display.HOMING { color: #8b5cf6; }
+        .state-display.MANUAL { color: #f59e0b; }
+        .state-display.RUNNING { color: #10b981; }
+        .state-display.STOPPING { color: #f97316; }
+        .state-display.FAULTED { color: #ef4444; }
+        .state-display.E_STOPPED { color: #dc2626; }
+        .state-display.RESETTING { color: #6366f1; }
+
+        .motion-step {
+            font-size: 18px;
+            color: #666;
+            margin-top: 10px;
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+
+        .btn {
+            padding: 15px 25px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-start {
+            background: #10b981;
+            color: white;
+            grid-column: 1 / -1;
+        }
+
+        .btn-stop {
+            background: #f97316;
+            color: white;
+        }
+
+        .btn-home {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .btn-manual {
+            background: #8b5cf6;
+            color: white;
+        }
+
+        .btn-reset {
+            background: #6366f1;
+            color: white;
+        }
+
+        .btn-estop {
+            background: #dc2626;
+            color: white;
+            grid-column: 1 / -1;
+            font-size: 20px;
+            padding: 20px;
+        }
+
+        .btn-drive-on {
+            background: #059669;
+            color: white;
+        }
+
+        .btn-drive-off {
+            background: #64748b;
+            color: white;
+        }
+
+        .recipe-selector {
+            margin-bottom: 20px;
+        }
+
+        .recipe-selector label {
+            display: block;
+            color: #666;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .recipe-selector select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 16px;
+            background: white;
+            cursor: pointer;
+        }
+
+        .recipe-info {
+            background: #f3f4f6;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+
+        .recipe-info h3 {
+            color: #333;
+            font-size: 16px;
+            margin-bottom: 5px;
+        }
+
+        .recipe-info p {
+            color: #666;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .recipe-locked {
+            display: inline-block;
+            background: #fef3c7;
+            color: #92400e;
+            padding: 5px 12px;
+            border-radius: 5px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-top: 10px;
+        }
+
+        .status-grid {
+            display: grid;
+            gap: 10px;
+        }
+
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            background: #f9fafb;
+            border-radius: 8px;
+        }
+
+        .status-label {
+            color: #666;
+            font-weight: 600;
+        }
+
+        .status-value {
+            color: #333;
+            font-weight: bold;
+        }
+
+        .indicator {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #e5e7eb;
+        }
+
+        .indicator.active {
+            background: #10b981;
+            box-shadow: 0 0 10px #10b981;
+        }
+
+        .footer {
+            text-align: center;
+            color: white;
+            margin-top: 30px;
+            opacity: 0.8;
+        }
+
+        .error-message {
+            background: #fee2e2;
+            color: #991b1b;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="connection-status">
+                <span id="connectionText">Disconnected</span>
+                <div id="connectionIndicator" class="status-indicator disconnected"></div>
+            </div>
+            <h1>Foam Block Carving Machine</h1>
+            <div class="subtitle">Web-Based HMI Control Panel</div>
+        </div>
+
+        <!-- Error Message -->
+        <div id="errorMessage" class="error-message"></div>
+
+        <!-- Main Grid -->
+        <div class="grid">
+            <!-- Machine State -->
+            <div class="card machine-state">
+                <h2>Machine Status</h2>
+                <div id="machineState" class="state-display">INIT</div>
+                <div id="motionStep" class="motion-step">Waiting...</div>
+            </div>
+
+            <!-- Control Buttons -->
+            <div class="card">
+                <h2>Machine Controls</h2>
+                <div class="controls">
+                    <button class="btn btn-start" onclick="sendCommand('btn_Start', true)">Start</button>
+                    <button class="btn btn-stop" onclick="sendCommand('btn_Stop', true)">Stop</button>
+                    <button class="btn btn-home" onclick="sendCommand('btn_Home', true)">Home</button>
+                    <button class="btn btn-manual" onclick="sendCommand('btn_Manual', true)">Manual</button>
+                    <button class="btn btn-reset" onclick="sendCommand('btn_Reset', true)">Reset</button>
+                    <button class="btn btn-estop" onclick="sendCommand('btn_EStop', true)">E-STOP</button>
+                    <button class="btn btn-drive-on" onclick="sendCommand('btn_DriveOn', true)">Drives ON</button>
+                    <button class="btn btn-drive-off" onclick="sendCommand('btn_DriveOn', false)">Drives OFF</button>
+                </div>
+            </div>
+
+            <!-- Recipe Selection -->
+            <div class="card">
+                <h2>Recipe Selection</h2>
+                <div class="recipe-selector">
+                    <label for="recipeSelect">Select Recipe:</label>
+                    <select id="recipeSelect" onchange="selectRecipe()">
+                        <option value="1">Recipe 1 - Default</option>
+                        <option value="2">Recipe 2 - Custom</option>
+                        <option value="3">Recipe 3 - Test</option>
+                        <option value="4">Recipe 4 - Advanced</option>
+                        <option value="5">Recipe 5 - Quick</option>
+                    </select>
+                </div>
+                <div class="recipe-info">
+                    <h3 id="recipeName">Recipe 1</h3>
+                    <p id="recipeDescription">Loading recipe information...</p>
+                    <div id="recipeLocked" class="recipe-locked" style="display: none;">
+                        🔒 Recipe Locked (Machine Running)
+                    </div>
+                </div>
+            </div>
+
+            <!-- Status Indicators -->
+            <div class="card">
+                <h2>System Status</h2>
+                <div class="status-grid">
+                    <div class="status-item">
+                        <span class="status-label">Running</span>
+                        <div id="indRunning" class="indicator"></div>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Faulted</span>
+                        <div id="indFaulted" class="indicator"></div>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Homed</span>
+                        <div id="indHomed" class="indicator"></div>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Drives Powered</span>
+                        <div id="indDrives" class="indicator"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p>Foam Block Carving Machine Control System v1.0</p>
+            <p>Last Update: <span id="lastUpdate">Never</span></p>
+        </div>
+    </div>
+
+    <script>
+        // Configuration - CHANGE THIS TO YOUR ctrlX IP ADDRESS!
+        const config = {
+            plcAddress: '192.168.1.1', // ← CHANGE TO YOUR ctrlX IP!
+            updateInterval: 500,        // Update every 500ms
+            apiBasePath: '/automation/api/v2',
+            username: 'boschrexroth',   // ← Change if using custom credentials
+            password: 'boschrexroth'    // ← Change if using custom credentials
+        };
+
+        // PLC Variable paths (adjust these to match your PLC structure)
+        const plcVars = {
+            // Machine State
+            machineState: 'PLC_PRG.MACHINE_STATE',
+
+            // Status Outputs
+            isRunning: 'PLC_PRG.stateMachine.isRunning',
+            isFaulted: 'PLC_PRG.stateMachine.isFaulted',
+            isHomed: 'PLC_PRG.stateMachine.isHomed',
+
+            // Button Inputs
+            btnStart: 'PLC_PRG.btn_Start',
+            btnStop: 'PLC_PRG.btn_Stop',
+            btnHome: 'PLC_PRG.btn_Home',
+            btnManual: 'PLC_PRG.btn_Manual',
+            btnReset: 'PLC_PRG.btn_Reset',
+            btnEStop: 'PLC_PRG.btn_EStop',
+            btnDriveOn: 'PLC_PRG.btn_DriveOn',
+
+            // Recipe Variables (when implemented)
+            recipeSelect: 'PLC_PRG.HMI_RecipeSelect',
+            activeRecipe: 'PLC_PRG.HMI_ActiveRecipe',
+            recipeName: 'PLC_PRG.HMI_RecipeName',
+            recipeDescription: 'PLC_PRG.HMI_RecipeDescription',
+            recipeLocked: 'PLC_PRG.HMI_RecipeLocked'
+        };
+
+        // State machine enumeration
+        const machineStates = {
+            0: 'INIT',
+            1: 'IDLE',
+            2: 'HOMING',
+            3: 'MANUAL',
+            4: 'RUNNING',
+            5: 'STOPPING',
+            6: 'FAULTED',
+            7: 'E_STOPPED',
+            8: 'RESETTING'
+        };
+
+        let connected = false;
+        let updateTimer = null;
+
+        // Initialize
+        window.onload = function() {
+            console.log('HMI Starting...');
+            startUpdates();
+        };
+
+        // Start periodic updates
+        function startUpdates() {
+            if (updateTimer) clearInterval(updateTimer);
+            updateTimer = setInterval(updatePLC, config.updateInterval);
+            updatePLC(); // Initial update
+        }
+
+        // Update all PLC data
+        async function updatePLC() {
+            try {
+                // Read machine state
+                const state = await readPLCVariable(plcVars.machineState);
+                updateMachineState(state);
+
+                // Read status indicators
+                const running = await readPLCVariable(plcVars.isRunning);
+                const faulted = await readPLCVariable(plcVars.isFaulted);
+                const homed = await readPLCVariable(plcVars.isHomed);
+                const drivesOn = await readPLCVariable(plcVars.btnDriveOn);
+
+                updateIndicator('indRunning', running);
+                updateIndicator('indFaulted', faulted);
+                updateIndicator('indHomed', homed);
+                updateIndicator('indDrives', drivesOn);
+
+                // Update recipe info (if variables exist)
+                try {
+                    const activeRecipe = await readPLCVariable(plcVars.activeRecipe);
+                    const recipeName = await readPLCVariable(plcVars.recipeName);
+                    const recipeDesc = await readPLCVariable(plcVars.recipeDescription);
+                    const recipeLocked = await readPLCVariable(plcVars.recipeLocked);
+
+                    document.getElementById('recipeName').textContent = recipeName || `Recipe ${activeRecipe}`;
+                    document.getElementById('recipeDescription').textContent = recipeDesc || 'No description available';
+                    document.getElementById('recipeLocked').style.display = recipeLocked ? 'inline-block' : 'none';
+                    document.getElementById('recipeSelect').value = activeRecipe;
+                    document.getElementById('recipeSelect').disabled = recipeLocked;
+                } catch (e) {
+                    // Recipe variables not available yet
+                }
+
+                updateConnectionStatus(true);
+                document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+
+            } catch (error) {
+                console.error('Update error:', error);
+                updateConnectionStatus(false);
+                showError('Connection lost: ' + error.message);
+            }
+        }
+
+        // ============================================================================
+        // REAL ctrlX DATA LAYER API IMPLEMENTATION
+        // ============================================================================
+
+        let authToken = null;
+
+        // Authenticate with ctrlX
+        async function authenticateCtrlX() {
+            const url = `https://${config.plcAddress}/identity-manager/api/v2/auth/token`;
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: config.username,
+                        password: config.password
+                    })
+                });
+
+                if (!response.ok) throw new Error(`Auth failed: ${response.status}`);
+
+                const data = await response.json();
+                authToken = data.access_token;
+                console.log('✓ Authenticated with ctrlX');
+                return true;
+
+            } catch (error) {
+                console.error('Authentication error:', error);
+                throw error;
+            }
+        }
+
+        // Read PLC variable via ctrlX Data Layer API
+        async function readPLCVariable(varPath) {
+            if (!authToken) await authenticateCtrlX();
+
+            const fullPath = `plc/app/Application/${varPath}`;
+            const url = `https://${config.plcAddress}${config.apiBasePath}/data/${fullPath}`;
+
+            try {
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        // Token expired, re-authenticate and retry
+                        authToken = null;
+                        return readPLCVariable(varPath);
+                    }
+                    throw new Error(`Read failed: ${response.status}`);
+                }
+
+                const data = await response.json();
+                return data.value;
+
+            } catch (error) {
+                console.error(`Error reading ${varPath}:`, error);
+                throw error;
+            }
+        }
+
+        // Write PLC variable via ctrlX Data Layer API
+        async function writePLCVariable(varPath, value) {
+            if (!authToken) await authenticateCtrlX();
+
+            const fullPath = `plc/app/Application/${varPath}`;
+            const url = `https://${config.plcAddress}${config.apiBasePath}/data/${fullPath}`;
+
+            try {
+                const response = await fetch(url, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        value: value,
+                        type: typeof value === 'boolean' ? 'bool8' :
+                              typeof value === 'number' ? 'int32' : 'string'
+                    })
+                });
+
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        // Token expired, re-authenticate and retry
+                        authToken = null;
+                        return writePLCVariable(varPath, value);
+                    }
+                    throw new Error(`Write failed: ${response.status}`);
+                }
+
+                console.log(`✓ Wrote ${varPath} = ${value}`);
+                return true;
+
+            } catch (error) {
+                console.error(`Error writing ${varPath}:`, error);
+                throw error;
+            }
+        }
+
+        // Send command to PLC
+        async function sendCommand(buttonVar, value) {
+            try {
+                await writePLCVariable(plcVars[buttonVar.replace('btn_', 'btn')], value);
+
+                // Auto-reset button after short delay
+                if (value === true) {
+                    setTimeout(() => {
+                        writePLCVariable(plcVars[buttonVar.replace('btn_', 'btn')], false);
+                    }, 100);
+                }
+            } catch (error) {
+                showError('Command failed: ' + error.message);
+            }
+        }
+
+        // Select recipe
+        async function selectRecipe() {
+            const recipeId = parseInt(document.getElementById('recipeSelect').value);
+            try {
+                await writePLCVariable(plcVars.recipeSelect, recipeId);
+            } catch (error) {
+                showError('Recipe selection failed: ' + error.message);
+            }
+        }
+
+        // Update machine state display
+        function updateMachineState(stateValue) {
+            const stateText = machineStates[stateValue] || 'UNKNOWN';
+            const stateElement = document.getElementById('machineState');
+            stateElement.textContent = stateText;
+            stateElement.className = `state-display ${stateText}`;
+        }
+
+        // Update indicator
+        function updateIndicator(elementId, active) {
+            const element = document.getElementById(elementId);
+            if (active) {
+                element.classList.add('active');
+            } else {
+                element.classList.remove('active');
+            }
+        }
+
+        // Update connection status
+        function updateConnectionStatus(isConnected) {
+            connected = isConnected;
+            const indicator = document.getElementById('connectionIndicator');
+            const text = document.getElementById('connectionText');
+
+            if (isConnected) {
+                indicator.className = 'status-indicator connected';
+                text.textContent = 'Connected';
+                hideError();
+            } else {
+                indicator.className = 'status-indicator disconnected';
+                text.textContent = 'Disconnected';
+            }
+        }
+
+        // Show error message
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.textContent = message;
+            errorDiv.classList.add('show');
+        }
+
+        // Hide error message
+        function hideError() {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.classList.remove('show');
+        }
+    </script>
+</body>
+</html>

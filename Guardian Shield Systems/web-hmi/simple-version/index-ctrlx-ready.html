@@ -402,7 +402,7 @@
         const config = {
             plcAddress: '192.168.1.1', // ← CHANGE TO YOUR ctrlX IP!
             updateInterval: 500,        // Update every 500ms
-            apiBasePath: '/automation/api/v2',
+            apiBasePath: '/automation/api/v1',
             username: 'boschrexroth',   // ← Change if using custom credentials
             password: 'boschrexroth'    // ← Change if using custom credentials
         };
@@ -445,6 +445,19 @@
             6: 'FAULTED',
             7: 'E_STOPPED',
             8: 'RESETTING'
+        };
+
+        // Reverse mapping: state name to number
+        const machineStateValues = {
+            'INIT': 0,
+            'IDLE': 1,
+            'HOMING': 2,
+            'MANUAL': 3,
+            'RUNNING': 4,
+            'STOPPING': 5,
+            'FAULTED': 6,
+            'E_STOPPED': 7,
+            'RESETTING': 8
         };
 
         let connected = false;
@@ -546,8 +559,7 @@
 
             // Replace dots with slashes for Data Layer path format
             const dataLayerPath = varPath.replace(/\./g, '/');
-            const fullPath = `plc/app/Application/sym/${dataLayerPath}`;
-            const url = `https://${config.plcAddress}${config.apiBasePath}/data/${fullPath}`;
+            const url = `https://${config.plcAddress}${config.apiBasePath}/plc/app/Application/sym/${dataLayerPath}`;
 
             try {
                 const response = await fetch(url, {
@@ -568,7 +580,23 @@
                 }
 
                 const data = await response.json();
-                return data.value;
+                let value = data.value;
+
+                // Handle enum types returned as objects like {"E_MachineState": "IDLE"}
+                if (value && typeof value === 'object' && !Array.isArray(value)) {
+                    // Extract the enum value (first property value)
+                    const enumValues = Object.values(value);
+                    if (enumValues.length > 0) {
+                        value = enumValues[0];
+                    }
+                }
+
+                // Convert string enum values to numbers for MACHINE_STATE
+                if (typeof value === 'string' && machineStateValues.hasOwnProperty(value)) {
+                    value = machineStateValues[value];
+                }
+
+                return value;
 
             } catch (error) {
                 console.error(`Error reading ${varPath}:`, error);
@@ -582,8 +610,7 @@
 
             // Replace dots with slashes for Data Layer path format
             const dataLayerPath = varPath.replace(/\./g, '/');
-            const fullPath = `plc/app/Application/sym/${dataLayerPath}`;
-            const url = `https://${config.plcAddress}${config.apiBasePath}/data/${fullPath}`;
+            const url = `https://${config.plcAddress}${config.apiBasePath}/plc/app/Application/sym/${dataLayerPath}`;
 
             try {
                 const response = await fetch(url, {

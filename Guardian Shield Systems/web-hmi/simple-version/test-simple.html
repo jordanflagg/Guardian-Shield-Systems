@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple ctrlX Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f0f0f0;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        button {
+            padding: 15px 30px;
+            font-size: 18px;
+            margin: 10px;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            background: #4CAF50;
+            color: white;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        #status {
+            margin-top: 20px;
+            padding: 15px;
+            background: #e3f2fd;
+            border-radius: 5px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        .error {
+            background: #ffebee !important;
+            color: #c62828;
+        }
+        .success {
+            background: #e8f5e9 !important;
+            color: #2e7d32;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>ctrlX Simple Test</h1>
+        <p>Test reading and writing a single PLC variable</p>
+
+        <button onclick="authenticate()">1. Authenticate</button>
+        <button onclick="readButton()">2. Read btn_EStop</button>
+        <button onclick="writeTrue()">3. Write TRUE</button>
+        <button onclick="writeFalse()">4. Write FALSE</button>
+
+        <div id="status">Click "Authenticate" first...</div>
+    </div>
+
+    <script>
+        const config = {
+            plcAddress: '192.168.1.1',
+            apiBasePath: '/automation/api/v1',
+            username: 'boschrexroth',
+            password: 'boschrexroth'
+        };
+
+        let authToken = null;
+
+        function log(message, isError = false) {
+            const status = document.getElementById('status');
+            const timestamp = new Date().toLocaleTimeString();
+            status.textContent += `\n[${timestamp}] ${message}`;
+            status.className = isError ? 'error' : (message.includes('✓') ? 'success' : '');
+            status.scrollTop = status.scrollHeight;
+            console.log(message);
+        }
+
+        async function authenticate() {
+            const url = `https://${config.plcAddress}/identity-manager/api/v2/auth/token`;
+
+            try {
+                log('Authenticating...');
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: config.username,
+                        password: config.password
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Auth failed: ${response.status}`);
+                }
+
+                const data = await response.json();
+                authToken = data.access_token;
+                log('✓ Authenticated! Token received.');
+                log('Now try "Read btn_Start"');
+
+            } catch (error) {
+                log(`✗ Auth error: ${error.message}`, true);
+            }
+        }
+
+        async function readButton() {
+            if (!authToken) {
+                log('✗ Please authenticate first!', true);
+                return;
+            }
+
+            const varPath = 'PLC_PRG/btn_EStop';
+            const url = `https://${config.plcAddress}${config.apiBasePath}/plc/app/Application/sym/${varPath}`;
+
+            try {
+                log(`Reading: ${varPath}`);
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Read failed: ${response.status}`);
+                }
+
+                const data = await response.json();
+                log(`✓ Read successful!`);
+                log(`  Full response: ${JSON.stringify(data, null, 2)}`);
+                log(`  Value: ${data.value}`);
+
+            } catch (error) {
+                log(`✗ Read error: ${error.message}`, true);
+            }
+        }
+
+        async function writeTrue() {
+            await writeValue(true);
+        }
+
+        async function writeFalse() {
+            await writeValue(false);
+        }
+
+        async function writeValue(value) {
+            if (!authToken) {
+                log('✗ Please authenticate first!', true);
+                return;
+            }
+
+            const varPath = 'PLC_PRG/btn_EStop';
+            const url = `https://${config.plcAddress}${config.apiBasePath}/plc/app/Application/sym/${varPath}`;
+
+            try {
+                log(`Writing ${value} to: ${varPath}`);
+                const response = await fetch(url, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        value: value,
+                        type: 'bool8'
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Write failed: ${response.status} - ${errorText}`);
+                }
+
+                log(`✓ Write successful! btn_EStop = ${value}`);
+                log('Check your PLC to verify the value changed!');
+
+            } catch (error) {
+                log(`✗ Write error: ${error.message}`, true);
+            }
+        }
+    </script>
+</body>
+</html>

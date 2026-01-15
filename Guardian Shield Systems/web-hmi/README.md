@@ -59,7 +59,7 @@ In `index.html`, find the configuration section (around line 290):
 
 ```javascript
 const config = {
-    plcAddress: '192.168.1.1',    // ← Change to your ctrlX IP
+    plcAddress: '192.168.0.29',    // ← Change to your ctrlX IP
     updateInterval: 500,           // Update every 500ms
     apiBasePath: '/automation/api/v2'
 };
@@ -115,7 +115,7 @@ The ctrlX Data Layer requires authentication. Update in `ctrlx-api-guide.js`:
 
 ```javascript
 const CTRLX_CONFIG = {
-    host: '192.168.1.1',           // Your ctrlX IP
+    host: '192.168.0.29',           // Your ctrlX IP
     port: 443,                     // HTTPS port
     username: 'boschrexroth',      // Your username
     password: 'boschrexroth',      // Your password

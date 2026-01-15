@@ -6,7 +6,7 @@ Connect your web HMI to the real ctrlX CORE and control your foam carving machin
 ## 📋 Prerequisites
 
 - [ ] ctrlX CORE PLC powered on and on your network
-- [ ] Know the IP address of your ctrlX CORE (e.g., 192.168.1.1)
+- [ ] Know the IP address of your ctrlX CORE (e.g., 192.168.0.29)
 - [ ] Have login credentials (default: boschrexroth / boschrexroth)
 - [ ] PLC program loaded and running
 - [ ] PC/laptop on same network as ctrlX CORE
@@ -43,7 +43,7 @@ ping ctrlx-core
    ```
    https://[YOUR-CTRLX-IP]
    ```
-   Example: `https://192.168.1.1`
+   Example: `https://192.168.0.29`
 
 3. **You'll see a security warning** - This is normal! Click:
    - **Advanced** → **Proceed to [IP address]**
@@ -167,7 +167,7 @@ const config = {
 
 ```javascript
 const config = {
-    plcAddress: '192.168.1.1',   // ← Your ctrlX IP
+    plcAddress: '192.168.0.29',   // ← Your ctrlX IP
     updateInterval: 500,
     apiBasePath: '/automation/api/v2'
 };

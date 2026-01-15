@@ -7,7 +7,7 @@
 
 // Configuration
 const CTRLX_CONFIG = {
-    host: '192.168.1.1',  // Replace with your ctrlX IP address
+    host: '192.168.0.29',  // Replace with your ctrlX IP address
     port: 443,             // HTTPS port (or 8443 for some configurations)
     username: 'boschrexroth',  // Default username
     password: 'boschrexroth',  // Default password

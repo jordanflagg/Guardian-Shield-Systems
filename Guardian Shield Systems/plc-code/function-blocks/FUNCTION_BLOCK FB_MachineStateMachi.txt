@@ -29,9 +29,13 @@ VAR
     currentState : E_MachineState := E_MachineState.INIT;  // Internal state
 
 	// Motion sequence variables
-	motionSequence 	: FB_MotionSequence;
+	motionSequence : FB_MotionSequence;
     motionStep : E_MotionStep := E_MotionStep.WAIT_FOR_LOAD;
     subStep : INT := 0;  // For tracking sub-movements within a step
+
+    // Axis gearing manager
+    axisGearing : FB_AxisGearing;
+    gearingNeeded : BOOL := TRUE;       // Flag to trigger gearing re-engagement
 
     // Flags for position confirmation
     allAxesInPosition : BOOL := FALSE;
@@ -113,11 +117,24 @@ CASE currentState OF
         isRunning := TRUE;
         recipeLocked := TRUE;  // Keep recipe locked while running
 
-        // Motion sequence state machine - recipe loads automatically when recipeID changes
-        motionSequence(
-            enable := startButton,
-            recipeID := activeRecipeID
-        );
+        // Engage/re-engage gearing if needed (after halt, e-stop, etc.)
+        IF gearingNeeded THEN
+            axisGearing(Execute := TRUE, Reset := FALSE);
+
+            // Wait for gearing to complete before running motion
+            IF axisGearing.Done THEN
+                gearingNeeded := FALSE;
+            ELSIF axisGearing.Error THEN
+                // Gearing failed - go to fault state
+                currentState := E_MachineState.FAULTED;
+            END_IF
+        ELSE
+            // Gearing is active - run motion sequence
+            motionSequence(
+                enable := startButton,
+                recipeID := activeRecipeID
+            );
+        END_IF
 
         // Check for stop button
         IF stopButton THEN
@@ -129,11 +146,15 @@ CASE currentState OF
         // Update outputs
         isRunning := FALSE;
 		startButton := FALSE;
-        
+
+        // Gearing will need to be re-engaged after stopping
+        gearingNeeded := TRUE;
+        axisGearing(Execute := FALSE, Reset := TRUE);
+
         // TODO: Command all active axes to decelerate in a controlled manner
         // In real implementation, you'd use MC_Halt for each axis
         // and wait for them to reach zero velocity
-        
+
         // For now, simplified transition back to IDLE
         currentState := E_MachineState.IDLE;
     
@@ -142,9 +163,13 @@ CASE currentState OF
         // Update outputs
         isRunning := FALSE;
         isFaulted := TRUE;
-        
+
+        // Gearing will need to be re-engaged after fault recovery
+        gearingNeeded := TRUE;
+        axisGearing(Execute := FALSE, Reset := TRUE);
+
         // TODO: Log which axis faulted, display error message
-        
+
         // Wait for operator to acknowledge and reset
         IF resetButton THEN
             currentState := E_MachineState.RESETTING;
@@ -155,10 +180,12 @@ CASE currentState OF
         // Update outputs
         isRunning := FALSE;
         isFaulted := TRUE;
-        
-        // TODO: Immediately disable all axes (emergency stop)
-        
-		
+
+        // Gearing will need to be re-engaged after E-stop recovery
+        gearingNeeded := TRUE;
+        axisGearing(Execute := FALSE, Reset := TRUE);
+
+        // Immediately halt all axes (emergency stop)
 		FOR i := MOTIF_CONFIG.MIN_AXIS_INDEX TO MOTIF_CONFIG.MAX_AXIS_INDEX DO
             fbHalt[i](
                 Execute := eStopActive,
@@ -167,7 +194,7 @@ CASE currentState OF
                 Axis := AXIF_CONFIG_INDEXES[i]
             );
 		END_FOR
-		
+
         // Can only exit when E-stop is released AND operator resets
         IF NOT eStopActive AND resetButton THEN
             currentState := E_MachineState.RESETTING;

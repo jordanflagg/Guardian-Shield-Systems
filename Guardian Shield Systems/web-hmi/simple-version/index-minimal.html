@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Foam Block Carving Machine - Minimal HMI</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: #f8f9fa;
+            min-height: 100vh;
+            color: #212529;
+        }
+
+        .container {
+            max-width: 1300px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #dee2e6;
+            margin-bottom: 25px;
+        }
+
+        .header h1 {
+            font-size: 22px;
+            font-weight: 600;
+            color: #212529;
+        }
+
+        .header-meta {
+            display: flex;
+            align-items: center;
+            gap: 30px;
+            font-size: 13px;
+            color: #6c757d;
+        }
+
+        .connection-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 14px;
+            background: #fff;
+            border: 1px solid #dee2e6;
+            border-radius: 20px;
+        }
+
+        .connection-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #dc3545;
+        }
+
+        .connection-dot.online {
+            background: #198754;
+        }
+
+        /* Main Grid */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 260px 1fr 280px;
+            gap: 25px;
+        }
+
+        /* Card Styling */
+        .card {
+            background: #fff;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .card-header {
+            padding: 14px 18px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #495057;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid #dee2e6;
+            background: #f8f9fa;
+        }
+
+        .card-body {
+            padding: 18px;
+        }
+
+        /* State Display */
+        .state-card {
+            text-align: center;
+            padding: 50px 30px;
+        }
+
+        .state-label {
+            font-size: 12px;
+            color: #6c757d;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 15px;
+        }
+
+        .state-value {
+            font-size: 52px;
+            font-weight: 700;
+            letter-spacing: 2px;
+        }
+
+        .state-value.INIT { color: #6c757d; }
+        .state-value.IDLE { color: #0d6efd; }
+        .state-value.HOMING { color: #6f42c1; }
+        .state-value.MANUAL { color: #fd7e14; }
+        .state-value.RUNNING { color: #198754; }
+        .state-value.STOPPING { color: #dc3545; }
+        .state-value.FAULTED { color: #dc3545; }
+        .state-value.E_STOPPED { color: #dc3545; font-weight: 800; }
+        .state-value.RESETTING { color: #6f42c1; }
+
+        .state-desc {
+            margin-top: 12px;
+            font-size: 14px;
+            color: #6c757d;
+        }
+
+        /* Step Info */
+        .step-info {
+            background: #f8f9fa;
+            border-radius: 6px;
+            padding: 16px;
+            margin-top: 25px;
+        }
+
+        .step-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            font-size: 13px;
+        }
+
+        .step-row:not(:last-child) {
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .step-label {
+            color: #6c757d;
+        }
+
+        .step-value {
+            font-weight: 600;
+            color: #212529;
+        }
+
+        .step-description {
+            background: #d1e7dd;
+            color: #0f5132;
+            padding: 12px;
+            border-radius: 6px;
+            margin-top: 15px;
+            text-align: center;
+            font-size: 13px;
+        }
+
+        /* Axes Grid */
+        .axes-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 15px;
+        }
+
+        .axis-tag {
+            padding: 4px 10px;
+            font-size: 11px;
+            font-weight: 500;
+            background: #e9ecef;
+            color: #6c757d;
+            border-radius: 4px;
+        }
+
+        .axis-tag.active {
+            background: #198754;
+            color: white;
+        }
+
+        /* Buttons */
+        .btn-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 14px 18px;
+            border: none;
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .btn:hover {
+            filter: brightness(0.95);
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-start {
+            background: #198754;
+            color: white;
+        }
+
+        .btn-stop {
+            background: #fd7e14;
+            color: white;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-outline {
+            background: white;
+            border: 1px solid #dee2e6;
+            color: #495057;
+        }
+
+        .btn-outline:hover {
+            background: #f8f9fa;
+        }
+
+        .btn-outline.active {
+            background: #198754;
+            border-color: #198754;
+            color: white;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+            padding: 18px;
+            font-size: 15px;
+            margin-top: 10px;
+        }
+
+        /* Status List */
+        .status-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .status-label {
+            font-size: 13px;
+            color: #495057;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #e9ecef;
+        }
+
+        .status-dot.on {
+            background: #198754;
+        }
+
+        .status-dot.fault {
+            background: #dc3545;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Recipe */
+        .recipe-select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: 14px;
+            background: white;
+            cursor: pointer;
+            margin-bottom: 15px;
+        }
+
+        .recipe-select:focus {
+            outline: none;
+            border-color: #0d6efd;
+        }
+
+        .recipe-detail {
+            background: #f8f9fa;
+            border-radius: 6px;
+            padding: 14px;
+        }
+
+        .recipe-name {
+            font-weight: 600;
+            color: #212529;
+            margin-bottom: 4px;
+        }
+
+        .recipe-desc {
+            font-size: 12px;
+            color: #6c757d;
+            line-height: 1.5;
+        }
+
+        .locked-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            background: #fff3cd;
+            color: #856404;
+            font-size: 11px;
+            font-weight: 600;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+
+        /* Operations */
+        .operations {
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid #dee2e6;
+        }
+
+        .operations-title {
+            font-size: 11px;
+            color: #6c757d;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+        }
+
+        .operation-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 6px 0;
+            font-size: 13px;
+        }
+
+        .operation-check {
+            width: 18px;
+            height: 18px;
+            border: 2px solid #dee2e6;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: transparent;
+        }
+
+        .operation-check.enabled {
+            background: #198754;
+            border-color: #198754;
+            color: white;
+        }
+
+        /* Error */
+        .error-toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #dc3545;
+            color: white;
+            padding: 14px 20px;
+            border-radius: 8px;
+            font-size: 13px;
+            display: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .error-toast.show {
+            display: block;
+        }
+
+        /* Responsive */
+        @media (max-width: 1100px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>Foam Block Carving Machine</h1>
+            <div class="header-meta">
+                <span>PLC: <strong id="plcAddress">192.168.0.29</strong></span>
+                <span>Updated: <strong id="lastUpdate">--:--:--</strong></span>
+                <div class="connection-badge">
+                    <div id="connectionDot" class="connection-dot"></div>
+                    <span id="connectionText">Offline</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Grid -->
+        <div class="main-grid">
+            <!-- Controls -->
+            <div class="card">
+                <div class="card-header">Controls</div>
+                <div class="card-body">
+                    <div class="btn-stack">
+                        <button class="btn btn-start" onclick="sendCommand('btn_Start', true)">Start Cycle</button>
+                        <button class="btn btn-stop" onclick="sendCommand('btn_Stop', true)">Stop</button>
+                        <button class="btn btn-secondary" onclick="sendCommand('btn_Home', true)">Home Axes</button>
+                        <button class="btn btn-secondary" onclick="sendCommand('btn_Manual', true)">Manual Mode</button>
+                        <button class="btn btn-outline" onclick="sendCommand('btn_Reset', true)">Reset Fault</button>
+                        <button id="btnDrives" class="btn btn-outline" onclick="toggleDrives()">Drives Off</button>
+                        <button class="btn btn-danger" onclick="sendCommand('btn_EStop', true)">EMERGENCY STOP</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Status -->
+            <div class="card">
+                <div class="card-header">Machine Status</div>
+                <div class="card-body state-card">
+                    <div class="state-label">Current State</div>
+                    <div id="machineState" class="state-value INIT">INIT</div>
+                    <div id="stateDesc" class="state-desc">Initializing...</div>
+
+                    <div class="step-info">
+                        <div class="step-row">
+                            <span class="step-label">Motion Step</span>
+                            <span id="motionStep" class="step-value">WAIT_FOR_LOAD</span>
+                        </div>
+                        <div class="step-row">
+                            <span class="step-label">Sub-Step</span>
+                            <span id="motionSubStep" class="step-value">0</span>
+                        </div>
+                        <div id="stepDescription" class="step-description">Waiting for block to load</div>
+
+                        <div class="axes-grid" id="axesGrid">
+                            <span class="axis-tag" data-axis="1">Axis 1</span>
+                            <span class="axis-tag" data-axis="2">Axis 2</span>
+                            <span class="axis-tag" data-axis="6">Axis 6</span>
+                            <span class="axis-tag" data-axis="8">Axis 8</span>
+                            <span class="axis-tag" data-axis="10">Axis 10</span>
+                            <span class="axis-tag" data-axis="14">Axis 14</span>
+                            <span class="axis-tag" data-axis="15">Axis 15</span>
+                            <span class="axis-tag" data-axis="18">Axis 18</span>
+                            <span class="axis-tag" data-axis="19">Axis 19</span>
+                            <span class="axis-tag" data-axis="22">Axis 22</span>
+                            <span class="axis-tag" data-axis="23">Axis 23</span>
+                            <span class="axis-tag" data-axis="26">Axis 26</span>
+                            <span class="axis-tag" data-axis="27">Axis 27</span>
+                            <span class="axis-tag" data-axis="30">Axis 30</span>
+                            <span class="axis-tag" data-axis="31">Axis 31</span>
+                            <span class="axis-tag" data-axis="34">Axis 34</span>
+                            <span class="axis-tag" data-axis="35">Axis 35</span>
+                            <span class="axis-tag" data-axis="36">Axis 36</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Side -->
+            <div style="display: flex; flex-direction: column; gap: 20px;">
+                <!-- Indicators -->
+                <div class="card">
+                    <div class="card-header">System Status</div>
+                    <div class="card-body">
+                        <div class="status-list">
+                            <div class="status-item">
+                                <span class="status-label">Running</span>
+                                <div id="dotRunning" class="status-dot"></div>
+                            </div>
+                            <div class="status-item">
+                                <span class="status-label">Faulted</span>
+                                <div id="dotFaulted" class="status-dot"></div>
+                            </div>
+                            <div class="status-item">
+                                <span class="status-label">Axes Homed</span>
+                                <div id="dotHomed" class="status-dot"></div>
+                            </div>
+                            <div class="status-item">
+                                <span class="status-label">Drives Enabled</span>
+                                <div id="dotDrives" class="status-dot"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recipe -->
+                <div class="card">
+                    <div class="card-header">Recipe</div>
+                    <div class="card-body">
+                        <select id="recipeSelect" class="recipe-select" onchange="selectRecipe()">
+                            <option value="1">Recipe 1 - Default</option>
+                            <option value="2">Recipe 2 - Custom</option>
+                            <option value="3">Recipe 3 - Test</option>
+                            <option value="4">Recipe 4 - Advanced</option>
+                            <option value="5">Recipe 5 - Quick</option>
+                        </select>
+                        <div class="recipe-detail">
+                            <div id="recipeName" class="recipe-name">Recipe 1</div>
+                            <div id="recipeDesc" class="recipe-desc">Standard cutting parameters.</div>
+                            <div id="recipeLocked" class="locked-badge" style="display: none;">Locked</div>
+                        </div>
+
+                        <div class="operations">
+                            <div class="operations-title">Operations</div>
+                            <div class="operation-row">
+                                <div id="opStuds" class="operation-check enabled">&#10003;</div>
+                                <span>Studs</span>
+                            </div>
+                            <div class="operation-row">
+                                <div id="opWindows" class="operation-check enabled">&#10003;</div>
+                                <span>Windows/Doors</span>
+                            </div>
+                            <div class="operation-row">
+                                <div id="opElectrical" class="operation-check enabled">&#10003;</div>
+                                <span>Electrical</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="errorToast" class="error-toast"></div>
+
+    <script>
+        const config = {
+            plcAddress: '192.168.0.29',
+            updateInterval: 500,
+            apiBasePath: '/automation/api/v1',
+            username: 'boschrexroth',
+            password: 'boschrexroth'
+        };
+
+        const plcVars = {
+            machineState: 'PLC_PRG/MACHINE_STATE',
+            isRunning: 'PLC_PRG/stateMachine/isRunning',
+            isFaulted: 'PLC_PRG/stateMachine/isFaulted',
+            isHomed: 'PLC_PRG/stateMachine/isHomed',
+            btnStart: 'PLC_PRG.btn_Start',
+            btnStop: 'PLC_PRG.btn_Stop',
+            btnHome: 'PLC_PRG.btn_Home',
+            btnManual: 'PLC_PRG.btn_Manual',
+            btnReset: 'PLC_PRG.btn_Reset',
+            btnEStop: 'PLC_PRG.btn_EStop',
+            btnDriveOn: 'PLC_PRG.btn_DriveOn',
+            recipeSelect: 'PLC_PRG.HMI_RecipeSelect',
+            recipeName: 'PLC_PRG.HMI_RecipeName',
+            recipeDescription: 'PLC_PRG.HMI_RecipeDescription',
+            recipeLocked: 'PLC_PRG.HMI_RecipeLocked',
+            enableStuds: 'PLC_PRG.HMI_EnableStuds',
+            enableWindows: 'PLC_PRG.HMI_EnableWindows',
+            enableElectrical: 'PLC_PRG.HMI_EnableElectrical',
+            motionStep: 'PLC_PRG.HMI_MotionStep',
+            motionSubStep: 'PLC_PRG.HMI_MotionSubStep',
+            activeAxesMask: 'PLC_PRG.HMI_ActiveAxesMask',
+            stepDescription: 'PLC_PRG.HMI_StepDescription'
+        };
+
+        const machineStates = { 0: 'INIT', 1: 'IDLE', 2: 'HOMING', 3: 'MANUAL', 4: 'RUNNING', 5: 'STOPPING', 6: 'FAULTED', 7: 'E_STOPPED', 8: 'RESETTING' };
+        const stateDescs = { 'INIT': 'Initializing...', 'IDLE': 'Ready', 'HOMING': 'Homing axes...', 'MANUAL': 'Manual mode', 'RUNNING': 'Running cycle', 'STOPPING': 'Stopping...', 'FAULTED': 'Fault detected', 'E_STOPPED': 'E-Stop active', 'RESETTING': 'Resetting...' };
+        const axisBits = { 1: 0, 2: 1, 6: 5, 8: 7, 10: 9, 14: 13, 15: 14, 18: 17, 19: 18, 22: 21, 23: 22, 26: 25, 27: 26, 30: 29, 31: 30, 34: 33, 35: 34, 36: 35 };
+
+        let authToken = null, drivesOn = false;
+
+        window.onload = () => {
+            document.getElementById('plcAddress').textContent = config.plcAddress;
+            setInterval(updateHMI, config.updateInterval);
+            updateHMI();
+        };
+
+        async function updateHMI() {
+            try {
+                const state = await readPLC(plcVars.machineState);
+                const stateText = typeof state === 'number' ? machineStates[state] : state || 'UNKNOWN';
+                document.getElementById('machineState').textContent = stateText;
+                document.getElementById('machineState').className = 'state-value ' + stateText;
+                document.getElementById('stateDesc').textContent = stateDescs[stateText] || '';
+
+                const running = await readPLC(plcVars.isRunning);
+                const faulted = await readPLC(plcVars.isFaulted);
+                const homed = await readPLC(plcVars.isHomed);
+                drivesOn = await readPLC(plcVars.btnDriveOn);
+
+                setDot('dotRunning', running);
+                setDot('dotFaulted', faulted, true);
+                setDot('dotHomed', homed);
+                setDot('dotDrives', drivesOn);
+                updateDrivesBtn();
+
+                try {
+                    document.getElementById('recipeName').textContent = await readPLC(plcVars.recipeName) || 'Recipe 1';
+                    document.getElementById('recipeDesc').textContent = await readPLC(plcVars.recipeDescription) || '';
+                    const locked = await readPLC(plcVars.recipeLocked);
+                    document.getElementById('recipeLocked').style.display = locked ? 'inline-block' : 'none';
+                    document.getElementById('recipeSelect').disabled = locked;
+                    setOp('opStuds', await readPLC(plcVars.enableStuds));
+                    setOp('opWindows', await readPLC(plcVars.enableWindows));
+                    setOp('opElectrical', await readPLC(plcVars.enableElectrical));
+                } catch(e) {}
+
+                try {
+                    document.getElementById('motionStep').textContent = await readPLC(plcVars.motionStep) || 'WAIT_FOR_LOAD';
+                    document.getElementById('motionSubStep').textContent = await readPLC(plcVars.motionSubStep) || '0';
+                    document.getElementById('stepDescription').textContent = await readPLC(plcVars.stepDescription) || 'Waiting...';
+                    updateAxes(await readPLC(plcVars.activeAxesMask));
+                } catch(e) {}
+
+                setConnection(true);
+                document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+            } catch (e) {
+                setConnection(false);
+            }
+        }
+
+        async function auth() {
+            try {
+                const r = await fetch(`https://${config.plcAddress}/identity-manager/api/v2/auth/token`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: config.username, password: config.password })
+                });
+                if (r.ok) authToken = (await r.json()).access_token;
+            } catch(e) {}
+        }
+
+        async function readPLC(v) {
+            if (!authToken) await auth();
+            const url = `https://${config.plcAddress}${config.apiBasePath}/plc/app/Application/sym/${v.replace(/\./g, '/')}`;
+            const r = await fetch(url, { headers: { 'Authorization': `Bearer ${authToken}` } });
+            if (r.status === 401) { authToken = null; return readPLC(v); }
+            const d = await r.json();
+            let val = d.hasOwnProperty('value') ? d.value : d;
+            if (val && typeof val === 'object') { const k = Object.keys(val); if (k.length === 1) val = val[k[0]]; }
+            return val;
+        }
+
+        async function writePLC(v, val, t) {
+            if (!authToken) await auth();
+            const url = `https://${config.plcAddress}${config.apiBasePath}/plc/app/Application/sym/${v.replace(/\./g, '/')}`;
+            const body = t === 'UINT' ? { type: 'uint16', value: Number(val) } : typeof val === 'boolean' ? { type: 'bool8', value: val } : { type: 'int32', value: Number(val) };
+            const r = await fetch(url, { method: 'PUT', headers: { 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+            if (r.status === 401) { authToken = null; return writePLC(v, val, t); }
+        }
+
+        async function sendCommand(btn, val) {
+            const n = 'btn' + btn.replace('btn_', '').charAt(0).toUpperCase() + btn.replace('btn_', '').slice(1);
+            await writePLC(plcVars[n], val);
+            if (val && btn !== 'btn_DriveOn') setTimeout(() => writePLC(plcVars[n], false), 100);
+        }
+
+        async function toggleDrives() { await writePLC(plcVars.btnDriveOn, !drivesOn); }
+        async function selectRecipe() { await writePLC(plcVars.recipeSelect, parseInt(document.getElementById('recipeSelect').value), 'UINT'); }
+
+        function updateDrivesBtn() {
+            const b = document.getElementById('btnDrives');
+            b.textContent = drivesOn ? 'Drives On' : 'Drives Off';
+            b.className = 'btn btn-outline' + (drivesOn ? ' active' : '');
+        }
+
+        function setDot(id, on, fault) {
+            document.getElementById(id).className = 'status-dot' + (on ? (fault ? ' fault' : ' on') : '');
+        }
+
+        function setOp(id, en) {
+            document.getElementById(id).className = 'operation-check' + (en ? ' enabled' : '');
+        }
+
+        function updateAxes(mask) {
+            document.querySelectorAll('.axis-tag').forEach(el => {
+                const bit = axisBits[parseInt(el.dataset.axis)];
+                el.className = 'axis-tag' + ((bit !== undefined && ((mask >> bit) & 1)) ? ' active' : '');
+            });
+        }
+
+        function setConnection(on) {
+            document.getElementById('connectionDot').className = 'connection-dot' + (on ? ' online' : '');
+            document.getElementById('connectionText').textContent = on ? 'Online' : 'Offline';
+        }
+
+        function showError(msg) {
+            const el = document.getElementById('errorToast');
+            el.textContent = msg; el.classList.add('show');
+            setTimeout(() => el.classList.remove('show'), 5000);
+        }
+    </script>
+</body>
+</html>

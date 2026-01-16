@@ -1,0 +1,282 @@
+FUNCTION_BLOCK FB_AxisGearing
+// Manages all permanent gearing relationships between master and slave axes.
+// Call this function block to establish/re-establish gearing after any
+// interruption (MC_Halt, E-Stop, fault recovery, etc.)
+
+VAR_INPUT
+    Execute : BOOL;             // Rising edge activates all gearing
+    Reset : BOOL;               // Reset all gearing (disengage)
+END_VAR
+
+VAR_OUTPUT
+    Done : BOOL;                // All gearing successfully engaged
+    Busy : BOOL;                // Gearing in progress
+    Error : BOOL;               // One or more gearing operations failed
+    ErrorAxisID : UINT;         // Which axis had the error (0 = none)
+END_VAR
+
+VAR
+    // Gearing function blocks for all slave axes
+    fbGearInAxis3 : MB_GearInPos;   // Axis 3 follows Axis 2
+    fbGearInAxis4 : MB_GearInPos;   // Axis 4 follows Axis 2
+    fbGearInAxis5 : MB_GearInPos;   // Axis 5 follows Axis 2
+    fbGearInAxis7 : MB_GearInPos;   // Axis 7 follows Axis 6
+    fbGearInAxis9 : MB_GearInPos;   // Axis 9 follows Axis 8
+    fbGearInAxis11 : MB_GearInPos;  // Axis 11 follows Axis 10
+    fbGearInAxis12 : MB_GearInPos;  // Axis 12 follows Axis 10
+    fbGearInAxis13 : MB_GearInPos;  // Axis 13 follows Axis 10
+    fbGearInAxis16 : MB_GearInPos;  // Axis 16 follows Axis 14
+    fbGearInAxis17 : MB_GearInPos;  // Axis 17 follows Axis 15
+    fbGearInAxis20 : MB_GearInPos;  // Axis 20 follows Axis 18
+    fbGearInAxis21 : MB_GearInPos;  // Axis 21 follows Axis 19
+    fbGearInAxis24 : MB_GearInPos;  // Axis 24 follows Axis 22
+    fbGearInAxis25 : MB_GearInPos;  // Axis 25 follows Axis 23
+    fbGearInAxis28 : MB_GearInPos;  // Axis 28 follows Axis 26
+    fbGearInAxis29 : MB_GearInPos;  // Axis 29 follows Axis 27
+    fbGearInAxis32 : MB_GearInPos;  // Axis 32 follows Axis 30
+    fbGearInAxis33 : MB_GearInPos;  // Axis 33 follows Axis 31
+
+    // Edge detection
+    executePrev : BOOL := FALSE;
+    executeRising : BOOL := FALSE;
+
+    // State tracking
+    gearingActive : BOOL := FALSE;
+END_VAR
+
+///////////////////////////////////////////////////////////////////////////////
+
+// Edge detection for Execute
+executeRising := Execute AND NOT executePrev;
+executePrev := Execute;
+
+// Reset outputs
+IF Reset THEN
+    Done := FALSE;
+    Busy := FALSE;
+    Error := FALSE;
+    ErrorAxisID := 0;
+    gearingActive := FALSE;
+END_IF
+
+// Start gearing on rising edge
+IF executeRising THEN
+    Busy := TRUE;
+    Done := FALSE;
+    Error := FALSE;
+    ErrorAxisID := 0;
+    gearingActive := TRUE;
+END_IF
+
+// ============================================================================
+// GEARING FUNCTION BLOCK CALLS
+// ============================================================================
+
+// Load table lift (axes 3,4,5 follow axis 2)
+fbGearInAxis3(
+    Execute := gearingActive,
+    Master := Axis_2,
+    Slave := Axis_3,
+    RatioNumerator := 1,
+    RatioDenominator := 1
+);
+
+fbGearInAxis4(
+    Execute := gearingActive,
+    Master := Axis_2,
+    Slave := Axis_4,
+    RatioNumerator := 1,
+    RatioDenominator := 1
+);
+
+fbGearInAxis5(
+    Execute := gearingActive,
+    Master := Axis_2,
+    Slave := Axis_5,
+    RatioNumerator := 1,
+    RatioDenominator := 1
+);
+
+// Shift to center (axis 7 follows axis 6)
+fbGearInAxis7(
+    Execute := gearingActive,
+    Master := Axis_6,
+    Slave := Axis_7,
+    RatioNumerator := 1,
+    RatioDenominator := 1
+);
+
+// Unload table pusher (axis 9 follows axis 8)
+fbGearInAxis9(
+    Execute := gearingActive,
+    Master := Axis_8,
+    Slave := Axis_9,
+    RatioNumerator := 1,
+    RatioDenominator := 1
+);
+
+// Unload table lift (axes 11,12,13 follow axis 10)
+fbGearInAxis11(
+    Execute := gearingActive,
+    Master := Axis_10,
+    Slave := Axis_11,
+    RatioNumerator := 1,
+    RatioDenominator := 1
+);
+
+fbGearInAxis12(
+    Execute := gearingActive,
+    Master := Axis_10,
+    Slave := Axis_12,
+    RatioNumerator := 1,
+    RatioDenominator := 1
+);
+
+fbGearInAxis13(
+    Execute := gearingActive,
+    Master := Axis_10,
+    Slave := Axis_13,
+    RatioNumerator := 1,
+    RatioDenominator := 1
+);
+
+// Stud carving pairs (8 geared pairs)
+fbGearInAxis16(
+    Execute := gearingActive,
+    Master := Axis_14,
+    Slave := Axis_16,
+    RatioNumerator := 1,
+    RatioDenominator := 1
+);
+
+fbGearInAxis17(
+    Execute := gearingActive,
+    Master := Axis_15,
+    Slave := Axis_17,
+    RatioNumerator := 1,
+    RatioDenominator := 1
+);
+
+fbGearInAxis20(
+    Execute := gearingActive,
+    Master := Axis_18,
+    Slave := Axis_20,
+    RatioNumerator := 1,
+    RatioDenominator := 1
+);
+
+fbGearInAxis21(
+    Execute := gearingActive,
+    Master := Axis_19,
+    Slave := Axis_21,
+    RatioNumerator := 1,
+    RatioDenominator := 1
+);
+
+fbGearInAxis24(
+    Execute := gearingActive,
+    Master := Axis_22,
+    Slave := Axis_24,
+    RatioNumerator := 1,
+    RatioDenominator := 1
+);
+
+fbGearInAxis25(
+    Execute := gearingActive,
+    Master := Axis_23,
+    Slave := Axis_25,
+    RatioNumerator := 1,
+    RatioDenominator := 1
+);
+
+fbGearInAxis28(
+    Execute := gearingActive,
+    Master := Axis_26,
+    Slave := Axis_28,
+    RatioNumerator := 1,
+    RatioDenominator := 1
+);
+
+fbGearInAxis29(
+    Execute := gearingActive,
+    Master := Axis_27,
+    Slave := Axis_29,
+    RatioNumerator := 1,
+    RatioDenominator := 1
+);
+
+// Window/door hot wire (axis 32 follows axis 30, axis 33 follows axis 31)
+fbGearInAxis32(
+    Execute := gearingActive,
+    Master := Axis_30,
+    Slave := Axis_32,
+    RatioNumerator := 1,
+    RatioDenominator := 1
+);
+
+fbGearInAxis33(
+    Execute := gearingActive,
+    Master := Axis_31,
+    Slave := Axis_33,
+    RatioNumerator := 1,
+    RatioDenominator := 1
+);
+
+// ============================================================================
+// CHECK GEARING STATUS
+// ============================================================================
+
+IF gearingActive THEN
+    // Check for errors first
+    IF fbGearInAxis3.Error THEN Error := TRUE; ErrorAxisID := 3;
+    ELSIF fbGearInAxis4.Error THEN Error := TRUE; ErrorAxisID := 4;
+    ELSIF fbGearInAxis5.Error THEN Error := TRUE; ErrorAxisID := 5;
+    ELSIF fbGearInAxis7.Error THEN Error := TRUE; ErrorAxisID := 7;
+    ELSIF fbGearInAxis9.Error THEN Error := TRUE; ErrorAxisID := 9;
+    ELSIF fbGearInAxis11.Error THEN Error := TRUE; ErrorAxisID := 11;
+    ELSIF fbGearInAxis12.Error THEN Error := TRUE; ErrorAxisID := 12;
+    ELSIF fbGearInAxis13.Error THEN Error := TRUE; ErrorAxisID := 13;
+    ELSIF fbGearInAxis16.Error THEN Error := TRUE; ErrorAxisID := 16;
+    ELSIF fbGearInAxis17.Error THEN Error := TRUE; ErrorAxisID := 17;
+    ELSIF fbGearInAxis20.Error THEN Error := TRUE; ErrorAxisID := 20;
+    ELSIF fbGearInAxis21.Error THEN Error := TRUE; ErrorAxisID := 21;
+    ELSIF fbGearInAxis24.Error THEN Error := TRUE; ErrorAxisID := 24;
+    ELSIF fbGearInAxis25.Error THEN Error := TRUE; ErrorAxisID := 25;
+    ELSIF fbGearInAxis28.Error THEN Error := TRUE; ErrorAxisID := 28;
+    ELSIF fbGearInAxis29.Error THEN Error := TRUE; ErrorAxisID := 29;
+    ELSIF fbGearInAxis32.Error THEN Error := TRUE; ErrorAxisID := 32;
+    ELSIF fbGearInAxis33.Error THEN Error := TRUE; ErrorAxisID := 33;
+    END_IF
+
+    // If error, stop trying
+    IF Error THEN
+        Busy := FALSE;
+        gearingActive := FALSE;
+    END_IF
+
+    // Check if all gearing is complete (InGear status)
+     // Check if all gearing is complete (InGear status)
+    IF NOT Error AND
+       fbGearInAxis3.InSync AND
+       fbGearInAxis4.InSync AND
+       fbGearInAxis5.InSync AND
+       fbGearInAxis7.InSync AND
+       fbGearInAxis9.InSync AND
+       fbGearInAxis11.InSync AND
+       fbGearInAxis12.InSync AND
+       fbGearInAxis13.InSync AND
+       fbGearInAxis16.InSync AND
+       fbGearInAxis17.InSync AND
+       fbGearInAxis20.InSync AND
+       fbGearInAxis21.InSync AND
+       fbGearInAxis24.InSync AND
+       fbGearInAxis25.InSync AND
+       fbGearInAxis28.InSync AND
+       fbGearInAxis29.InSync AND
+       fbGearInAxis32.InSync AND
+       fbGearInAxis33.InSync THEN
+        Done := TRUE;
+        Busy := FALSE;
+        // Keep gearingActive TRUE to maintain gearing
+    END_IF
+END_IF

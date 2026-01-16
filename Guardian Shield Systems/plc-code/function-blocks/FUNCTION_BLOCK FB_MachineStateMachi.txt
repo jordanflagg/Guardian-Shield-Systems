@@ -36,10 +36,6 @@ VAR
     // Flags for position confirmation
     allAxesInPosition : BOOL := FALSE;
 
-    // Recipe management
-    requestedRecipeID : UINT := 1;
-    loadRecipeTrigger : BOOL := FALSE;
-
 	fbHalt : ARRAY[MOTIF_CONFIG.MIN_AXIS_INDEX..MOTIF_CONFIG.MAX_AXIS_INDEX] OF MC_Halt;
 	i : UINT;
 END_VAR
@@ -75,12 +71,8 @@ CASE currentState OF
         isRunning := FALSE;
         recipeLocked := FALSE;  // Allow recipe changes in IDLE
 
-        // Handle recipe selection changes (only when not locked)
-        IF selectedRecipe <> activeRecipeID AND selectedRecipe >= 1 AND selectedRecipe <= 10 THEN
-            requestedRecipeID := selectedRecipe;
-            loadRecipeTrigger := TRUE;
-            activeRecipeID := selectedRecipe;
-        END_IF
+        // Track selected recipe (FB_MotionSequence loads it automatically when it changes)
+        activeRecipeID := selectedRecipe;
 
         // Check for operator commands and transition accordingly
         IF homeButton THEN
@@ -121,17 +113,11 @@ CASE currentState OF
         isRunning := TRUE;
         recipeLocked := TRUE;  // Keep recipe locked while running
 
-        // Motion sequence state machine with recipe support
+        // Motion sequence state machine - recipe loads automatically when recipeID changes
         motionSequence(
             enable := startButton,
-            recipeID := activeRecipeID,
-            loadRecipe := loadRecipeTrigger
+            recipeID := activeRecipeID
         );
-
-        // Clear load trigger after first cycle
-        IF loadRecipeTrigger THEN
-            loadRecipeTrigger := FALSE;
-        END_IF
 
         // Check for stop button
         IF stopButton THEN

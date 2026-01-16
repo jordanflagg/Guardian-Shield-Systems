@@ -3,7 +3,6 @@ FUNCTION_BLOCK FB_MotionSequence
 VAR_INPUT
     enable : BOOL;
     recipeID : UINT := 1;           // Recipe number to load (1-10)
-    loadRecipe : BOOL;              // Rising edge loads recipe
 END_VAR
 
 VAR_OUTPUT
@@ -27,9 +26,7 @@ VAR
     motionParams : ST_MotionParameters;
 
     // Recipe management
-    currentRecipeID : UINT := 1;
-    recipeLoaded : BOOL := FALSE;
-    loadRecipePrev : BOOL := FALSE;     // For edge detection
+    lastRecipeID : UINT := 0;           // Track previous recipeID to detect changes
 
     // Operation enable flags (from recipe)
     enableStudsOperation : BOOL := TRUE;
@@ -124,11 +121,11 @@ END_VAR
 ///////////////////////////////////////////////////////////////////////////////
 
 // ============================================================================
-// RECIPE LOADING - Execute before motion sequence
+// RECIPE LOADING - Load when recipeID changes
 // ============================================================================
 
-// Load recipe on rising edge or if no recipe loaded yet
-IF (loadRecipe AND NOT loadRecipePrev) OR NOT recipeLoaded THEN
+// Load recipe whenever recipeID changes (or on first scan when lastRecipeID is 0)
+IF recipeID <> lastRecipeID THEN
     IF recipeID >= 1 AND recipeID <= 10 THEN
         IF GVL_Recipes.RecipeLibrary[recipeID].isActive THEN
             // Load recipe data
@@ -138,11 +135,9 @@ IF (loadRecipe AND NOT loadRecipePrev) OR NOT recipeLoaded THEN
             enableWindowsDoorsOperation := GVL_Recipes.RecipeLibrary[recipeID].enableWindowsDoors;
             enableElectricalOperation := GVL_Recipes.RecipeLibrary[recipeID].enableElectrical;
 
-            currentRecipeID := recipeID;
-            recipeLoaded := TRUE;
+            activeRecipeID := recipeID;
             recipeLoadError := FALSE;
             recipeLoadComplete := TRUE;
-            activeRecipeID := recipeID;
         ELSE
             // Recipe is inactive
             recipeLoadError := TRUE;
@@ -153,10 +148,10 @@ IF (loadRecipe AND NOT loadRecipePrev) OR NOT recipeLoaded THEN
         recipeLoadError := TRUE;
         recipeLoadComplete := FALSE;
     END_IF
-END_IF
 
-// Update edge detection
-loadRecipePrev := loadRecipe;
+    // Update last recipe ID to detect next change
+    lastRecipeID := recipeID;
+END_IF
 
 
 // ============================================================================

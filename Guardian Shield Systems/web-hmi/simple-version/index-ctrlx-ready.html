@@ -12,410 +12,732 @@
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Consolas', 'Courier New', monospace;
+            background: #1a1a2e;
             min-height: 100vh;
+            color: #e0e0e0;
+        }
+
+        .hmi-container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 10px;
+        }
+
+        /* Header Bar */
+        .header-bar {
+            background: linear-gradient(180deg, #2d2d44 0%, #1a1a2e 100%);
+            border: 2px solid #3d3d5c;
+            border-radius: 4px;
+            padding: 10px 20px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-bar h1 {
+            font-size: 20px;
+            font-weight: bold;
+            color: #00d4ff;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .header-info {
+            display: flex;
+            gap: 30px;
+            align-items: center;
+        }
+
+        .header-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+        }
+
+        .header-item label {
+            color: #888;
+            text-transform: uppercase;
+        }
+
+        .header-item span {
+            color: #00ff88;
+            font-weight: bold;
+        }
+
+        .connection-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 5px 15px;
+            border-radius: 3px;
+            background: #2a2a3e;
+            border: 1px solid #3d3d5c;
+        }
+
+        .connection-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #ff4444;
+        }
+
+        .connection-dot.connected {
+            background: #00ff88;
+            box-shadow: 0 0 10px #00ff88;
+        }
+
+        /* Main Layout */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 300px 1fr 300px;
+            gap: 10px;
+            height: calc(100vh - 80px);
+        }
+
+        /* Panel Styling */
+        .panel {
+            background: linear-gradient(180deg, #252538 0%, #1e1e2e 100%);
+            border: 2px solid #3d3d5c;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .panel-header {
+            background: linear-gradient(180deg, #3d3d5c 0%, #2d2d44 100%);
+            padding: 8px 15px;
+            border-bottom: 2px solid #4a4a6a;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #00d4ff;
+        }
+
+        .panel-content {
+            padding: 15px;
+        }
+
+        /* Machine State Display - Center Panel */
+        .state-panel {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .state-display-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
             padding: 20px;
         }
 
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-        }
-
-        .header {
-            background: white;
-            padding: 20px 30px;
-            border-radius: 15px;
-            margin-bottom: 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-        }
-
-        .header h1 {
-            color: #333;
-            font-size: 28px;
-            margin-bottom: 5px;
-        }
-
-        .header .subtitle {
-            color: #666;
+        .state-label {
             font-size: 14px;
+            color: #888;
+            text-transform: uppercase;
+            margin-bottom: 10px;
         }
 
-        .connection-status {
-            float: right;
-            display: flex;
-            align-items: center;
-            gap: 10px;
+        .state-display {
+            font-size: 72px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            padding: 20px 40px;
+            border-radius: 8px;
+            background: #0a0a15;
+            border: 3px solid #3d3d5c;
+            text-shadow: 0 0 20px currentColor;
         }
 
-        .status-indicator {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            background: #ccc;
-            animation: pulse 2s infinite;
-        }
+        .state-display.INIT { color: #888888; border-color: #444; }
+        .state-display.IDLE { color: #00d4ff; border-color: #00d4ff; }
+        .state-display.HOMING { color: #a855f7; border-color: #a855f7; }
+        .state-display.MANUAL { color: #fbbf24; border-color: #fbbf24; }
+        .state-display.RUNNING { color: #00ff88; border-color: #00ff88; box-shadow: 0 0 30px rgba(0,255,136,0.3); }
+        .state-display.STOPPING { color: #fb923c; border-color: #fb923c; }
+        .state-display.FAULTED { color: #ff4444; border-color: #ff4444; animation: fault-blink 0.5s infinite; }
+        .state-display.E_STOPPED { color: #ff0000; border-color: #ff0000; animation: estop-blink 0.3s infinite; }
+        .state-display.RESETTING { color: #818cf8; border-color: #818cf8; }
 
-        .status-indicator.connected {
-            background: #10b981;
-        }
-
-        .status-indicator.disconnected {
-            background: #ef4444;
-        }
-
-        @keyframes pulse {
+        @keyframes fault-blink {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.5; }
         }
 
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-            margin-bottom: 20px;
+        @keyframes estop-blink {
+            0%, 100% { opacity: 1; background: #0a0a15; }
+            50% { opacity: 1; background: #3a0000; }
         }
-
-        .card {
-            background: white;
-            padding: 25px;
-            border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-        }
-
-        .card h2 {
-            color: #333;
-            font-size: 18px;
-            margin-bottom: 20px;
-            border-bottom: 2px solid #667eea;
-            padding-bottom: 10px;
-        }
-
-        .machine-state {
-            text-align: center;
-            padding: 40px 20px;
-        }
-
-        .state-display {
-            font-size: 48px;
-            font-weight: bold;
-            margin-bottom: 15px;
-            text-transform: uppercase;
-        }
-
-        .state-display.INIT { color: #6b7280; }
-        .state-display.IDLE { color: #3b82f6; }
-        .state-display.HOMING { color: #8b5cf6; }
-        .state-display.MANUAL { color: #f59e0b; }
-        .state-display.RUNNING { color: #10b981; }
-        .state-display.STOPPING { color: #f97316; }
-        .state-display.FAULTED { color: #ef4444; }
-        .state-display.E_STOPPED { color: #dc2626; }
-        .state-display.RESETTING { color: #6366f1; }
 
         .motion-step {
-            font-size: 18px;
-            color: #666;
-            margin-top: 10px;
+            margin-top: 15px;
+            font-size: 16px;
+            color: #888;
         }
 
-        .controls {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 15px;
+        /* Control Buttons */
+        .controls-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
         }
 
         .btn {
-            padding: 15px 25px;
-            border: none;
-            border-radius: 10px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
+            padding: 15px 20px;
+            border: 2px solid;
+            border-radius: 4px;
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: bold;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 1px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            position: relative;
+            overflow: hidden;
         }
 
         .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            filter: brightness(1.2);
         }
 
         .btn:active {
-            transform: translateY(0);
+            transform: scale(0.98);
+            filter: brightness(0.9);
         }
 
         .btn:disabled {
-            opacity: 0.5;
+            opacity: 0.4;
             cursor: not-allowed;
-            transform: none;
         }
 
         .btn-start {
-            background: #10b981;
+            background: linear-gradient(180deg, #059669 0%, #047857 100%);
+            border-color: #10b981;
             color: white;
-            grid-column: 1 / -1;
         }
 
         .btn-stop {
-            background: #f97316;
+            background: linear-gradient(180deg, #ea580c 0%, #c2410c 100%);
+            border-color: #f97316;
             color: white;
         }
 
         .btn-home {
-            background: #3b82f6;
+            background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%);
+            border-color: #3b82f6;
             color: white;
         }
 
         .btn-manual {
-            background: #8b5cf6;
+            background: linear-gradient(180deg, #7c3aed 0%, #6d28d9 100%);
+            border-color: #8b5cf6;
             color: white;
         }
 
         .btn-reset {
-            background: #6366f1;
+            background: linear-gradient(180deg, #4f46e5 0%, #4338ca 100%);
+            border-color: #6366f1;
+            color: white;
+        }
+
+        .btn-drive {
+            background: linear-gradient(180deg, #374151 0%, #1f2937 100%);
+            border-color: #4b5563;
+            color: #e0e0e0;
+        }
+
+        .btn-drive.active {
+            background: linear-gradient(180deg, #059669 0%, #047857 100%);
+            border-color: #10b981;
             color: white;
         }
 
         .btn-estop {
-            background: #dc2626;
+            background: linear-gradient(180deg, #dc2626 0%, #b91c1c 100%);
+            border-color: #ef4444;
             color: white;
-            grid-column: 1 / -1;
-            font-size: 20px;
-            padding: 20px;
-        }
-
-        .btn-drive-on {
-            background: #059669;
-            color: white;
-        }
-
-        .btn-drive-off {
-            background: #64748b;
-            color: white;
-        }
-
-        .recipe-selector {
-            margin-bottom: 20px;
-        }
-
-        .recipe-selector label {
-            display: block;
-            color: #666;
-            margin-bottom: 10px;
-            font-weight: 600;
-        }
-
-        .recipe-selector select {
-            width: 100%;
-            padding: 12px;
-            border: 2px solid #e5e7eb;
-            border-radius: 8px;
-            font-size: 16px;
-            background: white;
-            cursor: pointer;
-        }
-
-        .recipe-info {
-            background: #f3f4f6;
-            padding: 15px;
-            border-radius: 8px;
-            margin-top: 15px;
-        }
-
-        .recipe-info h3 {
-            color: #333;
-            font-size: 16px;
-            margin-bottom: 5px;
-        }
-
-        .recipe-info p {
-            color: #666;
-            font-size: 14px;
-            line-height: 1.5;
-        }
-
-        .recipe-locked {
-            display: inline-block;
-            background: #fef3c7;
-            color: #92400e;
-            padding: 5px 12px;
-            border-radius: 5px;
-            font-size: 12px;
-            font-weight: 600;
+            font-size: 18px;
+            padding: 25px;
             margin-top: 10px;
+            box-shadow: 0 0 20px rgba(239,68,68,0.4);
         }
 
+        .btn-estop:hover {
+            box-shadow: 0 0 30px rgba(239,68,68,0.6);
+        }
+
+        /* Status Indicators */
         .status-grid {
-            display: grid;
-            gap: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
         }
 
         .status-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 12px;
-            background: #f9fafb;
-            border-radius: 8px;
+            padding: 10px 12px;
+            background: #0a0a15;
+            border: 1px solid #3d3d5c;
+            border-radius: 3px;
         }
 
         .status-label {
-            color: #666;
-            font-weight: 600;
-        }
-
-        .status-value {
-            color: #333;
-            font-weight: bold;
+            font-size: 12px;
+            text-transform: uppercase;
+            color: #888;
+            letter-spacing: 0.5px;
         }
 
         .indicator {
-            width: 20px;
-            height: 20px;
+            width: 24px;
+            height: 24px;
             border-radius: 50%;
-            background: #e5e7eb;
+            background: #2a2a2a;
+            border: 2px solid #444;
+            position: relative;
+        }
+
+        .indicator::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #333;
         }
 
         .indicator.active {
-            background: #10b981;
-            box-shadow: 0 0 10px #10b981;
+            border-color: #00ff88;
         }
 
-        .footer {
-            text-align: center;
-            color: white;
-            margin-top: 30px;
-            opacity: 0.8;
+        .indicator.active::after {
+            background: #00ff88;
+            box-shadow: 0 0 10px #00ff88;
         }
 
-        .error-message {
-            background: #fee2e2;
-            color: #991b1b;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            display: none;
+        .indicator.fault {
+            border-color: #ff4444;
         }
 
-        .error-message.show {
+        .indicator.fault.active::after {
+            background: #ff4444;
+            box-shadow: 0 0 10px #ff4444;
+            animation: indicator-blink 0.5s infinite;
+        }
+
+        @keyframes indicator-blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        /* Recipe Panel */
+        .recipe-selector {
+            margin-bottom: 15px;
+        }
+
+        .recipe-selector label {
             display: block;
+            font-size: 11px;
+            text-transform: uppercase;
+            color: #888;
+            margin-bottom: 5px;
+        }
+
+        .recipe-selector select {
+            width: 100%;
+            padding: 10px;
+            background: #0a0a15;
+            border: 2px solid #3d3d5c;
+            border-radius: 3px;
+            color: #e0e0e0;
+            font-family: inherit;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        .recipe-selector select:focus {
+            outline: none;
+            border-color: #00d4ff;
+        }
+
+        .recipe-info {
+            background: #0a0a15;
+            border: 1px solid #3d3d5c;
+            border-radius: 3px;
+            padding: 12px;
+        }
+
+        .recipe-info h3 {
+            font-size: 14px;
+            color: #00d4ff;
+            margin-bottom: 5px;
+        }
+
+        .recipe-info p {
+            font-size: 12px;
+            color: #888;
+            line-height: 1.4;
+        }
+
+        .recipe-locked {
+            display: inline-block;
+            background: #92400e;
+            color: #fef3c7;
+            padding: 4px 10px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-top: 8px;
+        }
+
+        /* Motion Sequence Panel */
+        .motion-sequence-panel {
+            margin-top: 15px;
+            padding: 15px;
+            background: #0a0a15;
+            border: 1px solid #3d3d5c;
+            border-radius: 4px;
+        }
+
+        .sequence-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #3d3d5c;
+        }
+
+        .sequence-step {
+            font-size: 14px;
+            color: #00d4ff;
+            font-weight: bold;
+        }
+
+        .sequence-substep {
+            font-size: 12px;
+            color: #888;
+        }
+
+        .sequence-description {
+            font-size: 13px;
+            color: #00ff88;
+            margin-bottom: 12px;
+            padding: 8px;
+            background: rgba(0, 255, 136, 0.1);
+            border-radius: 3px;
+            text-align: center;
+        }
+
+        .active-axes-container {
+            margin-top: 10px;
+        }
+
+        .axes-label {
+            font-size: 11px;
+            color: #888;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+
+        .axes-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 4px;
+        }
+
+        .axis-indicator {
+            width: 100%;
+            padding: 4px 2px;
+            font-size: 10px;
+            text-align: center;
+            background: #1a1a2e;
+            border: 1px solid #3d3d5c;
+            border-radius: 2px;
+            color: #666;
+        }
+
+        .axis-indicator.active {
+            background: linear-gradient(180deg, #059669 0%, #047857 100%);
+            border-color: #10b981;
+            color: white;
+            box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
+            animation: axis-pulse 1s infinite;
+        }
+
+        @keyframes axis-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .operation-badges {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+
+        .operation-badge {
+            padding: 4px 10px;
+            font-size: 10px;
+            font-weight: bold;
+            text-transform: uppercase;
+            border-radius: 3px;
+            background: #2a2a3e;
+            border: 1px solid #3d3d5c;
+            color: #666;
+        }
+
+        .operation-badge.enabled {
+            background: rgba(0, 212, 255, 0.2);
+            border-color: #00d4ff;
+            color: #00d4ff;
+        }
+
+        .operation-badge.current {
+            background: rgba(0, 255, 136, 0.2);
+            border-color: #00ff88;
+            color: #00ff88;
+            animation: badge-pulse 1s infinite;
+        }
+
+        @keyframes badge-pulse {
+            0%, 100% { box-shadow: 0 0 5px rgba(0, 255, 136, 0.3); }
+            50% { box-shadow: 0 0 15px rgba(0, 255, 136, 0.6); }
+        }
+
+        /* Error Message */
+        .error-banner {
+            background: linear-gradient(180deg, #7f1d1d 0%, #450a0a 100%);
+            border: 2px solid #dc2626;
+            border-radius: 4px;
+            padding: 10px 20px;
+            margin-bottom: 10px;
+            display: none;
+            color: #fecaca;
+            font-size: 13px;
+        }
+
+        .error-banner.show {
+            display: block;
+        }
+
+        /* Footer */
+        .footer-bar {
+            background: #1e1e2e;
+            border: 1px solid #3d3d5c;
+            border-radius: 3px;
+            padding: 8px 20px;
+            margin-top: 10px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            color: #666;
+        }
+
+        .footer-bar span {
+            color: #888;
+        }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+                height: auto;
+            }
+
+            .state-display {
+                font-size: 48px;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <!-- Header -->
-        <div class="header">
-            <div class="connection-status">
-                <span id="connectionText">Disconnected</span>
-                <div id="connectionIndicator" class="status-indicator disconnected"></div>
-            </div>
+    <div class="hmi-container">
+        <!-- Header Bar -->
+        <div class="header-bar">
             <h1>Foam Block Carving Machine</h1>
-            <div class="subtitle">Web-Based HMI Control Panel</div>
+            <div class="header-info">
+                <div class="header-item">
+                    <label>PLC:</label>
+                    <span id="plcAddress">192.168.0.29</span>
+                </div>
+                <div class="header-item">
+                    <label>Update:</label>
+                    <span id="lastUpdate">--:--:--</span>
+                </div>
+                <div class="connection-indicator">
+                    <div id="connectionDot" class="connection-dot"></div>
+                    <span id="connectionText">OFFLINE</span>
+                </div>
+            </div>
         </div>
 
-        <!-- Error Message -->
-        <div id="errorMessage" class="error-message"></div>
+        <!-- Error Banner -->
+        <div id="errorBanner" class="error-banner"></div>
 
         <!-- Main Grid -->
-        <div class="grid">
-            <!-- Machine State -->
-            <div class="card machine-state">
-                <h2>Machine Status</h2>
-                <div id="machineState" class="state-display">INIT</div>
-                <div id="motionStep" class="motion-step">Waiting...</div>
-            </div>
-
-            <!-- Control Buttons -->
-            <div class="card">
-                <h2>Machine Controls</h2>
-                <div class="controls">
-                    <button class="btn btn-start" onclick="sendCommand('btn_Start', true)">Start</button>
-                    <button class="btn btn-stop" onclick="sendCommand('btn_Stop', true)">Stop</button>
-                    <button class="btn btn-home" onclick="sendCommand('btn_Home', true)">Home</button>
-                    <button class="btn btn-manual" onclick="sendCommand('btn_Manual', true)">Manual</button>
-                    <button class="btn btn-reset" onclick="sendCommand('btn_Reset', true)">Reset</button>
-                    <button class="btn btn-estop" onclick="sendCommand('btn_EStop', true)">E-STOP</button>
-                    <button class="btn btn-drive-on" onclick="sendCommand('btn_DriveOn', true)">Drives ON</button>
-                    <button class="btn btn-drive-off" onclick="sendCommand('btn_DriveOn', false)">Drives OFF</button>
-                </div>
-            </div>
-
-            <!-- Recipe Selection -->
-            <div class="card">
-                <h2>Recipe Selection</h2>
-                <div class="recipe-selector">
-                    <label for="recipeSelect">Select Recipe:</label>
-                    <select id="recipeSelect" onchange="selectRecipe()">
-                        <option value="1">Recipe 1 - Default</option>
-                        <option value="2">Recipe 2 - Custom</option>
-                        <option value="3">Recipe 3 - Test</option>
-                        <option value="4">Recipe 4 - Advanced</option>
-                        <option value="5">Recipe 5 - Quick</option>
-                    </select>
-                </div>
-                <div class="recipe-info">
-                    <h3 id="recipeName">Recipe 1</h3>
-                    <p id="recipeDescription">Loading recipe information...</p>
-                    <div id="recipeLocked" class="recipe-locked" style="display: none;">
-                        🔒 Recipe Locked (Machine Running)
+        <div class="main-grid">
+            <!-- Left Panel - Controls -->
+            <div class="panel">
+                <div class="panel-header">Machine Controls</div>
+                <div class="panel-content">
+                    <div class="controls-grid">
+                        <button class="btn btn-start" onclick="sendCommand('btn_Start', true)">Start Cycle</button>
+                        <button class="btn btn-stop" onclick="sendCommand('btn_Stop', true)">Stop</button>
+                        <button class="btn btn-home" onclick="sendCommand('btn_Home', true)">Home Axes</button>
+                        <button class="btn btn-manual" onclick="sendCommand('btn_Manual', true)">Manual Mode</button>
+                        <button class="btn btn-reset" onclick="sendCommand('btn_Reset', true)">Reset Fault</button>
+                        <button id="btnDriveOn" class="btn btn-drive" onclick="toggleDrives()">Drives OFF</button>
+                        <button class="btn btn-estop" onclick="sendCommand('btn_EStop', true)">EMERGENCY STOP</button>
                     </div>
                 </div>
             </div>
 
-            <!-- Status Indicators -->
-            <div class="card">
-                <h2>System Status</h2>
-                <div class="status-grid">
-                    <div class="status-item">
-                        <span class="status-label">Running</span>
-                        <div id="indRunning" class="indicator"></div>
+            <!-- Center Panel - Machine State -->
+            <div class="panel state-panel">
+                <div class="panel-header">Machine Status</div>
+                <div class="state-display-container">
+                    <div class="state-label">Current State</div>
+                    <div id="machineState" class="state-display INIT">INIT</div>
+                    <div id="motionStep" class="motion-step">System Initializing...</div>
+
+                    <!-- Motion Sequence Visualization -->
+                    <div class="motion-sequence-panel" id="motionSequencePanel">
+                        <div class="sequence-header">
+                            <span class="sequence-step" id="seqStep">WAIT_FOR_LOAD</span>
+                            <span class="sequence-substep">Step <span id="seqSubStep">0</span></span>
+                        </div>
+                        <div class="sequence-description" id="seqDescription">Waiting for block to load</div>
+
+                        <!-- Operation Progress Badges -->
+                        <div class="operation-badges">
+                            <span id="badgeStuds" class="operation-badge">Studs</span>
+                            <span id="badgeWindows" class="operation-badge">Windows</span>
+                            <span id="badgeElectrical" class="operation-badge">Electrical</span>
+                        </div>
+
+                        <!-- Active Axes Grid -->
+                        <div class="active-axes-container">
+                            <div class="axes-label">Active Axes</div>
+                            <div class="axes-grid" id="axesGrid">
+                                <!-- Axes 1-6 -->
+                                <div class="axis-indicator" data-axis="1">1</div>
+                                <div class="axis-indicator" data-axis="2">2</div>
+                                <div class="axis-indicator" data-axis="6">6</div>
+                                <div class="axis-indicator" data-axis="8">8</div>
+                                <div class="axis-indicator" data-axis="10">10</div>
+                                <div class="axis-indicator" data-axis="14">14</div>
+                                <!-- Axes 15-27 -->
+                                <div class="axis-indicator" data-axis="15">15</div>
+                                <div class="axis-indicator" data-axis="18">18</div>
+                                <div class="axis-indicator" data-axis="19">19</div>
+                                <div class="axis-indicator" data-axis="22">22</div>
+                                <div class="axis-indicator" data-axis="23">23</div>
+                                <div class="axis-indicator" data-axis="26">26</div>
+                                <!-- Axes 27-36 -->
+                                <div class="axis-indicator" data-axis="27">27</div>
+                                <div class="axis-indicator" data-axis="30">30</div>
+                                <div class="axis-indicator" data-axis="31">31</div>
+                                <div class="axis-indicator" data-axis="34">34</div>
+                                <div class="axis-indicator" data-axis="35">35</div>
+                                <div class="axis-indicator" data-axis="36">36</div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="status-item">
-                        <span class="status-label">Faulted</span>
-                        <div id="indFaulted" class="indicator"></div>
+                </div>
+            </div>
+
+            <!-- Right Panel - Status & Recipe -->
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                <!-- Status Indicators -->
+                <div class="panel" style="flex: 1;">
+                    <div class="panel-header">System Status</div>
+                    <div class="panel-content">
+                        <div class="status-grid">
+                            <div class="status-item">
+                                <span class="status-label">Running</span>
+                                <div id="indRunning" class="indicator"></div>
+                            </div>
+                            <div class="status-item">
+                                <span class="status-label">Faulted</span>
+                                <div id="indFaulted" class="indicator fault"></div>
+                            </div>
+                            <div class="status-item">
+                                <span class="status-label">Axes Homed</span>
+                                <div id="indHomed" class="indicator"></div>
+                            </div>
+                            <div class="status-item">
+                                <span class="status-label">Drives Enabled</span>
+                                <div id="indDrives" class="indicator"></div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="status-item">
-                        <span class="status-label">Homed</span>
-                        <div id="indHomed" class="indicator"></div>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">Drives Powered</span>
-                        <div id="indDrives" class="indicator"></div>
+                </div>
+
+                <!-- Recipe Selection -->
+                <div class="panel" style="flex: 1;">
+                    <div class="panel-header">Recipe Selection</div>
+                    <div class="panel-content">
+                        <div class="recipe-selector">
+                            <label>Active Recipe</label>
+                            <select id="recipeSelect" onchange="selectRecipe()">
+                                <option value="1">Recipe 1 - Default</option>
+                                <option value="2">Recipe 2 - Custom</option>
+                                <option value="3">Recipe 3 - Test</option>
+                                <option value="4">Recipe 4 - Advanced</option>
+                                <option value="5">Recipe 5 - Quick</option>
+                            </select>
+                        </div>
+                        <div class="recipe-info">
+                            <h3 id="recipeName">Recipe 1</h3>
+                            <p id="recipeDescription">Standard cutting parameters for foam blocks.</p>
+                            <div id="recipeLocked" class="recipe-locked" style="display: none;">
+                                LOCKED - MACHINE RUNNING
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
         <!-- Footer -->
-        <div class="footer">
-            <p>Foam Block Carving Machine Control System v1.0</p>
-            <p>Last Update: <span id="lastUpdate">Never</span></p>
+        <div class="footer-bar">
+            <span>Foam Block Carving Machine Control System v1.0</span>
+            <span>Guardian Shield Systems</span>
         </div>
     </div>
 
     <script>
         // Configuration - CHANGE THIS TO YOUR ctrlX IP ADDRESS!
         const config = {
-            plcAddress: '192.168.0.29', // ← CHANGE TO YOUR ctrlX IP!
+            plcAddress: '192.168.0.29', // <- CHANGE TO YOUR ctrlX IP!
             updateInterval: 500,        // Update every 500ms
             apiBasePath: '/automation/api/v1',
-            username: 'boschrexroth',   // ← Change if using custom credentials
-            password: 'boschrexroth'    // ← Change if using custom credentials
+            username: 'boschrexroth',   // <- Change if using custom credentials
+            password: 'boschrexroth'    // <- Change if using custom credentials
         };
 
         // PLC Variable paths (adjust these to match your PLC structure)
         const plcVars = {
             // Machine State
-            machineState: 'PLC_PRG.MACHINE_STATE',
-
+            machineState: 'PLC_PRG/MACHINE_STATE',
             // Status Outputs
-            isRunning: 'PLC_PRG.stateMachine.isRunning',
-            isFaulted: 'PLC_PRG.stateMachine.isFaulted',
-            isHomed: 'PLC_PRG.stateMachine.isHomed',
+            isRunning: 'PLC_PRG/stateMachine/isRunning',
+            isFaulted: 'PLC_PRG/stateMachine/isFaulted',
+            isHomed: 'PLC_PRG/stateMachine/isHomed',
 
             // Button Inputs
             btnStart: 'PLC_PRG.btn_Start',
@@ -426,12 +748,21 @@
             btnEStop: 'PLC_PRG.btn_EStop',
             btnDriveOn: 'PLC_PRG.btn_DriveOn',
 
-            // Recipe Variables (when implemented)
+            // Recipe Variables
             recipeSelect: 'PLC_PRG.HMI_RecipeSelect',
             activeRecipe: 'PLC_PRG.HMI_ActiveRecipe',
             recipeName: 'PLC_PRG.HMI_RecipeName',
             recipeDescription: 'PLC_PRG.HMI_RecipeDescription',
-            recipeLocked: 'PLC_PRG.HMI_RecipeLocked'
+            recipeLocked: 'PLC_PRG.HMI_RecipeLocked',
+            enableStuds: 'PLC_PRG.HMI_EnableStuds',
+            enableWindows: 'PLC_PRG.HMI_EnableWindows',
+            enableElectrical: 'PLC_PRG.HMI_EnableElectrical',
+
+            // Motion Sequence Variables
+            motionStep: 'PLC_PRG.HMI_MotionStep',
+            motionSubStep: 'PLC_PRG.HMI_MotionSubStep',
+            activeAxesMask: 'PLC_PRG.HMI_ActiveAxesMask',
+            stepDescription: 'PLC_PRG.HMI_StepDescription'
         };
 
         // State machine enumeration
@@ -460,12 +791,51 @@
             'RESETTING': 8
         };
 
+        // Motion step descriptions (for machine state display)
+        const motionSteps = {
+            'INIT': 'System Initializing...',
+            'IDLE': 'Ready for Operation',
+            'HOMING': 'Homing Axes...',
+            'MANUAL': 'Manual Control Active',
+            'RUNNING': 'Cycle in Progress',
+            'STOPPING': 'Stopping Motion...',
+            'FAULTED': 'FAULT - Check System',
+            'E_STOPPED': 'EMERGENCY STOP ACTIVE',
+            'RESETTING': 'Resetting System...'
+        };
+
+        // E_MotionStep enum values (from PLC)
+        const motionStepNames = {
+            1: 'WAIT_FOR_LOAD',
+            2: 'SHIFT_TO_PROCESSING',
+            3: 'STUDS',
+            4: 'WINDOWS_DOORS',
+            5: 'ELECTRICAL',
+            6: 'SHIFT_TO_UNLOAD',
+            'WAIT_FOR_LOAD': 1,
+            'SHIFT_TO_PROCESSING_AREA': 2,
+            'STUDS': 3,
+            'WINDOWS_DOORS': 4,
+            'ELECTRICAL': 5,
+            'SHIFT_TO_UNLOAD_AREA': 6
+        };
+
+        // Axis number to bitmask bit position mapping
+        const axisBitPositions = {
+            1: 0, 2: 1, 6: 5, 8: 7, 10: 9,
+            14: 13, 15: 14, 18: 17, 19: 18,
+            22: 21, 23: 22, 26: 25, 27: 26,
+            30: 29, 31: 30, 34: 33, 35: 34, 36: 35
+        };
+
         let connected = false;
         let updateTimer = null;
+        let drivesOn = false;
 
         // Initialize
         window.onload = function() {
             console.log('HMI Starting...');
+            document.getElementById('plcAddress').textContent = config.plcAddress;
             startUpdates();
         };
 
@@ -487,12 +857,16 @@
                 const running = await readPLCVariable(plcVars.isRunning);
                 const faulted = await readPLCVariable(plcVars.isFaulted);
                 const homed = await readPLCVariable(plcVars.isHomed);
-                const drivesOn = await readPLCVariable(plcVars.btnDriveOn);
+                const drivesOnState = await readPLCVariable(plcVars.btnDriveOn);
 
                 updateIndicator('indRunning', running);
                 updateIndicator('indFaulted', faulted);
                 updateIndicator('indHomed', homed);
-                updateIndicator('indDrives', drivesOn);
+                updateIndicator('indDrives', drivesOnState);
+
+                // Update drives button state
+                drivesOn = drivesOnState;
+                updateDrivesButton();
 
                 // Update recipe info (if variables exist)
                 try {
@@ -500,14 +874,34 @@
                     const recipeName = await readPLCVariable(plcVars.recipeName);
                     const recipeDesc = await readPLCVariable(plcVars.recipeDescription);
                     const recipeLocked = await readPLCVariable(plcVars.recipeLocked);
+                    const enableStuds = await readPLCVariable(plcVars.enableStuds);
+                    const enableWindows = await readPLCVariable(plcVars.enableWindows);
+                    const enableElectrical = await readPLCVariable(plcVars.enableElectrical);
 
                     document.getElementById('recipeName').textContent = recipeName || `Recipe ${activeRecipe}`;
                     document.getElementById('recipeDescription').textContent = recipeDesc || 'No description available';
                     document.getElementById('recipeLocked').style.display = recipeLocked ? 'inline-block' : 'none';
                     document.getElementById('recipeSelect').value = activeRecipe;
                     document.getElementById('recipeSelect').disabled = recipeLocked;
+
+                    // Update operation badges based on recipe enable flags
+                    updateOperationBadge('badgeStuds', enableStuds);
+                    updateOperationBadge('badgeWindows', enableWindows);
+                    updateOperationBadge('badgeElectrical', enableElectrical);
                 } catch (e) {
                     // Recipe variables not available yet
+                }
+
+                // Update motion sequence visualization
+                try {
+                    const motionStep = await readPLCVariable(plcVars.motionStep);
+                    const motionSubStep = await readPLCVariable(plcVars.motionSubStep);
+                    const activeAxesMask = await readPLCVariable(plcVars.activeAxesMask);
+                    const stepDescription = await readPLCVariable(plcVars.stepDescription);
+
+                    updateMotionSequence(motionStep, motionSubStep, activeAxesMask, stepDescription);
+                } catch (e) {
+                    // Motion sequence variables not available yet
                 }
 
                 updateConnectionStatus(true);
@@ -544,7 +938,7 @@
 
                 const data = await response.json();
                 authToken = data.access_token;
-                console.log('✓ Authenticated with ctrlX');
+                console.log('Authenticated with ctrlX');
                 return true;
 
             } catch (error) {
@@ -580,7 +974,15 @@
                 }
 
                 const data = await response.json();
-                let value = data.value;
+
+                // ctrlX returns data directly, not wrapped in "value" property
+                // Could be: {"E_MachineState":"RUNNING"} or just a primitive
+                let value = data;
+
+                // If there's a "value" property, use that (some endpoints wrap it)
+                if (data.hasOwnProperty('value')) {
+                    value = data.value;
+                }
 
                 // Handle enum types returned as objects like {"E_MachineState": "IDLE"}
                 if (value && typeof value === 'object' && !Array.isArray(value)) {
@@ -589,11 +991,6 @@
                     if (enumValues.length > 0) {
                         value = enumValues[0];
                     }
-                }
-
-                // Convert string enum values to numbers for MACHINE_STATE
-                if (typeof value === 'string' && machineStateValues.hasOwnProperty(value)) {
-                    value = machineStateValues[value];
                 }
 
                 return value;
@@ -605,12 +1002,33 @@
         }
 
         // Write PLC variable via ctrlX Data Layer API
-        async function writePLCVariable(varPath, value) {
+        async function writePLCVariable(varPath, value, plcType = null) {
             if (!authToken) await authenticateCtrlX();
 
             // Replace dots with slashes for Data Layer path format
             const dataLayerPath = varPath.replace(/\./g, '/');
             const url = `https://${config.plcAddress}${config.apiBasePath}/plc/app/Application/sym/${dataLayerPath}`;
+
+            // Debug logging
+            console.log(`Writing ${varPath} = ${value} (type: ${typeof value}, plcType: ${plcType})`);
+
+            // ctrlX Data Layer requires type+value format for writes
+            // Type names: bool8, uint16, int16, uint32, int32, float, double, string
+            let body;
+            if (plcType === 'uint16' || plcType === 'UINT') {
+                body = JSON.stringify({ type: "uint16", value: Number(value) });
+            } else if (plcType === 'bool8' || plcType === 'BOOL' || typeof value === 'boolean') {
+                // BOOL type in ctrlX is "bool8"
+                body = JSON.stringify({ type: "bool8", value: Boolean(value) });
+            } else if (typeof value === 'number') {
+                // Default numbers to int32
+                body = JSON.stringify({ type: "int32", value: Number(value) });
+            } else if (typeof value === 'string') {
+                body = JSON.stringify({ type: "string", value: String(value) });
+            } else {
+                // Fallback - try raw value
+                body = JSON.stringify(value);
+            }
 
             try {
                 const response = await fetch(url, {
@@ -619,23 +1037,21 @@
                         'Authorization': `Bearer ${authToken}`,
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({
-                        value: value,
-                        type: typeof value === 'boolean' ? 'bool8' :
-                              typeof value === 'number' ? 'int32' : 'string'
-                    })
+                    body: body
                 });
 
                 if (!response.ok) {
                     if (response.status === 401) {
                         // Token expired, re-authenticate and retry
                         authToken = null;
-                        return writePLCVariable(varPath, value);
+                        return writePLCVariable(varPath, value, plcType);
                     }
+                    const errorText = await response.text();
+                    console.error(`Write failed: ${response.status} - ${errorText}`);
                     throw new Error(`Write failed: ${response.status}`);
                 }
 
-                console.log(`✓ Wrote ${varPath} = ${value}`);
+                console.log(`Successfully wrote ${varPath} = ${value}`);
                 return true;
 
             } catch (error) {
@@ -647,12 +1063,13 @@
         // Send command to PLC
         async function sendCommand(buttonVar, value) {
             try {
-                await writePLCVariable(plcVars[buttonVar.replace('btn_', 'btn')], value);
+                const varName = 'btn' + buttonVar.replace('btn_', '').charAt(0).toUpperCase() + buttonVar.replace('btn_', '').slice(1);
+                await writePLCVariable(plcVars[varName], value);
 
-                // Auto-reset button after short delay
-                if (value === true) {
+                // Auto-reset button after short delay (pulse)
+                if (value === true && buttonVar !== 'btn_DriveOn') {
                     setTimeout(() => {
-                        writePLCVariable(plcVars[buttonVar.replace('btn_', 'btn')], false);
+                        writePLCVariable(plcVars[varName], false);
                     }, 100);
                 }
             } catch (error) {
@@ -660,11 +1077,33 @@
             }
         }
 
+        // Toggle drives on/off
+        async function toggleDrives() {
+            try {
+                await writePLCVariable(plcVars.btnDriveOn, !drivesOn);
+            } catch (error) {
+                showError('Drive toggle failed: ' + error.message);
+            }
+        }
+
+        // Update drives button appearance
+        function updateDrivesButton() {
+            const btn = document.getElementById('btnDriveOn');
+            if (drivesOn) {
+                btn.textContent = 'Drives ON';
+                btn.classList.add('active');
+            } else {
+                btn.textContent = 'Drives OFF';
+                btn.classList.remove('active');
+            }
+        }
+
         // Select recipe
         async function selectRecipe() {
             const recipeId = parseInt(document.getElementById('recipeSelect').value);
             try {
-                await writePLCVariable(plcVars.recipeSelect, recipeId);
+                // Pass 'UINT' type so the write function formats it correctly for ctrlX
+                await writePLCVariable(plcVars.recipeSelect, recipeId, 'UINT');
             } catch (error) {
                 showError('Recipe selection failed: ' + error.message);
             }
@@ -672,10 +1111,26 @@
 
         // Update machine state display
         function updateMachineState(stateValue) {
-            const stateText = machineStates[stateValue] || 'UNKNOWN';
+            let stateText;
+
+            // Handle both numeric and string state values
+            if (typeof stateValue === 'number') {
+                stateText = machineStates[stateValue] || 'UNKNOWN';
+            } else if (typeof stateValue === 'string') {
+                // Direct string value like "RUNNING"
+                stateText = machineStates.hasOwnProperty(machineStateValues[stateValue])
+                    ? stateValue
+                    : 'UNKNOWN';
+            } else {
+                stateText = 'UNKNOWN';
+            }
+
             const stateElement = document.getElementById('machineState');
+            const motionElement = document.getElementById('motionStep');
+
             stateElement.textContent = stateText;
             stateElement.className = `state-display ${stateText}`;
+            motionElement.textContent = motionSteps[stateText] || '';
         }
 
         // Update indicator
@@ -691,30 +1146,96 @@
         // Update connection status
         function updateConnectionStatus(isConnected) {
             connected = isConnected;
-            const indicator = document.getElementById('connectionIndicator');
+            const dot = document.getElementById('connectionDot');
             const text = document.getElementById('connectionText');
 
             if (isConnected) {
-                indicator.className = 'status-indicator connected';
-                text.textContent = 'Connected';
+                dot.classList.add('connected');
+                text.textContent = 'ONLINE';
+                text.style.color = '#00ff88';
                 hideError();
             } else {
-                indicator.className = 'status-indicator disconnected';
-                text.textContent = 'Disconnected';
+                dot.classList.remove('connected');
+                text.textContent = 'OFFLINE';
+                text.style.color = '#ff4444';
             }
         }
 
         // Show error message
         function showError(message) {
-            const errorDiv = document.getElementById('errorMessage');
+            const errorDiv = document.getElementById('errorBanner');
             errorDiv.textContent = message;
             errorDiv.classList.add('show');
         }
 
         // Hide error message
         function hideError() {
-            const errorDiv = document.getElementById('errorMessage');
+            const errorDiv = document.getElementById('errorBanner');
             errorDiv.classList.remove('show');
+        }
+
+        // Update motion sequence visualization
+        function updateMotionSequence(motionStep, subStep, axesMask, description) {
+            // Get step name from enum value or string
+            let stepName;
+            if (typeof motionStep === 'number') {
+                stepName = motionStepNames[motionStep] || 'UNKNOWN';
+            } else if (typeof motionStep === 'string') {
+                stepName = motionStep;
+            } else {
+                stepName = 'UNKNOWN';
+            }
+
+            // Update step and substep display
+            document.getElementById('seqStep').textContent = stepName;
+            document.getElementById('seqSubStep').textContent = subStep || 0;
+            document.getElementById('seqDescription').textContent = description || 'Waiting...';
+
+            // Update active axes indicators
+            const axisIndicators = document.querySelectorAll('.axis-indicator');
+            axisIndicators.forEach(indicator => {
+                const axisNum = parseInt(indicator.dataset.axis);
+                const bitPos = axisBitPositions[axisNum];
+                const isActive = bitPos !== undefined && ((axesMask >> bitPos) & 1) === 1;
+
+                if (isActive) {
+                    indicator.classList.add('active');
+                } else {
+                    indicator.classList.remove('active');
+                }
+            });
+
+            // Highlight current operation badge
+            const currentStepNum = typeof motionStep === 'number' ? motionStep : motionStepNames[motionStep];
+            updateCurrentOperationBadge(currentStepNum);
+        }
+
+        // Update operation badge enabled state
+        function updateOperationBadge(badgeId, enabled) {
+            const badge = document.getElementById(badgeId);
+            if (enabled) {
+                badge.classList.add('enabled');
+            } else {
+                badge.classList.remove('enabled');
+            }
+        }
+
+        // Highlight the current operation badge
+        function updateCurrentOperationBadge(currentStep) {
+            // Remove 'current' from all badges first
+            document.getElementById('badgeStuds').classList.remove('current');
+            document.getElementById('badgeWindows').classList.remove('current');
+            document.getElementById('badgeElectrical').classList.remove('current');
+
+            // Add 'current' to the active operation
+            // 3 = STUDS, 4 = WINDOWS_DOORS, 5 = ELECTRICAL
+            if (currentStep === 3) {
+                document.getElementById('badgeStuds').classList.add('current');
+            } else if (currentStep === 4) {
+                document.getElementById('badgeWindows').classList.add('current');
+            } else if (currentStep === 5) {
+                document.getElementById('badgeElectrical').classList.add('current');
+            }
         }
     </script>
 </body>

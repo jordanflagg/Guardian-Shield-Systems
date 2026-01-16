@@ -7,9 +7,7 @@ VAR_INPUT
     manualMode : BOOL;
     eStopActive : BOOL;
     resetButton : BOOL;
-	
-	
-	
+    selectedRecipe : UINT := 1;     // Recipe selection from HMI (1-10)
 END_VAR
 
 VAR_OUTPUT
@@ -17,19 +15,31 @@ VAR_OUTPUT
     isRunning : BOOL;
     isFaulted : BOOL;
     isHomed : BOOL;
+    activeRecipeID : UINT;              // Currently active recipe
+    recipeLocked : BOOL;                // TRUE when recipe cannot be changed
+
+    // Motion sequence visualization (pass-through from FB_MotionSequence)
+    motionStepOut : E_MotionStep;       // Current motion step
+    motionSubStep : INT;                // Current substep
+    activeAxesMask : DWORD;             // Bitmask of moving axes
+    stepDescription : STRING[80];       // Human-readable step description
 END_VAR
 
 VAR
     currentState : E_MachineState := E_MachineState.INIT;  // Internal state
-	
+
 	// Motion sequence variables
 	motionSequence 	: FB_MotionSequence;
     motionStep : E_MotionStep := E_MotionStep.WAIT_FOR_LOAD;
     subStep : INT := 0;  // For tracking sub-movements within a step
-    
+
     // Flags for position confirmation
     allAxesInPosition : BOOL := FALSE;
-	
+
+    // Recipe management
+    requestedRecipeID : UINT := 1;
+    loadRecipeTrigger : BOOL := FALSE;
+
 	fbHalt : ARRAY[MOTIF_CONFIG.MIN_AXIS_INDEX..MOTIF_CONFIG.MAX_AXIS_INDEX] OF MC_Halt;
 	i : UINT;
 END_VAR
@@ -63,17 +73,26 @@ CASE currentState OF
     E_MachineState.IDLE:
         // Update outputs
         isRunning := FALSE;
-        
+        recipeLocked := FALSE;  // Allow recipe changes in IDLE
+
+        // Handle recipe selection changes (only when not locked)
+        IF selectedRecipe <> activeRecipeID AND selectedRecipe >= 1 AND selectedRecipe <= 10 THEN
+            requestedRecipeID := selectedRecipe;
+            loadRecipeTrigger := TRUE;
+            activeRecipeID := selectedRecipe;
+        END_IF
+
         // Check for operator commands and transition accordingly
         IF homeButton THEN
             currentState := E_MachineState.HOMING;
-            
+
         ELSIF manualMode THEN
             currentState := E_MachineState.MANUAL;
-            
+
         ELSIF startButton THEN
+            recipeLocked := TRUE;  // Lock recipe when starting
             currentState := E_MachineState.RUNNING;
-            
+
         END_IF;
     
     // ------------------------------------------------------------------------
@@ -100,12 +119,20 @@ CASE currentState OF
     E_MachineState.RUNNING:
         // Update outputs
         isRunning := TRUE;
-        
-        // TODO: Motion sequence state machine will go here
-        // This is where your Level 2 state machine (motion steps) will execute
+        recipeLocked := TRUE;  // Keep recipe locked while running
+
+        // Motion sequence state machine with recipe support
         motionSequence(
-	enable := startButton
-);
+            enable := startButton,
+            recipeID := activeRecipeID,
+            loadRecipe := loadRecipeTrigger
+        );
+
+        // Clear load trigger after first cycle
+        IF loadRecipeTrigger THEN
+            loadRecipeTrigger := FALSE;
+        END_IF
+
         // Check for stop button
         IF stopButton THEN
             currentState := E_MachineState.STOPPING;
@@ -174,3 +201,9 @@ END_CASE;
 
 // Copy internal state to output so other code/HMI can see it
 currentStateOut := currentState;
+
+// Copy motion sequence visualization outputs
+motionStepOut := motionSequence.currentStep;
+motionSubStep := motionSequence.currentSubStep;
+activeAxesMask := motionSequence.activeAxesMask;
+stepDescription := motionSequence.stepDescription;

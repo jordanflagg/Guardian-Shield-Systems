@@ -22,6 +22,22 @@ VAR
     isRunning : BOOL;
     isFaulted : BOOL;
     isHomed : BOOL;
+
+    // HMI Recipe Variables
+    HMI_RecipeSelect : UINT := 1;           // Recipe dropdown selection (1-10)
+    HMI_ActiveRecipe : UINT := 1;           // Currently active recipe ID
+    HMI_RecipeName : STRING[40];            // Recipe name for display
+    HMI_RecipeDescription : STRING[100];    // Recipe description for display
+    HMI_RecipeLocked : BOOL := FALSE;       // TRUE when recipe cannot be changed
+    HMI_EnableStuds : BOOL := TRUE;         // Shows if STUDS operation enabled
+    HMI_EnableWindows : BOOL := TRUE;       // Shows if WINDOWS operation enabled
+    HMI_EnableElectrical : BOOL := TRUE;    // Shows if ELECTRICAL operation enabled
+
+    // HMI Motion Sequence Visualization Variables
+    HMI_MotionStep : E_MotionStep;          // Current motion step
+    HMI_MotionSubStep : INT;                // Current substep number
+    HMI_ActiveAxesMask : DWORD;             // Bitmask of currently moving axes
+    HMI_StepDescription : STRING[80];       // Human-readable description
 END_VAR
 
 
@@ -56,7 +72,8 @@ stateMachine(
     homeButton := buttonManager.btn_Home_Out,
     manualMode := buttonManager.btn_Manual_Out,
     eStopActive := buttonManager.btn_EStop_Out,
-    resetButton := buttonManager.btn_Reset_Out
+    resetButton := buttonManager.btn_Reset_Out,
+    selectedRecipe := HMI_RecipeSelect
 );
 
 
@@ -69,3 +86,32 @@ MACHINE_STATE := stateMachine.currentStateOut;
 isRunning := stateMachine.isRunning;
 isFaulted := stateMachine.isFaulted;
 isHomed := stateMachine.isHomed;
+
+// ============================================================================
+// UPDATE RECIPE HMI VARIABLES
+// ============================================================================
+HMI_ActiveRecipe := stateMachine.activeRecipeID;
+HMI_RecipeLocked := stateMachine.recipeLocked;
+
+// Update recipe name and description from library
+IF HMI_ActiveRecipe >= 1 AND HMI_ActiveRecipe <= 10 THEN
+    HMI_RecipeName := GVL_Recipes.RecipeLibrary[HMI_ActiveRecipe].recipeName;
+    HMI_RecipeDescription := GVL_Recipes.RecipeLibrary[HMI_ActiveRecipe].recipeDescription;
+    HMI_EnableStuds := GVL_Recipes.RecipeLibrary[HMI_ActiveRecipe].enableStuds;
+    HMI_EnableWindows := GVL_Recipes.RecipeLibrary[HMI_ActiveRecipe].enableWindowsDoors;
+    HMI_EnableElectrical := GVL_Recipes.RecipeLibrary[HMI_ActiveRecipe].enableElectrical;
+ELSE
+    HMI_RecipeName := 'INVALID';
+    HMI_RecipeDescription := 'Recipe ID out of range';
+    HMI_EnableStuds := FALSE;
+    HMI_EnableWindows := FALSE;
+    HMI_EnableElectrical := FALSE;
+END_IF
+
+// ============================================================================
+// UPDATE MOTION SEQUENCE HMI VARIABLES
+// ============================================================================
+HMI_MotionStep := stateMachine.motionStepOut;
+HMI_MotionSubStep := stateMachine.motionSubStep;
+HMI_ActiveAxesMask := stateMachine.activeAxesMask;
+HMI_StepDescription := stateMachine.stepDescription;

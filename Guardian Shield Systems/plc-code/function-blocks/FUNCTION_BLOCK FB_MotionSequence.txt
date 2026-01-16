@@ -2,20 +2,40 @@ FUNCTION_BLOCK FB_MotionSequence
 
 VAR_INPUT
     enable : BOOL;
+    recipeID : UINT := 1;           // Recipe number to load (1-10)
+    loadRecipe : BOOL;              // Rising edge loads recipe
 END_VAR
 
 VAR_OUTPUT
     sequenceComplete : BOOL;
     currentStep : E_MotionStep;
+    activeRecipeID : UINT;          // Currently loaded recipe ID
+    recipeLoadComplete : BOOL;      // Recipe loaded successfully
+    recipeLoadError : BOOL;         // Recipe load failed (invalid ID or inactive)
+
+    // HMI visualization outputs
+    currentSubStep : INT;           // Current substep within motion step
+    activeAxesMask : DWORD;         // Bitmask of currently moving axes (bit 0 = axis 1, etc)
+    stepDescription : STRING[80];   // Human-readable description of current action
 END_VAR
 
 VAR
     motionStep : E_MotionStep := E_MotionStep.WAIT_FOR_LOAD;
     subStep : INT := 0;
-    
+
     positions : ST_PositionSetpoints;
     motionParams : ST_MotionParameters;
-    
+
+    // Recipe management
+    currentRecipeID : UINT := 1;
+    recipeLoaded : BOOL := FALSE;
+    loadRecipePrev : BOOL := FALSE;     // For edge detection
+
+    // Operation enable flags (from recipe)
+    enableStudsOperation : BOOL := TRUE;
+    enableWindowsDoorsOperation : BOOL := TRUE;
+    enableElectricalOperation : BOOL := TRUE;
+
     blockLoaded : BOOL := TRUE;
     
     // Execute flags - ONLY for masters and independent axes
@@ -102,6 +122,42 @@ END_VAR
 
 
 ///////////////////////////////////////////////////////////////////////////////
+
+// ============================================================================
+// RECIPE LOADING - Execute before motion sequence
+// ============================================================================
+
+// Load recipe on rising edge or if no recipe loaded yet
+IF (loadRecipe AND NOT loadRecipePrev) OR NOT recipeLoaded THEN
+    IF recipeID >= 1 AND recipeID <= 10 THEN
+        IF GVL_Recipes.RecipeLibrary[recipeID].isActive THEN
+            // Load recipe data
+            positions := GVL_Recipes.RecipeLibrary[recipeID].positions;
+            motionParams := GVL_Recipes.RecipeLibrary[recipeID].motionParams;
+            enableStudsOperation := GVL_Recipes.RecipeLibrary[recipeID].enableStuds;
+            enableWindowsDoorsOperation := GVL_Recipes.RecipeLibrary[recipeID].enableWindowsDoors;
+            enableElectricalOperation := GVL_Recipes.RecipeLibrary[recipeID].enableElectrical;
+
+            currentRecipeID := recipeID;
+            recipeLoaded := TRUE;
+            recipeLoadError := FALSE;
+            recipeLoadComplete := TRUE;
+            activeRecipeID := recipeID;
+        ELSE
+            // Recipe is inactive
+            recipeLoadError := TRUE;
+            recipeLoadComplete := FALSE;
+        END_IF
+    ELSE
+        // Invalid recipe ID
+        recipeLoadError := TRUE;
+        recipeLoadComplete := FALSE;
+    END_IF
+END_IF
+
+// Update edge detection
+loadRecipePrev := loadRecipe;
+
 
 // ============================================================================
 // PERMANENT GEARING - ALWAYS ACTIVE
@@ -659,10 +715,19 @@ CASE motionStep OF
         
         // ----------------------------------------------------------------
         10: // Complete - block is now in center, ready for carving
-            // Move to next main state
-            motionStep := E_MotionStep.STUDS;
+            // Determine next operation based on recipe enable flags
+            IF enableStudsOperation THEN
+                motionStep := E_MotionStep.STUDS;
+            ELSIF enableWindowsDoorsOperation THEN
+                motionStep := E_MotionStep.WINDOWS_DOORS;
+            ELSIF enableElectricalOperation THEN
+                motionStep := E_MotionStep.ELECTRICAL;
+            ELSE
+                // All operations disabled - skip to unload
+                motionStep := E_MotionStep.SHIFT_TO_UNLOAD_AREA;
+            END_IF
             subStep := 0;
-            
+
     END_CASE;
 	
 	E_MotionStep.STUDS:
@@ -889,12 +954,19 @@ CASE motionStep OF
         
         // ----------------------------------------------------------------
         5: // Complete - stud carving done
-            // Move to next state (windows/doors or electrical)
-            motionStep := E_MotionStep.WINDOWS_DOORS;
+            // Determine next operation based on recipe enable flags
+            IF enableWindowsDoorsOperation THEN
+                motionStep := E_MotionStep.WINDOWS_DOORS;
+            ELSIF enableElectricalOperation THEN
+                motionStep := E_MotionStep.ELECTRICAL;
+            ELSE
+                // Skip to unload
+                motionStep := E_MotionStep.SHIFT_TO_UNLOAD_AREA;
+            END_IF
             subStep := 0;
-            
+
     END_CASE;
-	
+
 	E_MotionStep.WINDOWS_DOORS:
     
     CASE subStep OF
@@ -983,12 +1055,17 @@ CASE motionStep OF
         
         // ----------------------------------------------------------------
         5: // Complete - window/door carving done
-            // Move to next state
-            motionStep := E_MotionStep.ELECTRICAL;
+            // Determine next operation based on recipe enable flags
+            IF enableElectricalOperation THEN
+                motionStep := E_MotionStep.ELECTRICAL;
+            ELSE
+                // Skip to unload
+                motionStep := E_MotionStep.SHIFT_TO_UNLOAD_AREA;
+            END_IF
             subStep := 0;
-            
+
     END_CASE;
-	
+
 	E_MotionStep.ELECTRICAL:
     
     CASE subStep OF
@@ -1185,3 +1262,101 @@ CASE motionStep OF
 END_CASE;
 
 currentStep := motionStep;
+currentSubStep := subStep;
+
+// ============================================================================
+// UPDATE HMI VISUALIZATION OUTPUTS
+// ============================================================================
+
+// Build active axes bitmask from execute flags
+activeAxesMask := 0;
+IF executeAxis1Move THEN activeAxesMask := activeAxesMask OR SHL(DWORD#1, 0); END_IF
+IF executeAxis2Move THEN activeAxesMask := activeAxesMask OR SHL(DWORD#1, 1); END_IF
+IF executeAxis6Move THEN activeAxesMask := activeAxesMask OR SHL(DWORD#1, 5); END_IF
+IF executeAxis8Move THEN activeAxesMask := activeAxesMask OR SHL(DWORD#1, 7); END_IF
+IF executeAxis10Move THEN activeAxesMask := activeAxesMask OR SHL(DWORD#1, 9); END_IF
+IF executeAxis14Move THEN activeAxesMask := activeAxesMask OR SHL(DWORD#1, 13); END_IF
+IF executeAxis15Move THEN activeAxesMask := activeAxesMask OR SHL(DWORD#1, 14); END_IF
+IF executeAxis18Move THEN activeAxesMask := activeAxesMask OR SHL(DWORD#1, 17); END_IF
+IF executeAxis19Move THEN activeAxesMask := activeAxesMask OR SHL(DWORD#1, 18); END_IF
+IF executeAxis22Move THEN activeAxesMask := activeAxesMask OR SHL(DWORD#1, 21); END_IF
+IF executeAxis23Move THEN activeAxesMask := activeAxesMask OR SHL(DWORD#1, 22); END_IF
+IF executeAxis26Move THEN activeAxesMask := activeAxesMask OR SHL(DWORD#1, 25); END_IF
+IF executeAxis27Move THEN activeAxesMask := activeAxesMask OR SHL(DWORD#1, 26); END_IF
+IF executeAxis30Move THEN activeAxesMask := activeAxesMask OR SHL(DWORD#1, 29); END_IF
+IF executeAxis31Move THEN activeAxesMask := activeAxesMask OR SHL(DWORD#1, 30); END_IF
+IF executeAxis34Move THEN activeAxesMask := activeAxesMask OR SHL(DWORD#1, 33); END_IF
+IF executeAxis35Move THEN activeAxesMask := activeAxesMask OR SHL(DWORD#1, 34); END_IF
+IF executeAxis36Move THEN activeAxesMask := activeAxesMask OR SHL(DWORD#1, 35); END_IF
+
+// Generate step description
+CASE motionStep OF
+    E_MotionStep.WAIT_FOR_LOAD:
+        stepDescription := 'Waiting for block to load';
+
+    E_MotionStep.SHIFT_TO_PROCESSING_AREA:
+        CASE subStep OF
+            0: stepDescription := 'Shifting block to left wall';
+            1: stepDescription := 'Raising load table';
+            2: stepDescription := 'Shifting block to center';
+            3: stepDescription := 'Lowering load table';
+            4: stepDescription := 'Returning shift mechanism';
+            5: stepDescription := 'Raising unload table';
+            6: stepDescription := 'Centering block';
+            7: stepDescription := 'Engaging suction cups';
+            8: stepDescription := 'Returning pusher';
+            9: stepDescription := 'Lowering unload table';
+            10: stepDescription := 'Block positioned - ready for carving';
+        ELSE
+            stepDescription := 'Positioning block';
+        END_CASE
+
+    E_MotionStep.STUDS:
+        CASE subStep OF
+            0: stepDescription := 'Stud axes - moving to position 1';
+            1: stepDescription := 'Stud axes - horizontal extend';
+            2: stepDescription := 'Stud axes - cutting (vertical)';
+            3: stepDescription := 'Stud axes - retracting';
+            4: stepDescription := 'Stud axes - returning home';
+            5: stepDescription := 'Stud carving complete';
+        ELSE
+            stepDescription := 'Carving studs';
+        END_CASE
+
+    E_MotionStep.WINDOWS_DOORS:
+        CASE subStep OF
+            0: stepDescription := 'Window/door - horizontal position';
+            1: stepDescription := 'Window/door - vertical down';
+            2: stepDescription := 'Window/door - cutting horizontal';
+            3: stepDescription := 'Window/door - vertical up';
+            4: stepDescription := 'Window/door - returning home';
+            5: stepDescription := 'Window/door carving complete';
+        ELSE
+            stepDescription := 'Carving windows/doors';
+        END_CASE
+
+    E_MotionStep.ELECTRICAL:
+        CASE subStep OF
+            0: stepDescription := 'Electrical - positioning for trough';
+            1: stepDescription := 'Electrical - extending into foam';
+            2: stepDescription := 'Electrical - cutting trough';
+            3: stepDescription := 'Electrical - retracting';
+            4: stepDescription := 'Electrical - returning home';
+            5: stepDescription := 'Electrical trough complete';
+        ELSE
+            stepDescription := 'Carving electrical trough';
+        END_CASE
+
+    E_MotionStep.SHIFT_TO_UNLOAD_AREA:
+        CASE subStep OF
+            0: stepDescription := 'Unload - raising table';
+            1: stepDescription := 'Unload - shifting block';
+            2: stepDescription := 'Unload - lowering table';
+            3: stepDescription := 'Unload - returning pusher';
+            4: stepDescription := 'Cycle complete - ready for removal';
+        ELSE
+            stepDescription := 'Moving block to unload';
+        END_CASE
+ELSE
+    stepDescription := 'Unknown step';
+END_CASE

@@ -19,7 +19,7 @@
         }
 
         .container {
-            max-width: 1400px;
+            max-width: 1600px;
             margin: 0 auto;
         }
 
@@ -29,21 +29,52 @@
             border-radius: 15px;
             margin-bottom: 20px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
-        .header h1 {
+        .header-left h1 {
             color: #333;
             font-size: 28px;
             margin-bottom: 5px;
         }
 
-        .header .subtitle {
+        .header-left .subtitle {
             color: #666;
             font-size: 14px;
         }
 
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 10px;
+        }
+
+        .nav-link {
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .nav-link:hover {
+            background: #764ba2;
+        }
+
+        .nav-link.active {
+            background: #10b981;
+        }
+
         .connection-status {
-            float: right;
             display: flex;
             align-items: center;
             gap: 10px;
@@ -75,6 +106,10 @@
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
             gap: 20px;
             margin-bottom: 20px;
+        }
+
+        .grid-wide {
+            grid-template-columns: 1fr;
         }
 
         .card {
@@ -284,6 +319,216 @@
             box-shadow: 0 0 10px #10b981;
         }
 
+        .indicator.faulted {
+            background: #ef4444;
+            box-shadow: 0 0 10px #ef4444;
+        }
+
+        /* Axis Visualization Styles */
+        .axis-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .axis-section {
+            background: #f9fafb;
+            border-radius: 10px;
+            padding: 15px;
+        }
+
+        .axis-section h3 {
+            color: #333;
+            font-size: 14px;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .axis-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .axis-group {
+            display: flex;
+            gap: 4px;
+            padding: 6px;
+            background: #e5e7eb;
+            border-radius: 8px;
+            transition: all 0.3s;
+        }
+
+        .axis-group.active {
+            background: rgba(16, 185, 129, 0.3);
+            box-shadow: 0 0 15px rgba(16, 185, 129, 0.5);
+        }
+
+        .axis-box {
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
+        }
+
+        .axis-box.master {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .axis-box.slave {
+            background: #8b5cf6;
+            color: white;
+        }
+
+        .axis-box.independent {
+            background: #10b981;
+            color: white;
+        }
+
+        .axis-box.idle {
+            background: #6b7280;
+            color: white;
+        }
+
+        .axis-box.moving {
+            animation: axisMoving 0.5s infinite;
+        }
+
+        .axis-box.faulted {
+            background: #ef4444 !important;
+            animation: axisFaulted 0.5s infinite;
+        }
+
+        .axis-box.homed {
+            border: 2px solid #10b981;
+        }
+
+        .axis-box:hover {
+            transform: scale(1.1);
+            z-index: 10;
+        }
+
+        @keyframes axisMoving {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        @keyframes axisFaulted {
+            0%, 100% { box-shadow: 0 0 5px #ef4444; }
+            50% { box-shadow: 0 0 15px #ef4444; }
+        }
+
+        .axis-legend {
+            display: flex;
+            gap: 20px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+        }
+
+        /* Motor Stats Panel */
+        .axis-stats-panel {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            z-index: 1000;
+            min-width: 350px;
+            display: none;
+        }
+
+        .axis-stats-panel.show {
+            display: block;
+        }
+
+        .axis-stats-panel h3 {
+            font-size: 20px;
+            color: #333;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .stats-grid {
+            display: grid;
+            gap: 12px;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background: #f9fafb;
+            border-radius: 8px;
+        }
+
+        .stat-label {
+            color: #666;
+            font-weight: 600;
+        }
+
+        .stat-value {
+            color: #333;
+            font-weight: bold;
+            font-family: 'Courier New', monospace;
+        }
+
+        .close-panel {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: #ef4444;
+            color: white;
+            border: none;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 18px;
+        }
+
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 999;
+            display: none;
+        }
+
+        .overlay.show {
+            display: block;
+        }
+
         .footer {
             text-align: center;
             color: white;
@@ -303,18 +548,39 @@
         .error-message.show {
             display: block;
         }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                gap: 15px;
+            }
+            .axis-box {
+                width: 35px;
+                height: 35px;
+                font-size: 10px;
+            }
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <!-- Header -->
         <div class="header">
-            <div class="connection-status">
-                <span id="connectionText">Disconnected</span>
-                <div id="connectionIndicator" class="status-indicator disconnected"></div>
+            <div class="header-left">
+                <h1>Foam Block Carving Machine</h1>
+                <div class="subtitle">Web-Based HMI Control Panel</div>
             </div>
-            <h1>Foam Block Carving Machine</h1>
-            <div class="subtitle">Web-Based HMI Control Panel</div>
+            <div class="header-right">
+                <div class="nav-links">
+                    <a href="index.html" class="nav-link active">Dashboard</a>
+                    <a href="recipes.html" class="nav-link">Recipe Editor</a>
+                </div>
+                <div class="connection-status">
+                    <span id="connectionText">Disconnected</span>
+                    <div id="connectionIndicator" class="status-indicator disconnected"></div>
+                </div>
+            </div>
         </div>
 
         <!-- Error Message -->
@@ -350,18 +616,20 @@
                 <div class="recipe-selector">
                     <label for="recipeSelect">Select Recipe:</label>
                     <select id="recipeSelect" onchange="selectRecipe()">
-                        <option value="1">Recipe 1 - Default</option>
-                        <option value="2">Recipe 2 - Custom</option>
-                        <option value="3">Recipe 3 - Test</option>
-                        <option value="4">Recipe 4 - Advanced</option>
-                        <option value="5">Recipe 5 - Quick</option>
+                        <option value="1">1 - 8ft Standard Block</option>
+                        <option value="2">2 - 10ft Studs Only</option>
+                        <option value="3">3 - 8ft Windows Only</option>
+                        <option value="4">4 - 8ft Electrical Only</option>
+                        <option value="5">5 - 12ft Full Block</option>
+                        <option value="6">6 - 4ft Quick Test</option>
+                        <option value="7">7 - 8ft Studs+Windows</option>
                     </select>
                 </div>
                 <div class="recipe-info">
-                    <h3 id="recipeName">Recipe 1</h3>
-                    <p id="recipeDescription">Loading recipe information...</p>
+                    <h3 id="recipeName">8ft Standard Block</h3>
+                    <p id="recipeDescription">Standard 8ft block with studs, windows/doors, and electrical</p>
                     <div id="recipeLocked" class="recipe-locked" style="display: none;">
-                        🔒 Recipe Locked (Machine Running)
+                        Recipe Locked (Machine Running)
                     </div>
                 </div>
             </div>
@@ -386,36 +654,289 @@
                         <span class="status-label">Drives Powered</span>
                         <div id="indDrives" class="indicator"></div>
                     </div>
+                    <div class="status-item">
+                        <span class="status-label">Gearing Engaged</span>
+                        <div id="indGearing" class="indicator"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 36 Axis Visualization -->
+        <div class="grid grid-wide">
+            <div class="card">
+                <h2>36-Axis Visualization (Click axis for details)</h2>
+                <div class="axis-container">
+                    <!-- Loading/Unloading Section -->
+                    <div class="axis-section">
+                        <h3>Loading / Unloading System (Axes 1-13)</h3>
+                        <div class="axis-grid">
+                            <!-- Axis 1: Block Shift (Independent) -->
+                            <div class="axis-group" id="group-1" data-group="1">
+                                <div class="axis-box independent" id="axis-1" onclick="showAxisStats(1)" title="Axis 1: Block Shift Left">1</div>
+                            </div>
+                            <!-- Axes 2-5: Load Table Lift (Geared) -->
+                            <div class="axis-group" id="group-2-5" data-group="2-5">
+                                <div class="axis-box master" id="axis-2" onclick="showAxisStats(2)" title="Axis 2: Load Table Lift (Master)">2</div>
+                                <div class="axis-box slave" id="axis-3" onclick="showAxisStats(3)" title="Axis 3: Load Table Lift (Slave)">3</div>
+                                <div class="axis-box slave" id="axis-4" onclick="showAxisStats(4)" title="Axis 4: Load Table Lift (Slave)">4</div>
+                                <div class="axis-box slave" id="axis-5" onclick="showAxisStats(5)" title="Axis 5: Load Table Lift (Slave)">5</div>
+                            </div>
+                            <!-- Axes 6-7: Shift to Center (Geared) -->
+                            <div class="axis-group" id="group-6-7" data-group="6-7">
+                                <div class="axis-box master" id="axis-6" onclick="showAxisStats(6)" title="Axis 6: Shift to Center (Master)">6</div>
+                                <div class="axis-box slave" id="axis-7" onclick="showAxisStats(7)" title="Axis 7: Shift to Center (Slave)">7</div>
+                            </div>
+                            <!-- Axes 8-9: Unload Pusher (Geared) -->
+                            <div class="axis-group" id="group-8-9" data-group="8-9">
+                                <div class="axis-box master" id="axis-8" onclick="showAxisStats(8)" title="Axis 8: Unload Pusher (Master)">8</div>
+                                <div class="axis-box slave" id="axis-9" onclick="showAxisStats(9)" title="Axis 9: Unload Pusher (Slave)">9</div>
+                            </div>
+                            <!-- Axes 10-13: Unload Table Lift (Geared) -->
+                            <div class="axis-group" id="group-10-13" data-group="10-13">
+                                <div class="axis-box master" id="axis-10" onclick="showAxisStats(10)" title="Axis 10: Unload Lift (Master)">10</div>
+                                <div class="axis-box slave" id="axis-11" onclick="showAxisStats(11)" title="Axis 11: Unload Lift (Slave)">11</div>
+                                <div class="axis-box slave" id="axis-12" onclick="showAxisStats(12)" title="Axis 12: Unload Lift (Slave)">12</div>
+                                <div class="axis-box slave" id="axis-13" onclick="showAxisStats(13)" title="Axis 13: Unload Lift (Slave)">13</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Stud Carving Section -->
+                    <div class="axis-section">
+                        <h3>Stud Carving System (Axes 14-29) - 8 Geared Pairs</h3>
+                        <div class="axis-grid">
+                            <!-- Stud Pair 1: 14-16 -->
+                            <div class="axis-group" id="group-14-16" data-group="14-16">
+                                <div class="axis-box master" id="axis-14" onclick="showAxisStats(14)" title="Axis 14: Stud Pair 1 (Master)">14</div>
+                                <div class="axis-box slave" id="axis-16" onclick="showAxisStats(16)" title="Axis 16: Stud Pair 1 (Slave)">16</div>
+                            </div>
+                            <!-- Stud Pair 2: 15-17 -->
+                            <div class="axis-group" id="group-15-17" data-group="15-17">
+                                <div class="axis-box master" id="axis-15" onclick="showAxisStats(15)" title="Axis 15: Stud Pair 2 (Master)">15</div>
+                                <div class="axis-box slave" id="axis-17" onclick="showAxisStats(17)" title="Axis 17: Stud Pair 2 (Slave)">17</div>
+                            </div>
+                            <!-- Stud Pair 3: 18-20 -->
+                            <div class="axis-group" id="group-18-20" data-group="18-20">
+                                <div class="axis-box master" id="axis-18" onclick="showAxisStats(18)" title="Axis 18: Stud Pair 3 (Master)">18</div>
+                                <div class="axis-box slave" id="axis-20" onclick="showAxisStats(20)" title="Axis 20: Stud Pair 3 (Slave)">20</div>
+                            </div>
+                            <!-- Stud Pair 4: 19-21 -->
+                            <div class="axis-group" id="group-19-21" data-group="19-21">
+                                <div class="axis-box master" id="axis-19" onclick="showAxisStats(19)" title="Axis 19: Stud Pair 4 (Master)">19</div>
+                                <div class="axis-box slave" id="axis-21" onclick="showAxisStats(21)" title="Axis 21: Stud Pair 4 (Slave)">21</div>
+                            </div>
+                            <!-- Stud Pair 5: 22-24 -->
+                            <div class="axis-group" id="group-22-24" data-group="22-24">
+                                <div class="axis-box master" id="axis-22" onclick="showAxisStats(22)" title="Axis 22: Stud Pair 5 (Master)">22</div>
+                                <div class="axis-box slave" id="axis-24" onclick="showAxisStats(24)" title="Axis 24: Stud Pair 5 (Slave)">24</div>
+                            </div>
+                            <!-- Stud Pair 6: 23-25 -->
+                            <div class="axis-group" id="group-23-25" data-group="23-25">
+                                <div class="axis-box master" id="axis-23" onclick="showAxisStats(23)" title="Axis 23: Stud Pair 6 (Master)">23</div>
+                                <div class="axis-box slave" id="axis-25" onclick="showAxisStats(25)" title="Axis 25: Stud Pair 6 (Slave)">25</div>
+                            </div>
+                            <!-- Stud Pair 7: 26-28 -->
+                            <div class="axis-group" id="group-26-28" data-group="26-28">
+                                <div class="axis-box master" id="axis-26" onclick="showAxisStats(26)" title="Axis 26: Stud Pair 7 (Master)">26</div>
+                                <div class="axis-box slave" id="axis-28" onclick="showAxisStats(28)" title="Axis 28: Stud Pair 7 (Slave)">28</div>
+                            </div>
+                            <!-- Stud Pair 8: 27-29 -->
+                            <div class="axis-group" id="group-27-29" data-group="27-29">
+                                <div class="axis-box master" id="axis-27" onclick="showAxisStats(27)" title="Axis 27: Stud Pair 8 (Master)">27</div>
+                                <div class="axis-box slave" id="axis-29" onclick="showAxisStats(29)" title="Axis 29: Stud Pair 8 (Slave)">29</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Window/Door and Electrical Section -->
+                    <div class="axis-section">
+                        <h3>Window/Door Cutting (30-33) & Electrical Trough (34-36)</h3>
+                        <div class="axis-grid">
+                            <!-- Window Horizontal: 30-32 -->
+                            <div class="axis-group" id="group-30-32" data-group="30-32">
+                                <div class="axis-box master" id="axis-30" onclick="showAxisStats(30)" title="Axis 30: Window Horizontal (Master)">30</div>
+                                <div class="axis-box slave" id="axis-32" onclick="showAxisStats(32)" title="Axis 32: Window Horizontal (Slave)">32</div>
+                            </div>
+                            <!-- Window Vertical: 31-33 -->
+                            <div class="axis-group" id="group-31-33" data-group="31-33">
+                                <div class="axis-box master" id="axis-31" onclick="showAxisStats(31)" title="Axis 31: Window Vertical (Master)">31</div>
+                                <div class="axis-box slave" id="axis-33" onclick="showAxisStats(33)" title="Axis 33: Window Vertical (Slave)">33</div>
+                            </div>
+                            <!-- Axis 34: Block Shift (Independent) -->
+                            <div class="axis-group" id="group-34" data-group="34">
+                                <div class="axis-box independent" id="axis-34" onclick="showAxisStats(34)" title="Axis 34: Block Shift">34</div>
+                            </div>
+                            <!-- Electrical: 35-36 (Independent pair) -->
+                            <div class="axis-group" id="group-35-36" data-group="35-36">
+                                <div class="axis-box independent" id="axis-35" onclick="showAxisStats(35)" title="Axis 35: Electrical Trough">35</div>
+                                <div class="axis-box independent" id="axis-36" onclick="showAxisStats(36)" title="Axis 36: Electrical Trough">36</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Legend -->
+                    <div class="axis-legend">
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #3b82f6;"></div>
+                            <span>Master Axis</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #8b5cf6;"></div>
+                            <span>Slave Axis (Geared)</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #10b981;"></div>
+                            <span>Independent Axis</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #6b7280;"></div>
+                            <span>Idle</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: rgba(16, 185, 129, 0.3); border: 2px solid #10b981;"></div>
+                            <span>Group Moving</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #ef4444;"></div>
+                            <span>Faulted</span>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
 
         <!-- Footer -->
         <div class="footer">
-            <p>Foam Block Carving Machine Control System v1.0</p>
+            <p>Foam Block Carving Machine Control System v2.0</p>
             <p>Last Update: <span id="lastUpdate">Never</span></p>
+        </div>
+    </div>
+
+    <!-- Overlay for modals -->
+    <div id="overlay" class="overlay" onclick="closeAxisStats()"></div>
+
+    <!-- Axis Stats Panel -->
+    <div id="axisStatsPanel" class="axis-stats-panel">
+        <button class="close-panel" onclick="closeAxisStats()">X</button>
+        <h3 id="axisPanelTitle">Axis 1 Statistics</h3>
+        <div class="stats-grid">
+            <div class="stat-row">
+                <span class="stat-label">Current Position</span>
+                <span class="stat-value" id="statPosition">0.000 mm</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Target Position</span>
+                <span class="stat-value" id="statTargetPos">0.000 mm</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Velocity</span>
+                <span class="stat-value" id="statVelocity">0.000 mm/s</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Acceleration</span>
+                <span class="stat-value" id="statAccel">5.000 mm/s²</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Deceleration</span>
+                <span class="stat-value" id="statDecel">5.000 mm/s²</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Jerk</span>
+                <span class="stat-value" id="statJerk">1.000 mm/s³</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Status</span>
+                <span class="stat-value" id="statStatus">Idle</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Type</span>
+                <span class="stat-value" id="statType">Master</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Homed</span>
+                <span class="stat-value" id="statHomed">No</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Geared To</span>
+                <span class="stat-value" id="statGeared">N/A</span>
+            </div>
         </div>
     </div>
 
     <script>
         // Configuration
         const config = {
-            plcAddress: 'localhost', // Change to your ctrlX IP address
-            updateInterval: 500,      // Update every 500ms
+            plcAddress: '192.168.0.29',
+            updateInterval: 500,
             apiBasePath: '/automation/api/v2'
         };
 
-        // PLC Variable paths (adjust these to match your PLC structure)
-        const plcVars = {
-            // Machine State
-            machineState: 'PLC_PRG.MACHINE_STATE',
+        // Axis configuration with gearing relationships
+        const axisConfig = {
+            1:  { name: 'Block Shift Left', type: 'independent', group: '1' },
+            2:  { name: 'Load Table Lift', type: 'master', group: '2-5', slaves: [3, 4, 5] },
+            3:  { name: 'Load Table Lift', type: 'slave', group: '2-5', master: 2 },
+            4:  { name: 'Load Table Lift', type: 'slave', group: '2-5', master: 2 },
+            5:  { name: 'Load Table Lift', type: 'slave', group: '2-5', master: 2 },
+            6:  { name: 'Shift to Center', type: 'master', group: '6-7', slaves: [7] },
+            7:  { name: 'Shift to Center', type: 'slave', group: '6-7', master: 6 },
+            8:  { name: 'Unload Pusher', type: 'master', group: '8-9', slaves: [9] },
+            9:  { name: 'Unload Pusher', type: 'slave', group: '8-9', master: 8 },
+            10: { name: 'Unload Table Lift', type: 'master', group: '10-13', slaves: [11, 12, 13] },
+            11: { name: 'Unload Table Lift', type: 'slave', group: '10-13', master: 10 },
+            12: { name: 'Unload Table Lift', type: 'slave', group: '10-13', master: 10 },
+            13: { name: 'Unload Table Lift', type: 'slave', group: '10-13', master: 10 },
+            14: { name: 'Stud Carver Pair 1', type: 'master', group: '14-16', slaves: [16] },
+            15: { name: 'Stud Carver Pair 2', type: 'master', group: '15-17', slaves: [17] },
+            16: { name: 'Stud Carver Pair 1', type: 'slave', group: '14-16', master: 14 },
+            17: { name: 'Stud Carver Pair 2', type: 'slave', group: '15-17', master: 15 },
+            18: { name: 'Stud Carver Pair 3', type: 'master', group: '18-20', slaves: [20] },
+            19: { name: 'Stud Carver Pair 4', type: 'master', group: '19-21', slaves: [21] },
+            20: { name: 'Stud Carver Pair 3', type: 'slave', group: '18-20', master: 18 },
+            21: { name: 'Stud Carver Pair 4', type: 'slave', group: '19-21', master: 19 },
+            22: { name: 'Stud Carver Pair 5', type: 'master', group: '22-24', slaves: [24] },
+            23: { name: 'Stud Carver Pair 6', type: 'master', group: '23-25', slaves: [25] },
+            24: { name: 'Stud Carver Pair 5', type: 'slave', group: '22-24', master: 22 },
+            25: { name: 'Stud Carver Pair 6', type: 'slave', group: '23-25', master: 23 },
+            26: { name: 'Stud Carver Pair 7', type: 'master', group: '26-28', slaves: [28] },
+            27: { name: 'Stud Carver Pair 8', type: 'master', group: '27-29', slaves: [29] },
+            28: { name: 'Stud Carver Pair 7', type: 'slave', group: '26-28', master: 26 },
+            29: { name: 'Stud Carver Pair 8', type: 'slave', group: '27-29', master: 27 },
+            30: { name: 'Window Horizontal', type: 'master', group: '30-32', slaves: [32] },
+            31: { name: 'Window Vertical', type: 'master', group: '31-33', slaves: [33] },
+            32: { name: 'Window Horizontal', type: 'slave', group: '30-32', master: 30 },
+            33: { name: 'Window Vertical', type: 'slave', group: '31-33', master: 31 },
+            34: { name: 'Block Shift', type: 'independent', group: '34' },
+            35: { name: 'Electrical Trough 1', type: 'independent', group: '35-36' },
+            36: { name: 'Electrical Trough 2', type: 'independent', group: '35-36' }
+        };
 
-            // Status Outputs
+        // Axis data storage
+        let axisData = {};
+        for (let i = 1; i <= 36; i++) {
+            axisData[i] = {
+                position: 0,
+                targetPosition: 0,
+                velocity: 0,
+                acceleration: 5.0,
+                deceleration: 5.0,
+                jerk: 1.0,
+                isMoving: false,
+                isFaulted: false,
+                isHomed: false
+            };
+        }
+
+        // PLC Variable paths
+        const plcVars = {
+            machineState: 'PLC_PRG.MACHINE_STATE',
+            motionStep: 'PLC_PRG.motionSequence.stepDescription',
+            activeAxesMask: 'PLC_PRG.motionSequence.activeAxesMask',
             isRunning: 'PLC_PRG.stateMachine.isRunning',
             isFaulted: 'PLC_PRG.stateMachine.isFaulted',
             isHomed: 'PLC_PRG.stateMachine.isHomed',
-
-            // Button Inputs
+            gearingEngaged: 'PLC_PRG.axisGearing.Done',
             btnStart: 'PLC_PRG.btn_Start',
             btnStop: 'PLC_PRG.btn_Stop',
             btnHome: 'PLC_PRG.btn_Home',
@@ -423,8 +944,6 @@
             btnReset: 'PLC_PRG.btn_Reset',
             btnEStop: 'PLC_PRG.btn_EStop',
             btnDriveOn: 'PLC_PRG.btn_DriveOn',
-
-            // Recipe Variables (when implemented)
             recipeSelect: 'PLC_PRG.HMI_RecipeSelect',
             activeRecipe: 'PLC_PRG.HMI_ActiveRecipe',
             recipeName: 'PLC_PRG.HMI_RecipeName',
@@ -432,7 +951,6 @@
             recipeLocked: 'PLC_PRG.HMI_RecipeLocked'
         };
 
-        // State machine enumeration
         const machineStates = {
             0: 'INIT',
             1: 'IDLE',
@@ -447,6 +965,7 @@
 
         let connected = false;
         let updateTimer = null;
+        let selectedAxis = null;
 
         // Initialize
         window.onload = function() {
@@ -458,7 +977,7 @@
         function startUpdates() {
             if (updateTimer) clearInterval(updateTimer);
             updateTimer = setInterval(updatePLC, config.updateInterval);
-            updatePLC(); // Initial update
+            updatePLC();
         }
 
         // Update all PLC data
@@ -468,18 +987,28 @@
                 const state = await readPLCVariable(plcVars.machineState);
                 updateMachineState(state);
 
+                // Read motion step description
+                const motionStep = await readPLCVariable(plcVars.motionStep);
+                document.getElementById('motionStep').textContent = motionStep || 'Waiting...';
+
+                // Read active axes mask
+                const activeAxesMask = await readPLCVariable(plcVars.activeAxesMask);
+                updateAxisVisualization(activeAxesMask);
+
                 // Read status indicators
                 const running = await readPLCVariable(plcVars.isRunning);
                 const faulted = await readPLCVariable(plcVars.isFaulted);
                 const homed = await readPLCVariable(plcVars.isHomed);
                 const drivesOn = await readPLCVariable(plcVars.btnDriveOn);
+                const gearingEngaged = await readPLCVariable(plcVars.gearingEngaged);
 
                 updateIndicator('indRunning', running);
-                updateIndicator('indFaulted', faulted);
+                updateIndicator('indFaulted', faulted, 'faulted');
                 updateIndicator('indHomed', homed);
                 updateIndicator('indDrives', drivesOn);
+                updateIndicator('indGearing', gearingEngaged);
 
-                // Update recipe info (if variables exist)
+                // Update recipe info
                 try {
                     const activeRecipe = await readPLCVariable(plcVars.activeRecipe);
                     const recipeName = await readPLCVariable(plcVars.recipeName);
@@ -492,7 +1021,12 @@
                     document.getElementById('recipeSelect').value = activeRecipe;
                     document.getElementById('recipeSelect').disabled = recipeLocked;
                 } catch (e) {
-                    // Recipe variables not available yet
+                    // Recipe variables not available
+                }
+
+                // Update axis stats if panel is open
+                if (selectedAxis) {
+                    updateAxisStatsPanel(selectedAxis);
                 }
 
                 updateConnectionStatus(true);
@@ -505,26 +1039,102 @@
             }
         }
 
-        // Read PLC variable via ctrlX Data Layer API
+        // Update axis visualization based on active axes mask
+        function updateAxisVisualization(activeAxesMask) {
+            const movingAxes = [];
+
+            // Decode bitmask to find moving axes
+            for (let i = 1; i <= 36; i++) {
+                const isMoving = (activeAxesMask & (1 << (i - 1))) !== 0;
+                axisData[i].isMoving = isMoving;
+
+                const axisElement = document.getElementById(`axis-${i}`);
+                if (axisElement) {
+                    if (isMoving) {
+                        axisElement.classList.add('moving');
+                        movingAxes.push(i);
+                    } else {
+                        axisElement.classList.remove('moving');
+                    }
+                }
+            }
+
+            // Highlight groups containing moving axes
+            const activeGroups = new Set();
+            movingAxes.forEach(axisNum => {
+                const config = axisConfig[axisNum];
+                if (config) {
+                    activeGroups.add(config.group);
+                }
+            });
+
+            // Update all group highlights
+            document.querySelectorAll('.axis-group').forEach(group => {
+                const groupId = group.dataset.group;
+                if (activeGroups.has(groupId)) {
+                    group.classList.add('active');
+                } else {
+                    group.classList.remove('active');
+                }
+            });
+        }
+
+        // Show axis statistics panel
+        function showAxisStats(axisNum) {
+            selectedAxis = axisNum;
+            const config = axisConfig[axisNum];
+
+            document.getElementById('axisPanelTitle').textContent = `Axis ${axisNum}: ${config.name}`;
+            updateAxisStatsPanel(axisNum);
+
+            document.getElementById('overlay').classList.add('show');
+            document.getElementById('axisStatsPanel').classList.add('show');
+        }
+
+        // Update axis stats panel with current data
+        function updateAxisStatsPanel(axisNum) {
+            const data = axisData[axisNum];
+            const config = axisConfig[axisNum];
+
+            document.getElementById('statPosition').textContent = `${data.position.toFixed(3)} mm`;
+            document.getElementById('statTargetPos').textContent = `${data.targetPosition.toFixed(3)} mm`;
+            document.getElementById('statVelocity').textContent = `${data.velocity.toFixed(3)} mm/s`;
+            document.getElementById('statAccel').textContent = `${data.acceleration.toFixed(3)} mm/s²`;
+            document.getElementById('statDecel').textContent = `${data.deceleration.toFixed(3)} mm/s²`;
+            document.getElementById('statJerk').textContent = `${data.jerk.toFixed(3)} mm/s³`;
+
+            let status = 'Idle';
+            if (data.isFaulted) status = 'FAULTED';
+            else if (data.isMoving) status = 'Moving';
+            document.getElementById('statStatus').textContent = status;
+
+            document.getElementById('statType').textContent = config.type.charAt(0).toUpperCase() + config.type.slice(1);
+            document.getElementById('statHomed').textContent = data.isHomed ? 'Yes' : 'No';
+
+            if (config.master) {
+                document.getElementById('statGeared').textContent = `Follows Axis ${config.master}`;
+            } else if (config.slaves) {
+                document.getElementById('statGeared').textContent = `Master of ${config.slaves.join(', ')}`;
+            } else {
+                document.getElementById('statGeared').textContent = 'N/A';
+            }
+        }
+
+        // Close axis stats panel
+        function closeAxisStats() {
+            selectedAxis = null;
+            document.getElementById('overlay').classList.remove('show');
+            document.getElementById('axisStatsPanel').classList.remove('show');
+        }
+
+        // Read PLC variable
         async function readPLCVariable(varPath) {
-            // TODO: Replace with actual ctrlX Data Layer API call
-            // For now, return mock data for testing
             return getMockData(varPath);
         }
 
-        // Write PLC variable via ctrlX Data Layer API
+        // Write PLC variable
         async function writePLCVariable(varPath, value) {
-            // TODO: Replace with actual ctrlX Data Layer API call
             console.log(`Writing ${varPath} = ${value}`);
-
-            // Mock implementation - would normally be:
-            // const response = await fetch(`http://${config.plcAddress}${config.apiBasePath}/data/${varPath}`, {
-            //     method: 'PUT',
-            //     headers: { 'Content-Type': 'application/json' },
-            //     body: JSON.stringify({ value: value })
-            // });
-            // return response.ok;
-
             return true;
         }
 
@@ -532,8 +1142,6 @@
         async function sendCommand(buttonVar, value) {
             try {
                 await writePLCVariable(plcVars[buttonVar.replace('btn_', 'btn')], value);
-
-                // Auto-reset button after short delay
                 if (value === true) {
                     setTimeout(() => {
                         writePLCVariable(plcVars[buttonVar.replace('btn_', 'btn')], false);
@@ -563,12 +1171,11 @@
         }
 
         // Update indicator
-        function updateIndicator(elementId, active) {
+        function updateIndicator(elementId, active, activeClass = 'active') {
             const element = document.getElementById(elementId);
+            element.classList.remove('active', 'faulted');
             if (active) {
-                element.classList.add('active');
-            } else {
-                element.classList.remove('active');
+                element.classList.add(activeClass);
             }
         }
 
@@ -601,17 +1208,23 @@
             errorDiv.classList.remove('show');
         }
 
-        // Mock data for testing (remove when connecting to real PLC)
+        // Mock data for testing
         function getMockData(varPath) {
+            // Simulate some axes moving for demo
+            const mockActiveAxes = Math.random() > 0.7 ? (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4) : 0;
+
             const mockData = {
-                [plcVars.machineState]: 1, // IDLE
+                [plcVars.machineState]: 1,
+                [plcVars.motionStep]: 'Idle - Waiting for start command',
+                [plcVars.activeAxesMask]: mockActiveAxes,
                 [plcVars.isRunning]: false,
                 [plcVars.isFaulted]: false,
                 [plcVars.isHomed]: true,
-                [plcVars.btnDriveOn]: false,
+                [plcVars.btnDriveOn]: true,
+                [plcVars.gearingEngaged]: true,
                 [plcVars.activeRecipe]: 1,
-                [plcVars.recipeName]: 'Default Recipe',
-                [plcVars.recipeDescription]: 'Standard foam block processing with all operations',
+                [plcVars.recipeName]: '8ft Standard Block',
+                [plcVars.recipeDescription]: 'Standard 8ft block with studs, windows/doors, and electrical',
                 [plcVars.recipeLocked]: false
             };
             return mockData[varPath] !== undefined ? mockData[varPath] : null;

@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Foam Block Carving Machine - Industrial HMI</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+            background: #e8e8e8;
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .hmi-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 15px;
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(180deg, #4a4a4a 0%, #333 100%);
+            color: white;
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-radius: 4px 4px 0 0;
+            border-bottom: 3px solid #f7941d;
+        }
+
+        .header h1 {
+            font-size: 18px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 25px;
+            font-size: 13px;
+        }
+
+        .header-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .header-item label {
+            color: #aaa;
+        }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            background: #222;
+            border-radius: 3px;
+        }
+
+        .connection-led {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #666;
+            border: 1px solid #444;
+        }
+
+        .connection-led.online {
+            background: #4caf50;
+            box-shadow: 0 0 6px #4caf50;
+        }
+
+        .connection-led.offline {
+            background: #f44336;
+        }
+
+        /* Main Content Area */
+        .main-content {
+            background: #d0d0d0;
+            border: 1px solid #999;
+            border-top: none;
+            padding: 15px;
+            display: grid;
+            grid-template-columns: 280px 1fr 280px;
+            gap: 15px;
+            min-height: calc(100vh - 120px);
+        }
+
+        /* Panel Styling */
+        .panel {
+            background: #f5f5f5;
+            border: 1px solid #999;
+            border-radius: 3px;
+            box-shadow: inset 0 1px 0 white, 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .panel-title {
+            background: linear-gradient(180deg, #666 0%, #555 100%);
+            color: white;
+            padding: 8px 12px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 2px solid #f7941d;
+        }
+
+        .panel-body {
+            padding: 12px;
+        }
+
+        /* Machine State Display */
+        .state-panel {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .state-display-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 30px 20px;
+            background: #fff;
+            border: 1px solid #ccc;
+            margin: 12px;
+            border-radius: 3px;
+        }
+
+        .state-label {
+            font-size: 11px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+        }
+
+        .state-value {
+            font-size: 56px;
+            font-weight: bold;
+            padding: 15px 30px;
+            border: 3px solid #ccc;
+            border-radius: 5px;
+            background: #fafafa;
+            min-width: 300px;
+            text-align: center;
+        }
+
+        .state-value.INIT { color: #757575; border-color: #bdbdbd; }
+        .state-value.IDLE { color: #1976d2; border-color: #1976d2; background: #e3f2fd; }
+        .state-value.HOMING { color: #7b1fa2; border-color: #7b1fa2; background: #f3e5f5; }
+        .state-value.MANUAL { color: #f57c00; border-color: #f57c00; background: #fff3e0; }
+        .state-value.RUNNING { color: #388e3c; border-color: #388e3c; background: #e8f5e9; }
+        .state-value.STOPPING { color: #e64a19; border-color: #e64a19; background: #fbe9e7; }
+        .state-value.FAULTED { color: #d32f2f; border-color: #d32f2f; background: #ffebee; animation: fault-flash 0.5s infinite; }
+        .state-value.E_STOPPED { color: #b71c1c; border-color: #b71c1c; background: #ffcdd2; animation: estop-flash 0.3s infinite; }
+        .state-value.RESETTING { color: #512da8; border-color: #512da8; background: #ede7f6; }
+
+        @keyframes fault-flash {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        @keyframes estop-flash {
+            0%, 100% { background: #ffcdd2; }
+            50% { background: #ef9a9a; }
+        }
+
+        .state-description {
+            margin-top: 15px;
+            font-size: 14px;
+            color: #666;
+        }
+
+        /* Motion Info Panel */
+        .motion-info {
+            background: #fff;
+            border: 1px solid #ccc;
+            margin: 0 12px 12px;
+            border-radius: 3px;
+            padding: 12px;
+        }
+
+        .motion-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .motion-row:last-child {
+            border-bottom: none;
+        }
+
+        .motion-label {
+            color: #666;
+            font-size: 12px;
+        }
+
+        .motion-value {
+            font-weight: 600;
+            color: #333;
+            font-size: 12px;
+        }
+
+        .step-description {
+            background: #e8f5e9;
+            border: 1px solid #a5d6a7;
+            border-radius: 3px;
+            padding: 10px;
+            margin-top: 10px;
+            text-align: center;
+            font-size: 13px;
+            color: #2e7d32;
+        }
+
+        /* Control Buttons */
+        .button-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .btn {
+            padding: 14px 16px;
+            border: 1px solid;
+            border-radius: 3px;
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.1s ease;
+            box-shadow: 0 2px 0 rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.3);
+        }
+
+        .btn:hover {
+            filter: brightness(1.05);
+        }
+
+        .btn:active {
+            transform: translateY(1px);
+            box-shadow: 0 1px 0 rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.3);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-start {
+            background: linear-gradient(180deg, #4caf50 0%, #43a047 100%);
+            border-color: #388e3c;
+            color: white;
+        }
+
+        .btn-stop {
+            background: linear-gradient(180deg, #ff9800 0%, #f57c00 100%);
+            border-color: #e65100;
+            color: white;
+        }
+
+        .btn-home {
+            background: linear-gradient(180deg, #2196f3 0%, #1976d2 100%);
+            border-color: #1565c0;
+            color: white;
+        }
+
+        .btn-manual {
+            background: linear-gradient(180deg, #9c27b0 0%, #7b1fa2 100%);
+            border-color: #6a1b9a;
+            color: white;
+        }
+
+        .btn-reset {
+            background: linear-gradient(180deg, #607d8b 0%, #546e7a 100%);
+            border-color: #455a64;
+            color: white;
+        }
+
+        .btn-drives {
+            background: linear-gradient(180deg, #78909c 0%, #607d8b 100%);
+            border-color: #546e7a;
+            color: white;
+        }
+
+        .btn-drives.on {
+            background: linear-gradient(180deg, #66bb6a 0%, #4caf50 100%);
+            border-color: #43a047;
+        }
+
+        .btn-estop {
+            background: linear-gradient(180deg, #f44336 0%, #d32f2f 100%);
+            border-color: #c62828;
+            color: white;
+            font-size: 16px;
+            padding: 20px;
+            margin-top: 10px;
+            box-shadow: 0 3px 0 #b71c1c, inset 0 1px 0 rgba(255,255,255,0.3);
+        }
+
+        .btn-estop:active {
+            box-shadow: 0 1px 0 #b71c1c, inset 0 1px 0 rgba(255,255,255,0.3);
+            transform: translateY(2px);
+        }
+
+        /* Status Indicators */
+        .status-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .status-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 12px;
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+        }
+
+        .status-label {
+            font-size: 12px;
+            color: #555;
+            font-weight: 500;
+        }
+
+        .pilot-light {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            border: 2px solid #666;
+            background: linear-gradient(135deg, #888 0%, #555 100%);
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .pilot-light.green.on {
+            background: linear-gradient(135deg, #81c784 0%, #4caf50 100%);
+            border-color: #388e3c;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.2), 0 0 8px rgba(76, 175, 80, 0.5);
+        }
+
+        .pilot-light.red.on {
+            background: linear-gradient(135deg, #e57373 0%, #f44336 100%);
+            border-color: #d32f2f;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.2), 0 0 8px rgba(244, 67, 54, 0.5);
+            animation: red-blink 0.5s infinite;
+        }
+
+        @keyframes red-blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        /* Recipe Selection */
+        .recipe-section {
+            margin-bottom: 15px;
+        }
+
+        .recipe-label {
+            font-size: 11px;
+            color: #666;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+            display: block;
+        }
+
+        .recipe-select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            font-family: inherit;
+            font-size: 13px;
+            background: #fff;
+            cursor: pointer;
+        }
+
+        .recipe-select:focus {
+            outline: none;
+            border-color: #1976d2;
+        }
+
+        .recipe-details {
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            padding: 12px;
+            margin-top: 10px;
+        }
+
+        .recipe-name {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .recipe-desc {
+            font-size: 12px;
+            color: #666;
+            line-height: 1.4;
+        }
+
+        .recipe-locked-badge {
+            display: inline-block;
+            background: #fff3e0;
+            color: #e65100;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: 600;
+            margin-top: 8px;
+            border: 1px solid #ffcc80;
+        }
+
+        /* Operations Checkboxes */
+        .operations-section {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #ddd;
+        }
+
+        .operations-title {
+            font-size: 11px;
+            color: #666;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+
+        .operation-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 0;
+            font-size: 12px;
+        }
+
+        .operation-check {
+            width: 16px;
+            height: 16px;
+            border: 2px solid #ccc;
+            border-radius: 2px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .operation-check.enabled {
+            background: #4caf50;
+            border-color: #388e3c;
+            color: white;
+        }
+
+        .operation-check.enabled::after {
+            content: '✓';
+            font-size: 11px;
+        }
+
+        /* Active Axes Display */
+        .axes-section {
+            margin-top: 15px;
+        }
+
+        .axes-title {
+            font-size: 11px;
+            color: #666;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+
+        .axes-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 3px;
+        }
+
+        .axis-cell {
+            padding: 5px 3px;
+            text-align: center;
+            font-size: 10px;
+            background: #eee;
+            border: 1px solid #ccc;
+            border-radius: 2px;
+            color: #999;
+        }
+
+        .axis-cell.active {
+            background: #4caf50;
+            border-color: #388e3c;
+            color: white;
+            font-weight: bold;
+        }
+
+        /* Footer */
+        .footer {
+            background: #333;
+            color: #999;
+            padding: 8px 20px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            border-radius: 0 0 4px 4px;
+        }
+
+        /* Error Banner */
+        .error-banner {
+            background: #ffebee;
+            border: 1px solid #f44336;
+            color: #c62828;
+            padding: 10px 15px;
+            margin-bottom: 15px;
+            border-radius: 3px;
+            display: none;
+        }
+
+        .error-banner.show {
+            display: block;
+        }
+
+        /* Responsive */
+        @media (max-width: 1100px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+
+            .state-value {
+                font-size: 36px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="hmi-container">
+        <!-- Header -->
+        <div class="header">
+            <h1>Foam Block Carving Machine</h1>
+            <div class="header-right">
+                <div class="header-item">
+                    <label>PLC:</label>
+                    <span id="plcAddress">192.168.0.29</span>
+                </div>
+                <div class="header-item">
+                    <label>Updated:</label>
+                    <span id="lastUpdate">--:--:--</span>
+                </div>
+                <div class="connection-status">
+                    <div id="connectionLed" class="connection-led offline"></div>
+                    <span id="connectionText">Offline</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Left Panel - Controls -->
+            <div class="panel">
+                <div class="panel-title">Machine Controls</div>
+                <div class="panel-body">
+                    <div class="button-grid">
+                        <button class="btn btn-start" onclick="sendCommand('btn_Start', true)">Start Cycle</button>
+                        <button class="btn btn-stop" onclick="sendCommand('btn_Stop', true)">Stop</button>
+                        <button class="btn btn-home" onclick="sendCommand('btn_Home', true)">Home Axes</button>
+                        <button class="btn btn-manual" onclick="sendCommand('btn_Manual', true)">Manual Mode</button>
+                        <button class="btn btn-reset" onclick="sendCommand('btn_Reset', true)">Reset Fault</button>
+                        <button id="btnDrives" class="btn btn-drives" onclick="toggleDrives()">Drives Off</button>
+                        <button class="btn btn-estop" onclick="sendCommand('btn_EStop', true)">EMERGENCY STOP</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Center Panel - Status -->
+            <div class="panel state-panel">
+                <div class="panel-title">Machine Status</div>
+                <div class="state-display-area">
+                    <div class="state-label">Current State</div>
+                    <div id="machineState" class="state-value INIT">INIT</div>
+                    <div id="stateDescription" class="state-description">Initializing...</div>
+                </div>
+                <div class="motion-info">
+                    <div class="motion-row">
+                        <span class="motion-label">Motion Step:</span>
+                        <span id="motionStep" class="motion-value">WAIT_FOR_LOAD</span>
+                    </div>
+                    <div class="motion-row">
+                        <span class="motion-label">Sub-Step:</span>
+                        <span id="motionSubStep" class="motion-value">0</span>
+                    </div>
+                    <div id="stepDescription" class="step-description">Waiting for block to load</div>
+
+                    <!-- Active Axes -->
+                    <div class="axes-section">
+                        <div class="axes-title">Active Axes</div>
+                        <div class="axes-grid" id="axesGrid">
+                            <div class="axis-cell" data-axis="1">1</div>
+                            <div class="axis-cell" data-axis="2">2</div>
+                            <div class="axis-cell" data-axis="6">6</div>
+                            <div class="axis-cell" data-axis="8">8</div>
+                            <div class="axis-cell" data-axis="10">10</div>
+                            <div class="axis-cell" data-axis="14">14</div>
+                            <div class="axis-cell" data-axis="15">15</div>
+                            <div class="axis-cell" data-axis="18">18</div>
+                            <div class="axis-cell" data-axis="19">19</div>
+                            <div class="axis-cell" data-axis="22">22</div>
+                            <div class="axis-cell" data-axis="23">23</div>
+                            <div class="axis-cell" data-axis="26">26</div>
+                            <div class="axis-cell" data-axis="27">27</div>
+                            <div class="axis-cell" data-axis="30">30</div>
+                            <div class="axis-cell" data-axis="31">31</div>
+                            <div class="axis-cell" data-axis="34">34</div>
+                            <div class="axis-cell" data-axis="35">35</div>
+                            <div class="axis-cell" data-axis="36">36</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Panel - Status & Recipe -->
+            <div style="display: flex; flex-direction: column; gap: 15px;">
+                <!-- Status Indicators -->
+                <div class="panel">
+                    <div class="panel-title">System Status</div>
+                    <div class="panel-body">
+                        <div class="status-list">
+                            <div class="status-row">
+                                <span class="status-label">Running</span>
+                                <div id="ledRunning" class="pilot-light green"></div>
+                            </div>
+                            <div class="status-row">
+                                <span class="status-label">Faulted</span>
+                                <div id="ledFaulted" class="pilot-light red"></div>
+                            </div>
+                            <div class="status-row">
+                                <span class="status-label">Axes Homed</span>
+                                <div id="ledHomed" class="pilot-light green"></div>
+                            </div>
+                            <div class="status-row">
+                                <span class="status-label">Drives Enabled</span>
+                                <div id="ledDrives" class="pilot-light green"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recipe Selection -->
+                <div class="panel">
+                    <div class="panel-title">Recipe Selection</div>
+                    <div class="panel-body">
+                        <div class="recipe-section">
+                            <label class="recipe-label">Active Recipe</label>
+                            <select id="recipeSelect" class="recipe-select" onchange="selectRecipe()">
+                                <option value="1">Recipe 1 - Default</option>
+                                <option value="2">Recipe 2 - Custom</option>
+                                <option value="3">Recipe 3 - Test</option>
+                                <option value="4">Recipe 4 - Advanced</option>
+                                <option value="5">Recipe 5 - Quick</option>
+                            </select>
+                        </div>
+                        <div class="recipe-details">
+                            <div id="recipeName" class="recipe-name">Recipe 1</div>
+                            <div id="recipeDesc" class="recipe-desc">Standard cutting parameters for foam blocks.</div>
+                            <div id="recipeLocked" class="recipe-locked-badge" style="display: none;">LOCKED - RUNNING</div>
+                        </div>
+
+                        <!-- Operations -->
+                        <div class="operations-section">
+                            <div class="operations-title">Enabled Operations</div>
+                            <div class="operation-item">
+                                <div id="opStuds" class="operation-check enabled"></div>
+                                <span>Studs</span>
+                            </div>
+                            <div class="operation-item">
+                                <div id="opWindows" class="operation-check enabled"></div>
+                                <span>Windows/Doors</span>
+                            </div>
+                            <div class="operation-item">
+                                <div id="opElectrical" class="operation-check enabled"></div>
+                                <span>Electrical</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Error Banner -->
+        <div id="errorBanner" class="error-banner"></div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <span>Foam Block Carving Machine Control System v1.0</span>
+            <span>Guardian Shield Systems</span>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const config = {
+            plcAddress: '192.168.0.29',
+            updateInterval: 500,
+            apiBasePath: '/automation/api/v1',
+            username: 'boschrexroth',
+            password: 'boschrexroth'
+        };
+
+        // PLC Variable paths
+        const plcVars = {
+            machineState: 'PLC_PRG/MACHINE_STATE',
+            isRunning: 'PLC_PRG/stateMachine/isRunning',
+            isFaulted: 'PLC_PRG/stateMachine/isFaulted',
+            isHomed: 'PLC_PRG/stateMachine/isHomed',
+            btnStart: 'PLC_PRG.btn_Start',
+            btnStop: 'PLC_PRG.btn_Stop',
+            btnHome: 'PLC_PRG.btn_Home',
+            btnManual: 'PLC_PRG.btn_Manual',
+            btnReset: 'PLC_PRG.btn_Reset',
+            btnEStop: 'PLC_PRG.btn_EStop',
+            btnDriveOn: 'PLC_PRG.btn_DriveOn',
+            recipeSelect: 'PLC_PRG.HMI_RecipeSelect',
+            activeRecipe: 'PLC_PRG.HMI_ActiveRecipe',
+            recipeName: 'PLC_PRG.HMI_RecipeName',
+            recipeDescription: 'PLC_PRG.HMI_RecipeDescription',
+            recipeLocked: 'PLC_PRG.HMI_RecipeLocked',
+            enableStuds: 'PLC_PRG.HMI_EnableStuds',
+            enableWindows: 'PLC_PRG.HMI_EnableWindows',
+            enableElectrical: 'PLC_PRG.HMI_EnableElectrical',
+            motionStep: 'PLC_PRG.HMI_MotionStep',
+            motionSubStep: 'PLC_PRG.HMI_MotionSubStep',
+            activeAxesMask: 'PLC_PRG.HMI_ActiveAxesMask',
+            stepDescription: 'PLC_PRG.HMI_StepDescription'
+        };
+
+        const machineStates = {
+            0: 'INIT', 1: 'IDLE', 2: 'HOMING', 3: 'MANUAL',
+            4: 'RUNNING', 5: 'STOPPING', 6: 'FAULTED', 7: 'E_STOPPED', 8: 'RESETTING'
+        };
+
+        const stateDescriptions = {
+            'INIT': 'Initializing system...',
+            'IDLE': 'Ready for operation',
+            'HOMING': 'Homing axes...',
+            'MANUAL': 'Manual control active',
+            'RUNNING': 'Cycle in progress',
+            'STOPPING': 'Stopping motion...',
+            'FAULTED': 'FAULT - Check system',
+            'E_STOPPED': 'EMERGENCY STOP ACTIVE',
+            'RESETTING': 'Resetting system...'
+        };
+
+        const axisBitPositions = {
+            1: 0, 2: 1, 6: 5, 8: 7, 10: 9, 14: 13, 15: 14, 18: 17, 19: 18,
+            22: 21, 23: 22, 26: 25, 27: 26, 30: 29, 31: 30, 34: 33, 35: 34, 36: 35
+        };
+
+        let authToken = null;
+        let drivesOn = false;
+
+        window.onload = function() {
+            document.getElementById('plcAddress').textContent = config.plcAddress;
+            startUpdates();
+        };
+
+        function startUpdates() {
+            updateHMI();
+            setInterval(updateHMI, config.updateInterval);
+        }
+
+        async function updateHMI() {
+            try {
+                const state = await readPLCVariable(plcVars.machineState);
+                updateMachineState(state);
+
+                const running = await readPLCVariable(plcVars.isRunning);
+                const faulted = await readPLCVariable(plcVars.isFaulted);
+                const homed = await readPLCVariable(plcVars.isHomed);
+                const drivesState = await readPLCVariable(plcVars.btnDriveOn);
+
+                updatePilotLight('ledRunning', running, 'green');
+                updatePilotLight('ledFaulted', faulted, 'red');
+                updatePilotLight('ledHomed', homed, 'green');
+                updatePilotLight('ledDrives', drivesState, 'green');
+
+                drivesOn = drivesState;
+                updateDrivesButton();
+
+                try {
+                    const recipeLocked = await readPLCVariable(plcVars.recipeLocked);
+                    const recipeName = await readPLCVariable(plcVars.recipeName);
+                    const recipeDesc = await readPLCVariable(plcVars.recipeDescription);
+                    const enableStuds = await readPLCVariable(plcVars.enableStuds);
+                    const enableWindows = await readPLCVariable(plcVars.enableWindows);
+                    const enableElectrical = await readPLCVariable(plcVars.enableElectrical);
+
+                    document.getElementById('recipeName').textContent = recipeName || 'Recipe 1';
+                    document.getElementById('recipeDesc').textContent = recipeDesc || 'Standard parameters';
+                    document.getElementById('recipeLocked').style.display = recipeLocked ? 'inline-block' : 'none';
+                    document.getElementById('recipeSelect').disabled = recipeLocked;
+
+                    updateOperationCheck('opStuds', enableStuds);
+                    updateOperationCheck('opWindows', enableWindows);
+                    updateOperationCheck('opElectrical', enableElectrical);
+                } catch (e) {}
+
+                try {
+                    const motionStep = await readPLCVariable(plcVars.motionStep);
+                    const motionSubStep = await readPLCVariable(plcVars.motionSubStep);
+                    const activeAxesMask = await readPLCVariable(plcVars.activeAxesMask);
+                    const stepDesc = await readPLCVariable(plcVars.stepDescription);
+
+                    document.getElementById('motionStep').textContent = motionStep || 'WAIT_FOR_LOAD';
+                    document.getElementById('motionSubStep').textContent = motionSubStep || '0';
+                    document.getElementById('stepDescription').textContent = stepDesc || 'Waiting...';
+
+                    updateActiveAxes(activeAxesMask);
+                } catch (e) {}
+
+                updateConnectionStatus(true);
+                document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+
+            } catch (error) {
+                console.error('Update failed:', error);
+                updateConnectionStatus(false);
+            }
+        }
+
+        async function authenticateCtrlX() {
+            try {
+                const response = await fetch(`https://${config.plcAddress}/identity-manager/api/v2/auth/token`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: config.username, password: config.password })
+                });
+                if (!response.ok) throw new Error('Auth failed');
+                const data = await response.json();
+                authToken = data.access_token;
+                return true;
+            } catch (error) {
+                console.error('Authentication error:', error);
+                return false;
+            }
+        }
+
+        async function readPLCVariable(varPath) {
+            if (!authToken) await authenticateCtrlX();
+            const dataLayerPath = varPath.replace(/\./g, '/');
+            const url = `https://${config.plcAddress}${config.apiBasePath}/plc/app/Application/sym/${dataLayerPath}`;
+
+            try {
+                const response = await fetch(url, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        authToken = null;
+                        return readPLCVariable(varPath);
+                    }
+                    throw new Error(`Read failed: ${response.status}`);
+                }
+                const data = await response.json();
+                let value = data.hasOwnProperty('value') ? data.value : data;
+                if (value && typeof value === 'object' && !Array.isArray(value)) {
+                    const keys = Object.keys(value);
+                    if (keys.length === 1) value = value[keys[0]];
+                }
+                return value;
+            } catch (error) {
+                console.error(`Read error for ${varPath}:`, error);
+                throw error;
+            }
+        }
+
+        async function writePLCVariable(varPath, value, plcType = null) {
+            if (!authToken) await authenticateCtrlX();
+            const dataLayerPath = varPath.replace(/\./g, '/');
+            const url = `https://${config.plcAddress}${config.apiBasePath}/plc/app/Application/sym/${dataLayerPath}`;
+
+            let body;
+            if (plcType === 'UINT') {
+                body = JSON.stringify({ type: "uint16", value: Number(value) });
+            } else if (typeof value === 'boolean') {
+                body = JSON.stringify({ type: "bool8", value: Boolean(value) });
+            } else {
+                body = JSON.stringify({ type: "int32", value: Number(value) });
+            }
+
+            try {
+                const response = await fetch(url, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'application/json' },
+                    body: body
+                });
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        authToken = null;
+                        return writePLCVariable(varPath, value, plcType);
+                    }
+                    throw new Error(`Write failed: ${response.status}`);
+                }
+                return true;
+            } catch (error) {
+                console.error(`Write error for ${varPath}:`, error);
+                throw error;
+            }
+        }
+
+        async function sendCommand(buttonVar, value) {
+            try {
+                const varName = 'btn' + buttonVar.replace('btn_', '').charAt(0).toUpperCase() + buttonVar.replace('btn_', '').slice(1);
+                await writePLCVariable(plcVars[varName], value);
+                if (value === true && buttonVar !== 'btn_DriveOn') {
+                    setTimeout(() => writePLCVariable(plcVars[varName], false), 100);
+                }
+            } catch (error) {
+                showError('Command failed: ' + error.message);
+            }
+        }
+
+        async function toggleDrives() {
+            try {
+                await writePLCVariable(plcVars.btnDriveOn, !drivesOn);
+            } catch (error) {
+                showError('Drive toggle failed: ' + error.message);
+            }
+        }
+
+        function updateDrivesButton() {
+            const btn = document.getElementById('btnDrives');
+            if (drivesOn) {
+                btn.textContent = 'Drives On';
+                btn.classList.add('on');
+            } else {
+                btn.textContent = 'Drives Off';
+                btn.classList.remove('on');
+            }
+        }
+
+        async function selectRecipe() {
+            const recipeId = parseInt(document.getElementById('recipeSelect').value);
+            try {
+                await writePLCVariable(plcVars.recipeSelect, recipeId, 'UINT');
+            } catch (error) {
+                showError('Recipe selection failed: ' + error.message);
+            }
+        }
+
+        function updateMachineState(stateValue) {
+            let stateText = typeof stateValue === 'number' ? machineStates[stateValue] : stateValue;
+            if (!stateText) stateText = 'UNKNOWN';
+
+            const stateEl = document.getElementById('machineState');
+            const descEl = document.getElementById('stateDescription');
+
+            stateEl.textContent = stateText;
+            stateEl.className = 'state-value ' + stateText;
+            descEl.textContent = stateDescriptions[stateText] || '';
+        }
+
+        function updatePilotLight(id, isOn, color) {
+            const el = document.getElementById(id);
+            el.className = 'pilot-light ' + color + (isOn ? ' on' : '');
+        }
+
+        function updateOperationCheck(id, enabled) {
+            const el = document.getElementById(id);
+            el.className = 'operation-check' + (enabled ? ' enabled' : '');
+        }
+
+        function updateActiveAxes(axesMask) {
+            const cells = document.querySelectorAll('.axis-cell');
+            cells.forEach(cell => {
+                const axisNum = parseInt(cell.dataset.axis);
+                const bitPos = axisBitPositions[axisNum];
+                const isActive = bitPos !== undefined && ((axesMask >> bitPos) & 1) === 1;
+                cell.className = 'axis-cell' + (isActive ? ' active' : '');
+            });
+        }
+
+        function updateConnectionStatus(isConnected) {
+            const led = document.getElementById('connectionLed');
+            const text = document.getElementById('connectionText');
+            if (isConnected) {
+                led.className = 'connection-led online';
+                text.textContent = 'Online';
+                hideError();
+            } else {
+                led.className = 'connection-led offline';
+                text.textContent = 'Offline';
+            }
+        }
+
+        function showError(message) {
+            const el = document.getElementById('errorBanner');
+            el.textContent = message;
+            el.classList.add('show');
+        }
+
+        function hideError() {
+            document.getElementById('errorBanner').classList.remove('show');
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,1397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recipe Editor - Foam Block Carving Machine</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            padding: 20px 30px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-left h1 {
+            color: #333;
+            font-size: 28px;
+            margin-bottom: 5px;
+        }
+
+        .header-left .subtitle {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 10px;
+        }
+
+        .nav-link {
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .nav-link:hover {
+            background: #764ba2;
+        }
+
+        .nav-link.active {
+            background: #10b981;
+        }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ccc;
+            animation: pulse 2s infinite;
+        }
+
+        .status-indicator.connected {
+            background: #10b981;
+        }
+
+        .status-indicator.disconnected {
+            background: #ef4444;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 20px;
+        }
+
+        .card {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .card h2 {
+            color: #333;
+            font-size: 18px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .recipe-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .recipe-item {
+            padding: 15px;
+            background: #f9fafb;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 2px solid transparent;
+        }
+
+        .recipe-item:hover {
+            background: #f3f4f6;
+        }
+
+        .recipe-item.selected {
+            border-color: #667eea;
+            background: #eef2ff;
+        }
+
+        .recipe-item.inactive {
+            opacity: 0.5;
+        }
+
+        .recipe-item .recipe-id {
+            font-size: 12px;
+            color: #6b7280;
+            margin-bottom: 5px;
+        }
+
+        .recipe-item .recipe-name {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .recipe-item .recipe-status {
+            font-size: 12px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        .recipe-item .recipe-status.active {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .recipe-item .recipe-status.inactive {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .editor-content {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .form-section {
+            background: #f9fafb;
+            padding: 20px;
+            border-radius: 10px;
+        }
+
+        .form-section h3 {
+            color: #333;
+            font-size: 16px;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .form-group label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #666;
+            text-transform: uppercase;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            padding: 10px;
+            border: 2px solid #e5e7eb;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .form-group input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .checkbox-group label {
+            text-transform: none;
+            font-size: 14px;
+        }
+
+        .position-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+
+        .position-table th,
+        .position-table td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .position-table th {
+            background: #f3f4f6;
+            font-size: 12px;
+            font-weight: 600;
+            color: #666;
+            text-transform: uppercase;
+        }
+
+        .position-table input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .position-table input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-success {
+            background: #10b981;
+            color: white;
+        }
+
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+
+        .btn-secondary {
+            background: #6b7280;
+            color: white;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #e5e7eb;
+            padding-bottom: 0;
+        }
+
+        .tab {
+            padding: 12px 20px;
+            background: transparent;
+            border: none;
+            font-size: 14px;
+            font-weight: 600;
+            color: #6b7280;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            margin-bottom: -2px;
+            transition: all 0.3s;
+        }
+
+        .tab:hover {
+            color: #333;
+        }
+
+        .tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .alert-success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #10b981;
+        }
+
+        .alert-error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #ef4444;
+        }
+
+        .alert-warning {
+            background: #fef3c7;
+            color: #92400e;
+            border: 1px solid #f59e0b;
+        }
+
+        .footer {
+            text-align: center;
+            color: white;
+            margin-top: 30px;
+            opacity: 0.8;
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .position-group {
+            margin-bottom: 20px;
+        }
+
+        .position-group h4 {
+            font-size: 14px;
+            color: #333;
+            margin-bottom: 10px;
+            padding: 8px;
+            background: #e5e7eb;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-left">
+                <h1>Recipe Editor</h1>
+                <div class="subtitle">Configure machine recipes and positions</div>
+            </div>
+            <div class="header-right">
+                <div class="nav-links">
+                    <a href="index.html" class="nav-link">Dashboard</a>
+                    <a href="recipes.html" class="nav-link active">Recipe Editor</a>
+                </div>
+                <div class="connection-status">
+                    <span id="connectionText">Disconnected</span>
+                    <div id="connectionIndicator" class="status-indicator disconnected"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Alert Messages -->
+        <div id="alertContainer"></div>
+
+        <!-- Main Grid -->
+        <div class="main-grid">
+            <!-- Recipe List -->
+            <div class="card">
+                <h2>Recipes</h2>
+                <div class="recipe-list" id="recipeList">
+                    <!-- Populated by JavaScript -->
+                </div>
+            </div>
+
+            <!-- Recipe Editor -->
+            <div class="card">
+                <h2>Edit Recipe: <span id="editingRecipeName">Select a recipe</span></h2>
+
+                <!-- Tabs -->
+                <div class="tabs">
+                    <button class="tab active" onclick="switchTab('general')">General</button>
+                    <button class="tab" onclick="switchTab('loading')">Loading/Unloading</button>
+                    <button class="tab" onclick="switchTab('studs')">Stud Carving</button>
+                    <button class="tab" onclick="switchTab('windows')">Windows/Doors</button>
+                    <button class="tab" onclick="switchTab('electrical')">Electrical</button>
+                    <button class="tab" onclick="switchTab('motion')">Motion Params</button>
+                </div>
+
+                <!-- General Tab -->
+                <div id="tab-general" class="tab-content active">
+                    <div class="form-section">
+                        <h3>Recipe Information</h3>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>Recipe ID</label>
+                                <input type="number" id="recipeId" readonly>
+                            </div>
+                            <div class="form-group">
+                                <label>Recipe Name</label>
+                                <input type="text" id="recipeName" maxlength="40" placeholder="Enter recipe name">
+                            </div>
+                            <div class="form-group" style="grid-column: 1 / -1;">
+                                <label>Description</label>
+                                <textarea id="recipeDescription" rows="3" maxlength="100" placeholder="Enter recipe description"></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <h3>Feature Flags</h3>
+                        <div class="form-grid">
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="enableStuds">
+                                <label for="enableStuds">Enable Stud Carving</label>
+                            </div>
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="enableWindowsDoors">
+                                <label for="enableWindowsDoors">Enable Windows/Doors Cutting</label>
+                            </div>
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="enableElectrical">
+                                <label for="enableElectrical">Enable Electrical Trough</label>
+                            </div>
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="isActive">
+                                <label for="isActive">Recipe Active</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Loading/Unloading Tab -->
+                <div id="tab-loading" class="tab-content">
+                    <div class="form-section">
+                        <h3>Loading/Unloading Positions (mm)</h3>
+
+                        <div class="position-group">
+                            <h4>Axis 1 - Block Shift to Left Wall</h4>
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label>Shift Position</label>
+                                    <input type="number" step="0.1" id="axis1_ShiftPosition">
+                                </div>
+                                <div class="form-group">
+                                    <label>Home Position</label>
+                                    <input type="number" step="0.1" id="axis1_HomePosition">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="position-group">
+                            <h4>Axes 2-5 - Load Table Lift (Axis 2 Master)</h4>
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label>Raise Position</label>
+                                    <input type="number" step="0.1" id="axis2_RaisePosition">
+                                </div>
+                                <div class="form-group">
+                                    <label>Lower Position</label>
+                                    <input type="number" step="0.1" id="axis2_LowerPosition">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="position-group">
+                            <h4>Axes 6-7 - Shift to Center (Axis 6 Master)</h4>
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label>Shift Position</label>
+                                    <input type="number" step="0.1" id="axis6_ShiftPosition">
+                                </div>
+                                <div class="form-group">
+                                    <label>Home Position</label>
+                                    <input type="number" step="0.1" id="axis6_HomePosition">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="position-group">
+                            <h4>Axes 8-9 - Unload Table Pusher (Axis 8 Master)</h4>
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label>Shift Position</label>
+                                    <input type="number" step="0.1" id="axis8_ShiftPosition">
+                                </div>
+                                <div class="form-group">
+                                    <label>Home Position</label>
+                                    <input type="number" step="0.1" id="axis8_HomePosition">
+                                </div>
+                                <div class="form-group">
+                                    <label>Unload Position</label>
+                                    <input type="number" step="0.1" id="axis8_UnloadPosition">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="position-group">
+                            <h4>Axes 10-13 - Unload Table Lift (Axis 10 Master)</h4>
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label>Raise Position</label>
+                                    <input type="number" step="0.1" id="axis10_RaisePosition">
+                                </div>
+                                <div class="form-group">
+                                    <label>Lower Position</label>
+                                    <input type="number" step="0.1" id="axis10_LowerPosition">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Stud Carving Tab -->
+                <div id="tab-studs" class="tab-content">
+                    <div class="form-section">
+                        <h3>Stud Carving Positions (mm) - 8 Pairs</h3>
+
+                        <div class="position-group">
+                            <h4>Pair 1: Axes 14 & 16</h4>
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label>Target Position 1</label>
+                                    <input type="number" step="0.1" id="axis14_TargetPosition_1">
+                                </div>
+                                <div class="form-group">
+                                    <label>Target Position 2</label>
+                                    <input type="number" step="0.1" id="axis14_TargetPosition_2">
+                                </div>
+                                <div class="form-group">
+                                    <label>Home Position</label>
+                                    <input type="number" step="0.1" id="axis14_HomePosition">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="position-group">
+                            <h4>Pair 2: Axes 15 & 17</h4>
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label>Target Position 1</label>
+                                    <input type="number" step="0.1" id="axis15_TargetPosition_1">
+                                </div>
+                                <div class="form-group">
+                                    <label>Target Position 2</label>
+                                    <input type="number" step="0.1" id="axis15_TargetPosition_2">
+                                </div>
+                                <div class="form-group">
+                                    <label>Home Position</label>
+                                    <input type="number" step="0.1" id="axis15_HomePosition">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="position-group">
+                            <h4>Pair 3: Axes 18 & 20</h4>
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label>Target Position 1</label>
+                                    <input type="number" step="0.1" id="axis18_TargetPosition_1">
+                                </div>
+                                <div class="form-group">
+                                    <label>Target Position 2</label>
+                                    <input type="number" step="0.1" id="axis18_TargetPosition_2">
+                                </div>
+                                <div class="form-group">
+                                    <label>Home Position</label>
+                                    <input type="number" step="0.1" id="axis18_HomePosition">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="position-group">
+                            <h4>Pair 4: Axes 19 & 21</h4>
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label>Target Position 1</label>
+                                    <input type="number" step="0.1" id="axis19_TargetPosition_1">
+                                </div>
+                                <div class="form-group">
+                                    <label>Target Position 2</label>
+                                    <input type="number" step="0.1" id="axis19_TargetPosition_2">
+                                </div>
+                                <div class="form-group">
+                                    <label>Home Position</label>
+                                    <input type="number" step="0.1" id="axis19_HomePosition">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="position-group">
+                            <h4>Pair 5: Axes 22 & 24</h4>
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label>Target Position 1</label>
+                                    <input type="number" step="0.1" id="axis22_TargetPosition_1">
+                                </div>
+                                <div class="form-group">
+                                    <label>Target Position 2</label>
+                                    <input type="number" step="0.1" id="axis22_TargetPosition_2">
+                                </div>
+                                <div class="form-group">
+                                    <label>Home Position</label>
+                                    <input type="number" step="0.1" id="axis22_HomePosition">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="position-group">
+                            <h4>Pair 6: Axes 23 & 25</h4>
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label>Target Position 1</label>
+                                    <input type="number" step="0.1" id="axis23_TargetPosition_1">
+                                </div>
+                                <div class="form-group">
+                                    <label>Target Position 2</label>
+                                    <input type="number" step="0.1" id="axis23_TargetPosition_2">
+                                </div>
+                                <div class="form-group">
+                                    <label>Home Position</label>
+                                    <input type="number" step="0.1" id="axis23_HomePosition">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="position-group">
+                            <h4>Pair 7: Axes 26 & 28</h4>
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label>Target Position 1</label>
+                                    <input type="number" step="0.1" id="axis26_TargetPosition_1">
+                                </div>
+                                <div class="form-group">
+                                    <label>Target Position 2</label>
+                                    <input type="number" step="0.1" id="axis26_TargetPosition_2">
+                                </div>
+                                <div class="form-group">
+                                    <label>Home Position</label>
+                                    <input type="number" step="0.1" id="axis26_HomePosition">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="position-group">
+                            <h4>Pair 8: Axes 27 & 29</h4>
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label>Target Position 1</label>
+                                    <input type="number" step="0.1" id="axis27_TargetPosition_1">
+                                </div>
+                                <div class="form-group">
+                                    <label>Target Position 2</label>
+                                    <input type="number" step="0.1" id="axis27_TargetPosition_2">
+                                </div>
+                                <div class="form-group">
+                                    <label>Home Position</label>
+                                    <input type="number" step="0.1" id="axis27_HomePosition">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Windows/Doors Tab -->
+                <div id="tab-windows" class="tab-content">
+                    <div class="form-section">
+                        <h3>Window/Door Cutting Positions (mm)</h3>
+
+                        <div class="position-group">
+                            <h4>Axes 30 & 32 - Horizontal Movement</h4>
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label>Target Position 1</label>
+                                    <input type="number" step="0.1" id="axis30_TargetPosition_1">
+                                </div>
+                                <div class="form-group">
+                                    <label>Target Position 2</label>
+                                    <input type="number" step="0.1" id="axis30_TargetPosition_2">
+                                </div>
+                                <div class="form-group">
+                                    <label>Target Position 3</label>
+                                    <input type="number" step="0.1" id="axis30_TargetPosition_3">
+                                </div>
+                                <div class="form-group">
+                                    <label>Target Position 4</label>
+                                    <input type="number" step="0.1" id="axis30_TargetPosition_4">
+                                </div>
+                                <div class="form-group">
+                                    <label>Home Position</label>
+                                    <input type="number" step="0.1" id="axis30_HomePosition">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="position-group">
+                            <h4>Axes 31 & 33 - Vertical Movement</h4>
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label>Target Position 1 (Down)</label>
+                                    <input type="number" step="0.1" id="axis31_TargetPosition_1">
+                                </div>
+                                <div class="form-group">
+                                    <label>Target Position 2 (Up)</label>
+                                    <input type="number" step="0.1" id="axis31_TargetPosition_2">
+                                </div>
+                                <div class="form-group">
+                                    <label>Home Position</label>
+                                    <input type="number" step="0.1" id="axis31_HomePosition">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Electrical Tab -->
+                <div id="tab-electrical" class="tab-content">
+                    <div class="form-section">
+                        <h3>Electrical Trough Positions (mm)</h3>
+
+                        <div class="position-group">
+                            <h4>Axis 35 - Electrical Trough 1</h4>
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label>Target Position 1 (Extend)</label>
+                                    <input type="number" step="0.1" id="axis35_TargetPosition_1">
+                                </div>
+                                <div class="form-group">
+                                    <label>Target Position 2 (Retract)</label>
+                                    <input type="number" step="0.1" id="axis35_TargetPosition_2">
+                                </div>
+                                <div class="form-group">
+                                    <label>Home Position</label>
+                                    <input type="number" step="0.1" id="axis35_HomePosition">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="position-group">
+                            <h4>Axis 36 - Electrical Trough 2</h4>
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label>Target Position 1 (Extend)</label>
+                                    <input type="number" step="0.1" id="axis36_TargetPosition_1">
+                                </div>
+                                <div class="form-group">
+                                    <label>Target Position 2 (Retract)</label>
+                                    <input type="number" step="0.1" id="axis36_TargetPosition_2">
+                                </div>
+                                <div class="form-group">
+                                    <label>Home Position</label>
+                                    <input type="number" step="0.1" id="axis36_HomePosition">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Motion Parameters Tab -->
+                <div id="tab-motion" class="tab-content">
+                    <div class="form-section">
+                        <h3>Motion Parameters</h3>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>Default Velocity (mm/s)</label>
+                                <input type="number" step="0.1" id="defaultVelocity" min="0.1" max="10">
+                            </div>
+                            <div class="form-group">
+                                <label>Default Acceleration (mm/s²)</label>
+                                <input type="number" step="0.1" id="defaultAcceleration" min="0.1" max="20">
+                            </div>
+                            <div class="form-group">
+                                <label>Default Deceleration (mm/s²)</label>
+                                <input type="number" step="0.1" id="defaultDeceleration" min="0.1" max="20">
+                            </div>
+                            <div class="form-group">
+                                <label>Default Jerk (mm/s³)</label>
+                                <input type="number" step="0.1" id="defaultJerk" min="0.1" max="10">
+                            </div>
+                            <div class="form-group">
+                                <label>Position Tolerance (mm)</label>
+                                <input type="number" step="0.01" id="positionTolerance" min="0.01" max="5">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="button-group">
+                    <button class="btn btn-success" onclick="saveRecipe()" id="btnSave" disabled>Save Changes</button>
+                    <button class="btn btn-primary" onclick="downloadRecipe()" id="btnDownload" disabled>Download to PLC</button>
+                    <button class="btn btn-secondary" onclick="revertChanges()" id="btnRevert" disabled>Revert Changes</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p>Foam Block Carving Machine - Recipe Editor v2.0</p>
+        </div>
+    </div>
+
+    <script>
+        // Recipe data storage
+        const recipes = [
+            {
+                recipeID: 1,
+                recipeName: '8ft Standard Block',
+                recipeDescription: 'Standard 8ft block with studs, windows/doors, and electrical',
+                isActive: true,
+                enableStuds: true,
+                enableWindowsDoors: true,
+                enableElectrical: true,
+                positions: {
+                    axis1_ShiftPosition: 1000.0, axis1_HomePosition: 0,
+                    axis2_RaisePosition: 1000.0, axis2_LowerPosition: 0,
+                    axis6_ShiftPosition: 1000.0, axis6_HomePosition: 0,
+                    axis8_ShiftPosition: 1000.0, axis8_HomePosition: 0, axis8_UnloadPosition: 1000.0,
+                    axis10_RaisePosition: 1000.0, axis10_LowerPosition: 0,
+                    axis14_TargetPosition_1: 1000.0, axis14_TargetPosition_2: 1000.0, axis14_HomePosition: 0,
+                    axis15_TargetPosition_1: 1000.0, axis15_TargetPosition_2: 1000.0, axis15_HomePosition: 0,
+                    axis18_TargetPosition_1: 1000.0, axis18_TargetPosition_2: 1000.0, axis18_HomePosition: 0,
+                    axis19_TargetPosition_1: 1000.0, axis19_TargetPosition_2: 1000.0, axis19_HomePosition: 0,
+                    axis22_TargetPosition_1: 1000.0, axis22_TargetPosition_2: 1000.0, axis22_HomePosition: 0,
+                    axis23_TargetPosition_1: 1000.0, axis23_TargetPosition_2: 1000.0, axis23_HomePosition: 0,
+                    axis26_TargetPosition_1: 1000.0, axis26_TargetPosition_2: 1000.0, axis26_HomePosition: 0,
+                    axis27_TargetPosition_1: 1000.0, axis27_TargetPosition_2: 1000.0, axis27_HomePosition: 0,
+                    axis30_TargetPosition_1: 1000.0, axis30_TargetPosition_2: 1000.0, axis30_TargetPosition_3: 1000.0, axis30_TargetPosition_4: 1000.0, axis30_HomePosition: 0,
+                    axis31_TargetPosition_1: 1000.0, axis31_TargetPosition_2: 1000.0, axis31_HomePosition: 0,
+                    axis35_TargetPosition_1: 1000.0, axis35_TargetPosition_2: 1000.0, axis35_HomePosition: 0,
+                    axis36_TargetPosition_1: 1000.0, axis36_TargetPosition_2: 1000.0, axis36_HomePosition: 0
+                },
+                motionParams: {
+                    defaultVelocity: 1.0,
+                    defaultAcceleration: 5.0,
+                    defaultDeceleration: 5.0,
+                    defaultJerk: 1.0,
+                    positionTolerance: 0.5
+                }
+            },
+            {
+                recipeID: 2,
+                recipeName: '10ft Studs Only',
+                recipeDescription: '10ft block with studs only - no windows or electrical',
+                isActive: true,
+                enableStuds: true,
+                enableWindowsDoors: false,
+                enableElectrical: false,
+                positions: {
+                    axis1_ShiftPosition: 1200.0, axis1_HomePosition: 0,
+                    axis2_RaisePosition: 1000.0, axis2_LowerPosition: 0,
+                    axis6_ShiftPosition: 1200.0, axis6_HomePosition: 0,
+                    axis8_ShiftPosition: 1200.0, axis8_HomePosition: 0, axis8_UnloadPosition: 1200.0,
+                    axis10_RaisePosition: 1000.0, axis10_LowerPosition: 0,
+                    axis14_TargetPosition_1: 1200.0, axis14_TargetPosition_2: 1200.0, axis14_HomePosition: 0,
+                    axis15_TargetPosition_1: 1200.0, axis15_TargetPosition_2: 1200.0, axis15_HomePosition: 0,
+                    axis18_TargetPosition_1: 1200.0, axis18_TargetPosition_2: 1200.0, axis18_HomePosition: 0,
+                    axis19_TargetPosition_1: 1200.0, axis19_TargetPosition_2: 1200.0, axis19_HomePosition: 0,
+                    axis22_TargetPosition_1: 1200.0, axis22_TargetPosition_2: 1200.0, axis22_HomePosition: 0,
+                    axis23_TargetPosition_1: 1200.0, axis23_TargetPosition_2: 1200.0, axis23_HomePosition: 0,
+                    axis26_TargetPosition_1: 1200.0, axis26_TargetPosition_2: 1200.0, axis26_HomePosition: 0,
+                    axis27_TargetPosition_1: 1200.0, axis27_TargetPosition_2: 1200.0, axis27_HomePosition: 0,
+                    axis30_TargetPosition_1: 1000.0, axis30_TargetPosition_2: 1000.0, axis30_TargetPosition_3: 1000.0, axis30_TargetPosition_4: 1000.0, axis30_HomePosition: 0,
+                    axis31_TargetPosition_1: 1000.0, axis31_TargetPosition_2: 1000.0, axis31_HomePosition: 0,
+                    axis35_TargetPosition_1: 1000.0, axis35_TargetPosition_2: 1000.0, axis35_HomePosition: 0,
+                    axis36_TargetPosition_1: 1000.0, axis36_TargetPosition_2: 1000.0, axis36_HomePosition: 0
+                },
+                motionParams: {
+                    defaultVelocity: 1.0,
+                    defaultAcceleration: 5.0,
+                    defaultDeceleration: 5.0,
+                    defaultJerk: 1.0,
+                    positionTolerance: 0.5
+                }
+            },
+            {
+                recipeID: 3,
+                recipeName: '8ft Windows Only',
+                recipeDescription: '8ft block with windows/doors only - no studs or electrical',
+                isActive: true,
+                enableStuds: false,
+                enableWindowsDoors: true,
+                enableElectrical: false,
+                positions: {
+                    axis1_ShiftPosition: 1000.0, axis1_HomePosition: 0,
+                    axis2_RaisePosition: 1000.0, axis2_LowerPosition: 0,
+                    axis6_ShiftPosition: 1000.0, axis6_HomePosition: 0,
+                    axis8_ShiftPosition: 1000.0, axis8_HomePosition: 0, axis8_UnloadPosition: 1000.0,
+                    axis10_RaisePosition: 1000.0, axis10_LowerPosition: 0,
+                    axis14_TargetPosition_1: 1000.0, axis14_TargetPosition_2: 1000.0, axis14_HomePosition: 0,
+                    axis15_TargetPosition_1: 1000.0, axis15_TargetPosition_2: 1000.0, axis15_HomePosition: 0,
+                    axis18_TargetPosition_1: 1000.0, axis18_TargetPosition_2: 1000.0, axis18_HomePosition: 0,
+                    axis19_TargetPosition_1: 1000.0, axis19_TargetPosition_2: 1000.0, axis19_HomePosition: 0,
+                    axis22_TargetPosition_1: 1000.0, axis22_TargetPosition_2: 1000.0, axis22_HomePosition: 0,
+                    axis23_TargetPosition_1: 1000.0, axis23_TargetPosition_2: 1000.0, axis23_HomePosition: 0,
+                    axis26_TargetPosition_1: 1000.0, axis26_TargetPosition_2: 1000.0, axis26_HomePosition: 0,
+                    axis27_TargetPosition_1: 1000.0, axis27_TargetPosition_2: 1000.0, axis27_HomePosition: 0,
+                    axis30_TargetPosition_1: 1000.0, axis30_TargetPosition_2: 1000.0, axis30_TargetPosition_3: 1000.0, axis30_TargetPosition_4: 1000.0, axis30_HomePosition: 0,
+                    axis31_TargetPosition_1: 1000.0, axis31_TargetPosition_2: 1000.0, axis31_HomePosition: 0,
+                    axis35_TargetPosition_1: 1000.0, axis35_TargetPosition_2: 1000.0, axis35_HomePosition: 0,
+                    axis36_TargetPosition_1: 1000.0, axis36_TargetPosition_2: 1000.0, axis36_HomePosition: 0
+                },
+                motionParams: {
+                    defaultVelocity: 1.0,
+                    defaultAcceleration: 5.0,
+                    defaultDeceleration: 5.0,
+                    defaultJerk: 1.0,
+                    positionTolerance: 0.5
+                }
+            },
+            {
+                recipeID: 4,
+                recipeName: '8ft Electrical Only',
+                recipeDescription: '8ft block with electrical trough only',
+                isActive: true,
+                enableStuds: false,
+                enableWindowsDoors: false,
+                enableElectrical: true,
+                positions: {
+                    axis1_ShiftPosition: 1000.0, axis1_HomePosition: 0,
+                    axis2_RaisePosition: 1000.0, axis2_LowerPosition: 0,
+                    axis6_ShiftPosition: 1000.0, axis6_HomePosition: 0,
+                    axis8_ShiftPosition: 1000.0, axis8_HomePosition: 0, axis8_UnloadPosition: 1000.0,
+                    axis10_RaisePosition: 1000.0, axis10_LowerPosition: 0,
+                    axis14_TargetPosition_1: 1000.0, axis14_TargetPosition_2: 1000.0, axis14_HomePosition: 0,
+                    axis15_TargetPosition_1: 1000.0, axis15_TargetPosition_2: 1000.0, axis15_HomePosition: 0,
+                    axis18_TargetPosition_1: 1000.0, axis18_TargetPosition_2: 1000.0, axis18_HomePosition: 0,
+                    axis19_TargetPosition_1: 1000.0, axis19_TargetPosition_2: 1000.0, axis19_HomePosition: 0,
+                    axis22_TargetPosition_1: 1000.0, axis22_TargetPosition_2: 1000.0, axis22_HomePosition: 0,
+                    axis23_TargetPosition_1: 1000.0, axis23_TargetPosition_2: 1000.0, axis23_HomePosition: 0,
+                    axis26_TargetPosition_1: 1000.0, axis26_TargetPosition_2: 1000.0, axis26_HomePosition: 0,
+                    axis27_TargetPosition_1: 1000.0, axis27_TargetPosition_2: 1000.0, axis27_HomePosition: 0,
+                    axis30_TargetPosition_1: 1000.0, axis30_TargetPosition_2: 1000.0, axis30_TargetPosition_3: 1000.0, axis30_TargetPosition_4: 1000.0, axis30_HomePosition: 0,
+                    axis31_TargetPosition_1: 1000.0, axis31_TargetPosition_2: 1000.0, axis31_HomePosition: 0,
+                    axis35_TargetPosition_1: 1000.0, axis35_TargetPosition_2: 1000.0, axis35_HomePosition: 0,
+                    axis36_TargetPosition_1: 1000.0, axis36_TargetPosition_2: 1000.0, axis36_HomePosition: 0
+                },
+                motionParams: {
+                    defaultVelocity: 1.0,
+                    defaultAcceleration: 5.0,
+                    defaultDeceleration: 5.0,
+                    defaultJerk: 1.0,
+                    positionTolerance: 0.5
+                }
+            },
+            {
+                recipeID: 5,
+                recipeName: '12ft Full Block',
+                recipeDescription: '12ft block with all features - studs, windows, electrical',
+                isActive: true,
+                enableStuds: true,
+                enableWindowsDoors: true,
+                enableElectrical: true,
+                positions: {
+                    axis1_ShiftPosition: 1500.0, axis1_HomePosition: 0,
+                    axis2_RaisePosition: 1000.0, axis2_LowerPosition: 0,
+                    axis6_ShiftPosition: 1500.0, axis6_HomePosition: 0,
+                    axis8_ShiftPosition: 1500.0, axis8_HomePosition: 0, axis8_UnloadPosition: 1500.0,
+                    axis10_RaisePosition: 1000.0, axis10_LowerPosition: 0,
+                    axis14_TargetPosition_1: 1500.0, axis14_TargetPosition_2: 1500.0, axis14_HomePosition: 0,
+                    axis15_TargetPosition_1: 1500.0, axis15_TargetPosition_2: 1500.0, axis15_HomePosition: 0,
+                    axis18_TargetPosition_1: 1500.0, axis18_TargetPosition_2: 1500.0, axis18_HomePosition: 0,
+                    axis19_TargetPosition_1: 1500.0, axis19_TargetPosition_2: 1500.0, axis19_HomePosition: 0,
+                    axis22_TargetPosition_1: 1500.0, axis22_TargetPosition_2: 1500.0, axis22_HomePosition: 0,
+                    axis23_TargetPosition_1: 1500.0, axis23_TargetPosition_2: 1500.0, axis23_HomePosition: 0,
+                    axis26_TargetPosition_1: 1500.0, axis26_TargetPosition_2: 1500.0, axis26_HomePosition: 0,
+                    axis27_TargetPosition_1: 1500.0, axis27_TargetPosition_2: 1500.0, axis27_HomePosition: 0,
+                    axis30_TargetPosition_1: 1500.0, axis30_TargetPosition_2: 1500.0, axis30_TargetPosition_3: 1500.0, axis30_TargetPosition_4: 1500.0, axis30_HomePosition: 0,
+                    axis31_TargetPosition_1: 1500.0, axis31_TargetPosition_2: 1500.0, axis31_HomePosition: 0,
+                    axis35_TargetPosition_1: 1500.0, axis35_TargetPosition_2: 1500.0, axis35_HomePosition: 0,
+                    axis36_TargetPosition_1: 1500.0, axis36_TargetPosition_2: 1500.0, axis36_HomePosition: 0
+                },
+                motionParams: {
+                    defaultVelocity: 0.8,
+                    defaultAcceleration: 4.0,
+                    defaultDeceleration: 4.0,
+                    defaultJerk: 1.0,
+                    positionTolerance: 0.5
+                }
+            },
+            {
+                recipeID: 6,
+                recipeName: '4ft Quick Test',
+                recipeDescription: '4ft test block with all features at reduced speed',
+                isActive: true,
+                enableStuds: true,
+                enableWindowsDoors: true,
+                enableElectrical: true,
+                positions: {
+                    axis1_ShiftPosition: 500.0, axis1_HomePosition: 0,
+                    axis2_RaisePosition: 500.0, axis2_LowerPosition: 0,
+                    axis6_ShiftPosition: 500.0, axis6_HomePosition: 0,
+                    axis8_ShiftPosition: 500.0, axis8_HomePosition: 0, axis8_UnloadPosition: 500.0,
+                    axis10_RaisePosition: 500.0, axis10_LowerPosition: 0,
+                    axis14_TargetPosition_1: 500.0, axis14_TargetPosition_2: 500.0, axis14_HomePosition: 0,
+                    axis15_TargetPosition_1: 500.0, axis15_TargetPosition_2: 500.0, axis15_HomePosition: 0,
+                    axis18_TargetPosition_1: 500.0, axis18_TargetPosition_2: 500.0, axis18_HomePosition: 0,
+                    axis19_TargetPosition_1: 500.0, axis19_TargetPosition_2: 500.0, axis19_HomePosition: 0,
+                    axis22_TargetPosition_1: 500.0, axis22_TargetPosition_2: 500.0, axis22_HomePosition: 0,
+                    axis23_TargetPosition_1: 500.0, axis23_TargetPosition_2: 500.0, axis23_HomePosition: 0,
+                    axis26_TargetPosition_1: 500.0, axis26_TargetPosition_2: 500.0, axis26_HomePosition: 0,
+                    axis27_TargetPosition_1: 500.0, axis27_TargetPosition_2: 500.0, axis27_HomePosition: 0,
+                    axis30_TargetPosition_1: 500.0, axis30_TargetPosition_2: 500.0, axis30_TargetPosition_3: 500.0, axis30_TargetPosition_4: 500.0, axis30_HomePosition: 0,
+                    axis31_TargetPosition_1: 500.0, axis31_TargetPosition_2: 500.0, axis31_HomePosition: 0,
+                    axis35_TargetPosition_1: 500.0, axis35_TargetPosition_2: 500.0, axis35_HomePosition: 0,
+                    axis36_TargetPosition_1: 500.0, axis36_TargetPosition_2: 500.0, axis36_HomePosition: 0
+                },
+                motionParams: {
+                    defaultVelocity: 0.5,
+                    defaultAcceleration: 2.0,
+                    defaultDeceleration: 2.0,
+                    defaultJerk: 0.5,
+                    positionTolerance: 0.5
+                }
+            },
+            {
+                recipeID: 7,
+                recipeName: '8ft Studs+Windows',
+                recipeDescription: '8ft block with studs and windows - no electrical',
+                isActive: true,
+                enableStuds: true,
+                enableWindowsDoors: true,
+                enableElectrical: false,
+                positions: {
+                    axis1_ShiftPosition: 1000.0, axis1_HomePosition: 0,
+                    axis2_RaisePosition: 1000.0, axis2_LowerPosition: 0,
+                    axis6_ShiftPosition: 1000.0, axis6_HomePosition: 0,
+                    axis8_ShiftPosition: 1000.0, axis8_HomePosition: 0, axis8_UnloadPosition: 1000.0,
+                    axis10_RaisePosition: 1000.0, axis10_LowerPosition: 0,
+                    axis14_TargetPosition_1: 1000.0, axis14_TargetPosition_2: 1000.0, axis14_HomePosition: 0,
+                    axis15_TargetPosition_1: 1000.0, axis15_TargetPosition_2: 1000.0, axis15_HomePosition: 0,
+                    axis18_TargetPosition_1: 1000.0, axis18_TargetPosition_2: 1000.0, axis18_HomePosition: 0,
+                    axis19_TargetPosition_1: 1000.0, axis19_TargetPosition_2: 1000.0, axis19_HomePosition: 0,
+                    axis22_TargetPosition_1: 1000.0, axis22_TargetPosition_2: 1000.0, axis22_HomePosition: 0,
+                    axis23_TargetPosition_1: 1000.0, axis23_TargetPosition_2: 1000.0, axis23_HomePosition: 0,
+                    axis26_TargetPosition_1: 1000.0, axis26_TargetPosition_2: 1000.0, axis26_HomePosition: 0,
+                    axis27_TargetPosition_1: 1000.0, axis27_TargetPosition_2: 1000.0, axis27_HomePosition: 0,
+                    axis30_TargetPosition_1: 1000.0, axis30_TargetPosition_2: 1000.0, axis30_TargetPosition_3: 1000.0, axis30_TargetPosition_4: 1000.0, axis30_HomePosition: 0,
+                    axis31_TargetPosition_1: 1000.0, axis31_TargetPosition_2: 1000.0, axis31_HomePosition: 0,
+                    axis35_TargetPosition_1: 1000.0, axis35_TargetPosition_2: 1000.0, axis35_HomePosition: 0,
+                    axis36_TargetPosition_1: 1000.0, axis36_TargetPosition_2: 1000.0, axis36_HomePosition: 0
+                },
+                motionParams: {
+                    defaultVelocity: 1.0,
+                    defaultAcceleration: 5.0,
+                    defaultDeceleration: 5.0,
+                    defaultJerk: 1.0,
+                    positionTolerance: 0.5
+                }
+            },
+            {
+                recipeID: 8,
+                recipeName: 'Reserved 8',
+                recipeDescription: 'Reserved for future use',
+                isActive: false,
+                enableStuds: true,
+                enableWindowsDoors: true,
+                enableElectrical: true,
+                positions: {},
+                motionParams: {
+                    defaultVelocity: 1.0,
+                    defaultAcceleration: 5.0,
+                    defaultDeceleration: 5.0,
+                    defaultJerk: 1.0,
+                    positionTolerance: 0.5
+                }
+            },
+            {
+                recipeID: 9,
+                recipeName: 'Reserved 9',
+                recipeDescription: 'Reserved for future use',
+                isActive: false,
+                enableStuds: true,
+                enableWindowsDoors: true,
+                enableElectrical: true,
+                positions: {},
+                motionParams: {
+                    defaultVelocity: 1.0,
+                    defaultAcceleration: 5.0,
+                    defaultDeceleration: 5.0,
+                    defaultJerk: 1.0,
+                    positionTolerance: 0.5
+                }
+            },
+            {
+                recipeID: 10,
+                recipeName: 'Reserved 10',
+                recipeDescription: 'Reserved for future use',
+                isActive: false,
+                enableStuds: true,
+                enableWindowsDoors: true,
+                enableElectrical: true,
+                positions: {},
+                motionParams: {
+                    defaultVelocity: 1.0,
+                    defaultAcceleration: 5.0,
+                    defaultDeceleration: 5.0,
+                    defaultJerk: 1.0,
+                    positionTolerance: 0.5
+                }
+            }
+        ];
+
+        let selectedRecipeIndex = -1;
+        let originalRecipe = null;
+        let hasChanges = false;
+
+        // Initialize
+        window.onload = function() {
+            renderRecipeList();
+            updateConnectionStatus(true); // Mock connected
+        };
+
+        // Render recipe list
+        function renderRecipeList() {
+            const listContainer = document.getElementById('recipeList');
+            listContainer.innerHTML = '';
+
+            recipes.forEach((recipe, index) => {
+                const item = document.createElement('div');
+                item.className = `recipe-item ${recipe.isActive ? '' : 'inactive'} ${index === selectedRecipeIndex ? 'selected' : ''}`;
+                item.onclick = () => selectRecipe(index);
+                item.innerHTML = `
+                    <div class="recipe-id">Recipe ${recipe.recipeID}</div>
+                    <div class="recipe-name">${recipe.recipeName}</div>
+                    <span class="recipe-status ${recipe.isActive ? 'active' : 'inactive'}">
+                        ${recipe.isActive ? 'Active' : 'Inactive'}
+                    </span>
+                `;
+                listContainer.appendChild(item);
+            });
+        }
+
+        // Select recipe for editing
+        function selectRecipe(index) {
+            if (hasChanges) {
+                if (!confirm('You have unsaved changes. Discard them?')) {
+                    return;
+                }
+            }
+
+            selectedRecipeIndex = index;
+            originalRecipe = JSON.parse(JSON.stringify(recipes[index]));
+            loadRecipeIntoForm(recipes[index]);
+            renderRecipeList();
+
+            document.getElementById('editingRecipeName').textContent = recipes[index].recipeName;
+            document.getElementById('btnSave').disabled = false;
+            document.getElementById('btnDownload').disabled = false;
+            document.getElementById('btnRevert').disabled = false;
+            hasChanges = false;
+        }
+
+        // Load recipe data into form
+        function loadRecipeIntoForm(recipe) {
+            // General info
+            document.getElementById('recipeId').value = recipe.recipeID;
+            document.getElementById('recipeName').value = recipe.recipeName;
+            document.getElementById('recipeDescription').value = recipe.recipeDescription;
+            document.getElementById('enableStuds').checked = recipe.enableStuds;
+            document.getElementById('enableWindowsDoors').checked = recipe.enableWindowsDoors;
+            document.getElementById('enableElectrical').checked = recipe.enableElectrical;
+            document.getElementById('isActive').checked = recipe.isActive;
+
+            // Positions
+            for (const [key, value] of Object.entries(recipe.positions)) {
+                const input = document.getElementById(key);
+                if (input) {
+                    input.value = value;
+                }
+            }
+
+            // Motion params
+            document.getElementById('defaultVelocity').value = recipe.motionParams.defaultVelocity;
+            document.getElementById('defaultAcceleration').value = recipe.motionParams.defaultAcceleration;
+            document.getElementById('defaultDeceleration').value = recipe.motionParams.defaultDeceleration;
+            document.getElementById('defaultJerk').value = recipe.motionParams.defaultJerk;
+            document.getElementById('positionTolerance').value = recipe.motionParams.positionTolerance;
+        }
+
+        // Collect form data into recipe object
+        function collectFormData() {
+            const recipe = {
+                recipeID: parseInt(document.getElementById('recipeId').value),
+                recipeName: document.getElementById('recipeName').value,
+                recipeDescription: document.getElementById('recipeDescription').value,
+                enableStuds: document.getElementById('enableStuds').checked,
+                enableWindowsDoors: document.getElementById('enableWindowsDoors').checked,
+                enableElectrical: document.getElementById('enableElectrical').checked,
+                isActive: document.getElementById('isActive').checked,
+                positions: {},
+                motionParams: {
+                    defaultVelocity: parseFloat(document.getElementById('defaultVelocity').value),
+                    defaultAcceleration: parseFloat(document.getElementById('defaultAcceleration').value),
+                    defaultDeceleration: parseFloat(document.getElementById('defaultDeceleration').value),
+                    defaultJerk: parseFloat(document.getElementById('defaultJerk').value),
+                    positionTolerance: parseFloat(document.getElementById('positionTolerance').value)
+                }
+            };
+
+            // Collect all position inputs
+            const positionFields = [
+                'axis1_ShiftPosition', 'axis1_HomePosition',
+                'axis2_RaisePosition', 'axis2_LowerPosition',
+                'axis6_ShiftPosition', 'axis6_HomePosition',
+                'axis8_ShiftPosition', 'axis8_HomePosition', 'axis8_UnloadPosition',
+                'axis10_RaisePosition', 'axis10_LowerPosition',
+                'axis14_TargetPosition_1', 'axis14_TargetPosition_2', 'axis14_HomePosition',
+                'axis15_TargetPosition_1', 'axis15_TargetPosition_2', 'axis15_HomePosition',
+                'axis18_TargetPosition_1', 'axis18_TargetPosition_2', 'axis18_HomePosition',
+                'axis19_TargetPosition_1', 'axis19_TargetPosition_2', 'axis19_HomePosition',
+                'axis22_TargetPosition_1', 'axis22_TargetPosition_2', 'axis22_HomePosition',
+                'axis23_TargetPosition_1', 'axis23_TargetPosition_2', 'axis23_HomePosition',
+                'axis26_TargetPosition_1', 'axis26_TargetPosition_2', 'axis26_HomePosition',
+                'axis27_TargetPosition_1', 'axis27_TargetPosition_2', 'axis27_HomePosition',
+                'axis30_TargetPosition_1', 'axis30_TargetPosition_2', 'axis30_TargetPosition_3', 'axis30_TargetPosition_4', 'axis30_HomePosition',
+                'axis31_TargetPosition_1', 'axis31_TargetPosition_2', 'axis31_HomePosition',
+                'axis35_TargetPosition_1', 'axis35_TargetPosition_2', 'axis35_HomePosition',
+                'axis36_TargetPosition_1', 'axis36_TargetPosition_2', 'axis36_HomePosition'
+            ];
+
+            positionFields.forEach(field => {
+                const input = document.getElementById(field);
+                if (input) {
+                    recipe.positions[field] = parseFloat(input.value) || 0;
+                }
+            });
+
+            return recipe;
+        }
+
+        // Save recipe
+        function saveRecipe() {
+            if (selectedRecipeIndex < 0) return;
+
+            const updatedRecipe = collectFormData();
+            recipes[selectedRecipeIndex] = updatedRecipe;
+            originalRecipe = JSON.parse(JSON.stringify(updatedRecipe));
+            hasChanges = false;
+
+            showAlert('Recipe saved successfully!', 'success');
+            renderRecipeList();
+            document.getElementById('editingRecipeName').textContent = updatedRecipe.recipeName;
+        }
+
+        // Download recipe to PLC
+        async function downloadRecipe() {
+            if (selectedRecipeIndex < 0) return;
+
+            // Save first
+            saveRecipe();
+
+            // In production, this would write to the PLC
+            showAlert('Recipe downloaded to PLC successfully! (Mock - would write to GVL_Recipes.RecipeLibrary)', 'success');
+
+            // Log the recipe data that would be sent
+            console.log('Recipe data to download:', recipes[selectedRecipeIndex]);
+        }
+
+        // Revert changes
+        function revertChanges() {
+            if (selectedRecipeIndex < 0 || !originalRecipe) return;
+
+            recipes[selectedRecipeIndex] = JSON.parse(JSON.stringify(originalRecipe));
+            loadRecipeIntoForm(originalRecipe);
+            hasChanges = false;
+
+            showAlert('Changes reverted.', 'warning');
+        }
+
+        // Switch tabs
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+            document.querySelector(`.tab[onclick="switchTab('${tabName}')"]`).classList.add('active');
+            document.getElementById(`tab-${tabName}`).classList.add('active');
+        }
+
+        // Show alert message
+        function showAlert(message, type) {
+            const container = document.getElementById('alertContainer');
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type}`;
+            alert.textContent = message;
+            container.appendChild(alert);
+
+            setTimeout(() => {
+                alert.remove();
+            }, 3000);
+        }
+
+        // Update connection status
+        function updateConnectionStatus(isConnected) {
+            const indicator = document.getElementById('connectionIndicator');
+            const text = document.getElementById('connectionText');
+
+            if (isConnected) {
+                indicator.className = 'status-indicator connected';
+                text.textContent = 'Connected';
+            } else {
+                indicator.className = 'status-indicator disconnected';
+                text.textContent = 'Disconnected';
+            }
+        }
+
+        // Track changes
+        document.addEventListener('input', function(e) {
+            if (selectedRecipeIndex >= 0) {
+                hasChanges = true;
+            }
+        });
+    </script>
+</body>
+</html>

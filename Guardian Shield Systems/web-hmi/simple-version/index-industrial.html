@@ -761,6 +761,8 @@
             'RESETTING': 'Resetting system...'
         };
 
+        // Bit positions for each axis (axis N uses bit N-1)
+        // Note: axes 34-36 use bits 33-35 which require BigInt for proper 64-bit handling
         const axisBitPositions = {
             1: 0, 2: 1, 6: 5, 8: 7, 10: 9, 14: 13, 15: 14, 18: 17, 19: 18,
             22: 21, 23: 22, 26: 25, 27: 26, 30: 29, 31: 30, 34: 33, 35: 34, 36: 35
@@ -980,11 +982,13 @@
         }
 
         function updateActiveAxes(axesMask) {
+            // Convert to BigInt to handle bits 32+ properly (axes 34-36)
+            const mask = BigInt(axesMask >>> 0);
             const cells = document.querySelectorAll('.axis-cell');
             cells.forEach(cell => {
                 const axisNum = parseInt(cell.dataset.axis);
                 const bitPos = axisBitPositions[axisNum];
-                const isActive = bitPos !== undefined && ((axesMask >> bitPos) & 1) === 1;
+                const isActive = bitPos !== undefined && ((mask >> BigInt(bitPos)) & 1n) === 1n;
                 cell.className = 'axis-cell' + (isActive ? ' active' : '');
             });
         }

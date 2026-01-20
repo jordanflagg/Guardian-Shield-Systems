@@ -1,0 +1,12 @@
+TYPE ST_MotionError :
+// Error information structure for motion faults
+STRUCT
+    hasError : BOOL;            // TRUE if an error exists
+    errorAxisID : UINT;         // Which axis caused the error (0 = none)
+    errorCode : DWORD;          // Error code from motion controller
+    errorStep : E_MotionStep;   // Which motion step the error occurred in
+    errorSubStep : INT;         // Which substep the error occurred in
+    errorTimestamp : TIME;      // When the error occurred
+    errorDescription : STRING[80]; // Human-readable error description
+END_STRUCT
+END_TYPE

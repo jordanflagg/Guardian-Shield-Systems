@@ -1,0 +1,12 @@
+TYPE ST_AxisMoveCmd :
+// Command structure for axis movement
+// Used to pass move commands to FB_AxisMover
+STRUCT
+    axisIndex : UINT;           // Which axis to move (1-36)
+    targetPosition : LREAL;     // Target position
+    velocity : LREAL;           // Move velocity
+    acceleration : LREAL;       // Acceleration
+    deceleration : LREAL;       // Deceleration
+    jerk : LREAL;               // Jerk limit
+END_STRUCT
+END_TYPE

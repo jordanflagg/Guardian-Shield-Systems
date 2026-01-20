@@ -1,0 +1,183 @@
+FUNCTION_BLOCK FB_MotionStep_Unload
+// Handles SHIFT_TO_UNLOAD_AREA motion sequence
+// Moves completed block from processing center to unload table
+// 5 substeps total
+
+VAR_INPUT
+    Enable : BOOL;                      // TRUE to run this step
+    Reset : BOOL;                       // Reset to initial state
+    Positions : ST_PositionSetpoints;   // Position setpoints from recipe
+    MotionParams : ST_MotionParameters; // Motion parameters from recipe
+END_VAR
+
+VAR_OUTPUT
+    Done : BOOL;                        // Step completed
+    Busy : BOOL;                        // Step in progress
+    Error : BOOL;                       // Step failed
+    ErrorAxisID : UINT;                 // Which axis caused error
+    CurrentSubStep : INT;               // Current substep (0-4)
+    ActiveAxesMask : DWORD;             // Bitmask of moving axes
+    StepDescription : STRING[80];       // Human-readable description
+END_VAR
+
+VAR
+    subStep : INT := 0;
+
+    // Unload axes
+    moverAxis8 : FB_AxisMover;          // Pusher master (slave: 9)
+    moverAxis10 : FB_AxisMover;         // Table lift master (slaves: 11, 12, 13)
+
+    // State tracking
+    stepStarted : BOOL := FALSE;
+END_VAR
+
+///////////////////////////////////////////////////////////////////////////////
+
+// Reset handling
+IF Reset THEN
+    subStep := 0;
+    Done := FALSE;
+    Busy := FALSE;
+    Error := FALSE;
+    ErrorAxisID := 0;
+    ActiveAxesMask := 0;
+    stepStarted := FALSE;
+
+    moverAxis8(Reset := TRUE);
+    moverAxis10(Reset := TRUE);
+    RETURN;
+END_IF
+
+// Not enabled - idle
+IF NOT Enable THEN
+    Busy := FALSE;
+    ActiveAxesMask := 0;
+    RETURN;
+END_IF
+
+// Start on enable
+IF Enable AND NOT stepStarted THEN
+    stepStarted := TRUE;
+    Busy := TRUE;
+    subStep := 0;
+END_IF
+
+// Update output
+CurrentSubStep := subStep;
+
+// Substep state machine
+CASE subStep OF
+
+    // ----------------------------------------------------------------
+    0: // Axes 10,11,12,13 raise to pick up block
+        StepDescription := 'Unload - raising table';
+
+        // TODO: Disable suction cups first when I/O is available
+        // suctionCupsEnable := FALSE;
+
+        moverAxis10(
+            Execute := TRUE,
+            AxisRef := Axis_10,
+            Position := Positions.axis10_RaisePosition,
+            Velocity := MotionParams.defaultVelocity,
+            Acceleration := MotionParams.defaultAcceleration,
+            Deceleration := MotionParams.defaultDeceleration,
+            Jerk := MotionParams.defaultJerk
+        );
+
+        ActiveAxesMask := SHL(DWORD#1, 9);  // Axis 10 (slaves 11,12,13 follow)
+
+        IF moverAxis10.Done THEN
+            moverAxis10(Reset := TRUE);
+            subStep := 1;
+        ELSIF moverAxis10.Error THEN
+            Error := TRUE;
+            ErrorAxisID := 10;
+        END_IF
+
+    // ----------------------------------------------------------------
+    1: // Axes 8,9 shift block to unload table
+        StepDescription := 'Unload - shifting block';
+
+        moverAxis8(
+            Execute := TRUE,
+            AxisRef := Axis_8,
+            Position := Positions.axis8_UnloadPosition,
+            Velocity := MotionParams.defaultVelocity,
+            Acceleration := MotionParams.defaultAcceleration,
+            Deceleration := MotionParams.defaultDeceleration,
+            Jerk := MotionParams.defaultJerk
+        );
+
+        ActiveAxesMask := SHL(DWORD#1, 7);  // Axis 8 (slave 9 follows)
+
+        IF moverAxis8.Done THEN
+            moverAxis8(Reset := TRUE);
+            subStep := 2;
+        ELSIF moverAxis8.Error THEN
+            Error := TRUE;
+            ErrorAxisID := 8;
+        END_IF
+
+    // ----------------------------------------------------------------
+    2: // Axes 10,11,12,13 lower (place block on unload table)
+        StepDescription := 'Unload - lowering table';
+
+        moverAxis10(
+            Execute := TRUE,
+            AxisRef := Axis_10,
+            Position := Positions.axis10_LowerPosition,
+            Velocity := MotionParams.defaultVelocity,
+            Acceleration := MotionParams.defaultAcceleration,
+            Deceleration := MotionParams.defaultDeceleration,
+            Jerk := MotionParams.defaultJerk
+        );
+
+        ActiveAxesMask := SHL(DWORD#1, 9);  // Axis 10
+
+        IF moverAxis10.Done THEN
+            moverAxis10(Reset := TRUE);
+            subStep := 3;
+        ELSIF moverAxis10.Error THEN
+            Error := TRUE;
+            ErrorAxisID := 10;
+        END_IF
+
+    // ----------------------------------------------------------------
+    3: // Axes 8,9 return home
+        StepDescription := 'Unload - returning pusher';
+
+        moverAxis8(
+            Execute := TRUE,
+            AxisRef := Axis_8,
+            Position := Positions.axis8_HomePosition,
+            Velocity := MotionParams.defaultVelocity,
+            Acceleration := MotionParams.defaultAcceleration,
+            Deceleration := MotionParams.defaultDeceleration,
+            Jerk := MotionParams.defaultJerk
+        );
+
+        ActiveAxesMask := SHL(DWORD#1, 7);  // Axis 8
+
+        IF moverAxis8.Done THEN
+            moverAxis8(Reset := TRUE);
+            subStep := 4;
+        ELSIF moverAxis8.Error THEN
+            Error := TRUE;
+            ErrorAxisID := 8;
+        END_IF
+
+    // ----------------------------------------------------------------
+    4: // Complete - block on unload table, ready for fork truck
+        StepDescription := 'Cycle complete - ready for removal';
+        ActiveAxesMask := 0;
+        Done := TRUE;
+        Busy := FALSE;
+
+END_CASE
+
+// Handle errors
+IF Error THEN
+    Busy := FALSE;
+    ActiveAxesMask := 0;
+END_IF

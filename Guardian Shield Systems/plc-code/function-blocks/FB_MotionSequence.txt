@@ -1,0 +1,293 @@
+FUNCTION_BLOCK FB_MotionSequence
+// Refactored motion sequence controller
+// Orchestrates modular motion step FBs for cleaner, more maintainable code
+// Each motion phase is now handled by a dedicated function block
+
+VAR_INPUT
+    Enable : BOOL;                      // TRUE when machine in RUNNING state
+    RecipeID : UINT := 1;               // Recipe number to load (1-10)
+END_VAR
+
+VAR_OUTPUT
+    SequenceComplete : BOOL;            // Full cycle completed
+    CurrentStep : E_MotionStep;         // Current motion phase
+    ActiveRecipeID : UINT;              // Currently loaded recipe ID
+    RecipeLoadComplete : BOOL;          // Recipe loaded successfully
+    RecipeLoadError : BOOL;             // Recipe load failed
+
+    // HMI visualization outputs
+    CurrentSubStep : INT;               // Current substep within motion step
+    ActiveAxesMask : DWORD;             // Bitmask of currently moving axes
+    StepDescription : STRING[80];       // Human-readable description
+
+    // Error outputs
+    HasError : BOOL;                    // Motion error occurred
+    ErrorAxisID : UINT;                 // Which axis caused error
+END_VAR
+
+VAR
+    // Motion step (main state machine)
+    motionStep : E_MotionStep := E_MotionStep.WAIT_FOR_LOAD;
+
+    // Recipe data
+    positions : ST_PositionSetpoints;
+    motionParams : ST_MotionParameters;
+    lastRecipeID : UINT := 0;
+
+    // Operation enable flags (from recipe)
+    enableStuds : BOOL := TRUE;
+    enableWindowsDoors : BOOL := TRUE;
+    enableElectrical : BOOL := TRUE;
+
+    // Block loaded flag (would come from sensor in production)
+    blockLoaded : BOOL := TRUE;
+
+    // Modular motion step function blocks
+    stepLoadBlock : FB_MotionStep_LoadBlock;
+    stepStuds : FB_MotionStep_Studs;
+    stepWindowsDoors : FB_MotionStep_WindowsDoors;
+    stepElectrical : FB_MotionStep_Electrical;
+    stepUnload : FB_MotionStep_Unload;
+
+    // Error handler
+    errorHandler : FB_ErrorHandler;
+
+    // State tracking
+    stepStarted : BOOL := FALSE;
+END_VAR
+
+///////////////////////////////////////////////////////////////////////////////
+
+// ============================================================================
+// RECIPE LOADING - Load when RecipeID changes
+// ============================================================================
+
+IF RecipeID <> lastRecipeID THEN
+    IF RecipeID >= 1 AND RecipeID <= 10 THEN
+        IF GVL_Recipes.RecipeLibrary[RecipeID].isActive THEN
+            // Load recipe data
+            positions := GVL_Recipes.RecipeLibrary[RecipeID].positions;
+            motionParams := GVL_Recipes.RecipeLibrary[RecipeID].motionParams;
+            enableStuds := GVL_Recipes.RecipeLibrary[RecipeID].enableStuds;
+            enableWindowsDoors := GVL_Recipes.RecipeLibrary[RecipeID].enableWindowsDoors;
+            enableElectrical := GVL_Recipes.RecipeLibrary[RecipeID].enableElectrical;
+
+            ActiveRecipeID := RecipeID;
+            RecipeLoadError := FALSE;
+            RecipeLoadComplete := TRUE;
+        ELSE
+            // Recipe is inactive
+            RecipeLoadError := TRUE;
+            RecipeLoadComplete := FALSE;
+        END_IF
+    ELSE
+        // Invalid recipe ID
+        RecipeLoadError := TRUE;
+        RecipeLoadComplete := FALSE;
+    END_IF
+
+    lastRecipeID := RecipeID;
+END_IF
+
+// ============================================================================
+// HANDLE DISABLE - Reset all step FBs
+// ============================================================================
+
+IF NOT Enable THEN
+    stepLoadBlock(Reset := TRUE);
+    stepStuds(Reset := TRUE);
+    stepWindowsDoors(Reset := TRUE);
+    stepElectrical(Reset := TRUE);
+    stepUnload(Reset := TRUE);
+    errorHandler(Reset := TRUE);
+
+    ActiveAxesMask := 0;
+    stepStarted := FALSE;
+    RETURN;
+END_IF
+
+// ============================================================================
+// MOTION SEQUENCE STATE MACHINE
+// ============================================================================
+
+CASE motionStep OF
+
+    // ----------------------------------------------------------------
+    E_MotionStep.WAIT_FOR_LOAD:
+        SequenceComplete := FALSE;
+        CurrentSubStep := 0;
+        StepDescription := 'Waiting for block to load';
+        ActiveAxesMask := 0;
+
+        // Reset step FBs for new cycle
+        stepLoadBlock(Reset := TRUE);
+        stepStuds(Reset := TRUE);
+        stepWindowsDoors(Reset := TRUE);
+        stepElectrical(Reset := TRUE);
+        stepUnload(Reset := TRUE);
+
+        IF blockLoaded THEN
+            motionStep := E_MotionStep.SHIFT_TO_PROCESSING_AREA;
+        END_IF
+
+    // ----------------------------------------------------------------
+    E_MotionStep.SHIFT_TO_PROCESSING_AREA:
+        stepLoadBlock(
+            Enable := TRUE,
+            Reset := FALSE,
+            Positions := positions,
+            MotionParams := motionParams
+        );
+
+        CurrentSubStep := stepLoadBlock.CurrentSubStep;
+        ActiveAxesMask := stepLoadBlock.ActiveAxesMask;
+        StepDescription := stepLoadBlock.StepDescription;
+
+        IF stepLoadBlock.Error THEN
+            HasError := TRUE;
+            ErrorAxisID := stepLoadBlock.ErrorAxisID;
+        ELSIF stepLoadBlock.Done THEN
+            stepLoadBlock(Reset := TRUE);
+            // Determine next operation based on recipe
+            IF enableStuds THEN
+                motionStep := E_MotionStep.STUDS;
+            ELSIF enableWindowsDoors THEN
+                motionStep := E_MotionStep.WINDOWS_DOORS;
+            ELSIF enableElectrical THEN
+                motionStep := E_MotionStep.ELECTRICAL;
+            ELSE
+                motionStep := E_MotionStep.SHIFT_TO_UNLOAD_AREA;
+            END_IF
+        END_IF
+
+    // ----------------------------------------------------------------
+    E_MotionStep.STUDS:
+        stepStuds(
+            Enable := TRUE,
+            Reset := FALSE,
+            Positions := positions,
+            MotionParams := motionParams
+        );
+
+        CurrentSubStep := stepStuds.CurrentSubStep;
+        ActiveAxesMask := stepStuds.ActiveAxesMask;
+        StepDescription := stepStuds.StepDescription;
+
+        IF stepStuds.Error THEN
+            HasError := TRUE;
+            ErrorAxisID := stepStuds.ErrorAxisID;
+        ELSIF stepStuds.Done THEN
+            stepStuds(Reset := TRUE);
+            // Determine next operation
+            IF enableWindowsDoors THEN
+                motionStep := E_MotionStep.WINDOWS_DOORS;
+            ELSIF enableElectrical THEN
+                motionStep := E_MotionStep.ELECTRICAL;
+            ELSE
+                motionStep := E_MotionStep.SHIFT_TO_UNLOAD_AREA;
+            END_IF
+        END_IF
+
+    // ----------------------------------------------------------------
+    E_MotionStep.WINDOWS_DOORS:
+        stepWindowsDoors(
+            Enable := TRUE,
+            Reset := FALSE,
+            Positions := positions,
+            MotionParams := motionParams
+        );
+
+        CurrentSubStep := stepWindowsDoors.CurrentSubStep;
+        ActiveAxesMask := stepWindowsDoors.ActiveAxesMask;
+        StepDescription := stepWindowsDoors.StepDescription;
+
+        IF stepWindowsDoors.Error THEN
+            HasError := TRUE;
+            ErrorAxisID := stepWindowsDoors.ErrorAxisID;
+        ELSIF stepWindowsDoors.Done THEN
+            stepWindowsDoors(Reset := TRUE);
+            // Determine next operation
+            IF enableElectrical THEN
+                motionStep := E_MotionStep.ELECTRICAL;
+            ELSE
+                motionStep := E_MotionStep.SHIFT_TO_UNLOAD_AREA;
+            END_IF
+        END_IF
+
+    // ----------------------------------------------------------------
+    E_MotionStep.ELECTRICAL:
+        stepElectrical(
+            Enable := TRUE,
+            Reset := FALSE,
+            Positions := positions,
+            MotionParams := motionParams
+        );
+
+        CurrentSubStep := stepElectrical.CurrentSubStep;
+        ActiveAxesMask := stepElectrical.ActiveAxesMask;
+        StepDescription := stepElectrical.StepDescription;
+
+        IF stepElectrical.Error THEN
+            HasError := TRUE;
+            ErrorAxisID := stepElectrical.ErrorAxisID;
+        ELSIF stepElectrical.Done THEN
+            stepElectrical(Reset := TRUE);
+            motionStep := E_MotionStep.SHIFT_TO_UNLOAD_AREA;
+        END_IF
+
+    // ----------------------------------------------------------------
+    E_MotionStep.SHIFT_TO_UNLOAD_AREA:
+        stepUnload(
+            Enable := TRUE,
+            Reset := FALSE,
+            Positions := positions,
+            MotionParams := motionParams
+        );
+
+        CurrentSubStep := stepUnload.CurrentSubStep;
+        ActiveAxesMask := stepUnload.ActiveAxesMask;
+        StepDescription := stepUnload.StepDescription;
+
+        IF stepUnload.Error THEN
+            HasError := TRUE;
+            ErrorAxisID := stepUnload.ErrorAxisID;
+        ELSIF stepUnload.Done THEN
+            stepUnload(Reset := TRUE);
+            SequenceComplete := TRUE;
+            motionStep := E_MotionStep.WAIT_FOR_LOAD;
+        END_IF
+
+END_CASE
+
+// Update current step output
+CurrentStep := motionStep;
+
+// ============================================================================
+// ERROR HANDLER
+// ============================================================================
+
+errorHandler(
+    Reset := NOT Enable,
+    LoadBlockError := stepLoadBlock.Error,
+    LoadBlockErrorAxisID := stepLoadBlock.ErrorAxisID,
+    StudsError := stepStuds.Error,
+    StudsErrorAxisID := stepStuds.ErrorAxisID,
+    WindowsDoorsError := stepWindowsDoors.Error,
+    WindowsDoorsErrorAxisID := stepWindowsDoors.ErrorAxisID,
+    ElectricalError := stepElectrical.Error,
+    ElectricalErrorAxisID := stepElectrical.ErrorAxisID,
+    UnloadError := stepUnload.Error,
+    UnloadErrorAxisID := stepUnload.ErrorAxisID,
+    GearingError := FALSE,  // Would come from FB_AxisGearing
+    GearingErrorAxisID := 0,
+    PowerError := FALSE,    // Would come from FB_AxisPower
+    PowerErrorAxisID := 0,
+    CurrentStep := motionStep,
+    CurrentSubStep := CurrentSubStep
+);
+
+// Propagate error handler output
+IF errorHandler.HasError THEN
+    HasError := TRUE;
+    ErrorAxisID := errorHandler.ErrorInfo.errorAxisID;
+END_IF

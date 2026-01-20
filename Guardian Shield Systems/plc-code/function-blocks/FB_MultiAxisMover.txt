@@ -1,0 +1,174 @@
+FUNCTION_BLOCK FB_MultiAxisMover
+// Coordinates multiple axis moves and waits for all to complete
+// Simplifies parallel motion patterns used throughout the sequence
+
+VAR_INPUT
+    Execute : BOOL;             // Rising edge starts all moves
+    Reset : BOOL;               // Reset all movers
+
+    // Motion parameters (shared by all axes)
+    Velocity : LREAL;
+    Acceleration : LREAL;
+    Deceleration : LREAL;
+    Jerk : LREAL;
+
+    // Axis enables and positions (up to 8 axes per group)
+    Enable1 : BOOL; Axis1 : AXIS_REF; Position1 : LREAL;
+    Enable2 : BOOL; Axis2 : AXIS_REF; Position2 : LREAL;
+    Enable3 : BOOL; Axis3 : AXIS_REF; Position3 : LREAL;
+    Enable4 : BOOL; Axis4 : AXIS_REF; Position4 : LREAL;
+    Enable5 : BOOL; Axis5 : AXIS_REF; Position5 : LREAL;
+    Enable6 : BOOL; Axis6 : AXIS_REF; Position6 : LREAL;
+    Enable7 : BOOL; Axis7 : AXIS_REF; Position7 : LREAL;
+    Enable8 : BOOL; Axis8 : AXIS_REF; Position8 : LREAL;
+END_VAR
+
+VAR_OUTPUT
+    Done : BOOL;                // All enabled moves completed
+    Busy : BOOL;                // At least one move in progress
+    Error : BOOL;               // At least one move failed
+    ErrorAxisNum : UINT;        // Which axis (1-8) had first error
+    ErrorID : DWORD;            // Error code from failed axis
+    ActiveAxesMask : BYTE;      // Bitmask of currently moving axes
+END_VAR
+
+VAR
+    mover : ARRAY[1..8] OF FB_AxisMover;
+    enables : ARRAY[1..8] OF BOOL;
+    i : UINT;
+
+    state : INT := 0;
+    executePrev : BOOL;
+    executeRising : BOOL;
+
+    allDone : BOOL;
+    anyBusy : BOOL;
+    anyError : BOOL;
+    firstError : UINT;
+    activeMask : BYTE;
+END_VAR
+
+///////////////////////////////////////////////////////////////////////////////
+
+// Edge detection
+executeRising := Execute AND NOT executePrev;
+executePrev := Execute;
+
+// Copy enables to array for loop processing
+enables[1] := Enable1;
+enables[2] := Enable2;
+enables[3] := Enable3;
+enables[4] := Enable4;
+enables[5] := Enable5;
+enables[6] := Enable6;
+enables[7] := Enable7;
+enables[8] := Enable8;
+
+// Reset handling
+IF Reset THEN
+    FOR i := 1 TO 8 DO
+        mover[i](Reset := TRUE);
+    END_FOR
+    state := 0;
+    Done := FALSE;
+    Busy := FALSE;
+    Error := FALSE;
+    ErrorAxisNum := 0;
+    ErrorID := 0;
+    ActiveAxesMask := 0;
+    RETURN;
+END_IF
+
+// State machine
+CASE state OF
+
+    0: // IDLE
+        Done := FALSE;
+        Busy := FALSE;
+        Error := FALSE;
+        ActiveAxesMask := 0;
+
+        IF executeRising THEN
+            state := 1;
+            Busy := TRUE;
+        END_IF
+
+    1: // MOVING - execute all enabled moves
+        // Call all movers
+        mover[1](Execute := enables[1], AxisRef := Axis1, Position := Position1,
+                 Velocity := Velocity, Acceleration := Acceleration,
+                 Deceleration := Deceleration, Jerk := Jerk);
+        mover[2](Execute := enables[2], AxisRef := Axis2, Position := Position2,
+                 Velocity := Velocity, Acceleration := Acceleration,
+                 Deceleration := Deceleration, Jerk := Jerk);
+        mover[3](Execute := enables[3], AxisRef := Axis3, Position := Position3,
+                 Velocity := Velocity, Acceleration := Acceleration,
+                 Deceleration := Deceleration, Jerk := Jerk);
+        mover[4](Execute := enables[4], AxisRef := Axis4, Position := Position4,
+                 Velocity := Velocity, Acceleration := Acceleration,
+                 Deceleration := Deceleration, Jerk := Jerk);
+        mover[5](Execute := enables[5], AxisRef := Axis5, Position := Position5,
+                 Velocity := Velocity, Acceleration := Acceleration,
+                 Deceleration := Deceleration, Jerk := Jerk);
+        mover[6](Execute := enables[6], AxisRef := Axis6, Position := Position6,
+                 Velocity := Velocity, Acceleration := Acceleration,
+                 Deceleration := Deceleration, Jerk := Jerk);
+        mover[7](Execute := enables[7], AxisRef := Axis7, Position := Position7,
+                 Velocity := Velocity, Acceleration := Acceleration,
+                 Deceleration := Deceleration, Jerk := Jerk);
+        mover[8](Execute := enables[8], AxisRef := Axis8, Position := Position8,
+                 Velocity := Velocity, Acceleration := Acceleration,
+                 Deceleration := Deceleration, Jerk := Jerk);
+
+        // Check status
+        allDone := TRUE;
+        anyBusy := FALSE;
+        anyError := FALSE;
+        firstError := 0;
+        activeMask := 0;
+
+        FOR i := 1 TO 8 DO
+            IF enables[i] THEN
+                IF mover[i].Active THEN
+                    activeMask := activeMask OR SHL(BYTE#1, i-1);
+                    anyBusy := TRUE;
+                END_IF
+
+                IF NOT mover[i].Done THEN
+                    allDone := FALSE;
+                END_IF
+
+                IF mover[i].Error AND firstError = 0 THEN
+                    anyError := TRUE;
+                    firstError := i;
+                END_IF
+            END_IF
+        END_FOR
+
+        ActiveAxesMask := activeMask;
+
+        // Check for completion
+        IF anyError THEN
+            state := 3;
+            Error := TRUE;
+            ErrorAxisNum := firstError;
+            ErrorID := mover[firstError].ErrorID;
+            Busy := FALSE;
+        ELSIF allDone AND NOT anyBusy THEN
+            state := 2;
+            Done := TRUE;
+            Busy := FALSE;
+        END_IF
+
+    2: // DONE
+        ActiveAxesMask := 0;
+        IF NOT Execute THEN
+            state := 0;
+            Done := FALSE;
+        END_IF
+
+    3: // ERROR
+        ActiveAxesMask := 0;
+        // Stay in error until Reset
+
+END_CASE

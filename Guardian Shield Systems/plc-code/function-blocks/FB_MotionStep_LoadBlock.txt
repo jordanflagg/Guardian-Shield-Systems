@@ -1,0 +1,315 @@
+FUNCTION_BLOCK FB_MotionStep_LoadBlock
+// Handles SHIFT_TO_PROCESSING_AREA motion sequence
+// Moves block from load table to processing center
+// 11 substeps total
+
+VAR_INPUT
+    Enable : BOOL;                      // TRUE to run this step
+    Reset : BOOL;                       // Reset to initial state
+    Positions : ST_PositionSetpoints;   // Position setpoints from recipe
+    MotionParams : ST_MotionParameters; // Motion parameters from recipe
+END_VAR
+
+VAR_OUTPUT
+    Done : BOOL;                        // Step completed
+    Busy : BOOL;                        // Step in progress
+    Error : BOOL;                       // Step failed
+    ErrorAxisID : UINT;                 // Which axis caused error
+    CurrentSubStep : INT;               // Current substep (0-10)
+    ActiveAxesMask : DWORD;             // Bitmask of moving axes
+    StepDescription : STRING[80];       // Human-readable description
+END_VAR
+
+VAR
+    subStep : INT := 0;
+
+    // Axis movers
+    moverAxis1 : FB_AxisMover;
+    moverAxis2 : FB_AxisMover;
+    moverAxis6 : FB_AxisMover;
+    moverAxis8 : FB_AxisMover;
+    moverAxis10 : FB_AxisMover;
+
+    // State tracking
+    stepStarted : BOOL := FALSE;
+END_VAR
+
+///////////////////////////////////////////////////////////////////////////////
+
+// Reset handling
+IF Reset THEN
+    subStep := 0;
+    Done := FALSE;
+    Busy := FALSE;
+    Error := FALSE;
+    ErrorAxisID := 0;
+    ActiveAxesMask := 0;
+    stepStarted := FALSE;
+
+    moverAxis1(Reset := TRUE);
+    moverAxis2(Reset := TRUE);
+    moverAxis6(Reset := TRUE);
+    moverAxis8(Reset := TRUE);
+    moverAxis10(Reset := TRUE);
+    RETURN;
+END_IF
+
+// Not enabled - idle
+IF NOT Enable THEN
+    Busy := FALSE;
+    ActiveAxesMask := 0;
+    RETURN;
+END_IF
+
+// Start on enable
+IF Enable AND NOT stepStarted THEN
+    stepStarted := TRUE;
+    Busy := TRUE;
+    subStep := 0;
+END_IF
+
+// Update output
+CurrentSubStep := subStep;
+
+// Substep state machine
+CASE subStep OF
+
+    // ----------------------------------------------------------------
+    0: // Axis 1 shifts block to left wall
+        StepDescription := 'Shifting block to left wall';
+
+        moverAxis1(
+            Execute := TRUE,
+            AxisRef := Axis_1,
+            Position := Positions.axis1_ShiftPosition,
+            Velocity := MotionParams.defaultVelocity,
+            Acceleration := MotionParams.defaultAcceleration,
+            Deceleration := MotionParams.defaultDeceleration,
+            Jerk := MotionParams.defaultJerk
+        );
+
+        ActiveAxesMask := SHL(DWORD#1, 0);  // Axis 1
+
+        IF moverAxis1.Done THEN
+            moverAxis1(Reset := TRUE);
+            subStep := 1;
+        ELSIF moverAxis1.Error THEN
+            Error := TRUE;
+            ErrorAxisID := 1;
+        END_IF
+
+    // ----------------------------------------------------------------
+    1: // Axes 2,3,4,5 raise (lift block off load table)
+        StepDescription := 'Raising load table';
+
+        moverAxis2(
+            Execute := TRUE,
+            AxisRef := Axis_2,
+            Position := Positions.axis2_RaisePosition,
+            Velocity := MotionParams.defaultVelocity,
+            Acceleration := MotionParams.defaultAcceleration,
+            Deceleration := MotionParams.defaultDeceleration,
+            Jerk := MotionParams.defaultJerk
+        );
+
+        ActiveAxesMask := SHL(DWORD#1, 1);  // Axis 2 (slaves 3,4,5 follow via gearing)
+
+        IF moverAxis2.Done THEN
+            moverAxis2(Reset := TRUE);
+            subStep := 2;
+        ELSIF moverAxis2.Error THEN
+            Error := TRUE;
+            ErrorAxisID := 2;
+        END_IF
+
+    // ----------------------------------------------------------------
+    2: // Axes 6,7 shift block toward center
+        StepDescription := 'Shifting block to center';
+
+        moverAxis6(
+            Execute := TRUE,
+            AxisRef := Axis_6,
+            Position := Positions.axis6_ShiftPosition,
+            Velocity := MotionParams.defaultVelocity,
+            Acceleration := MotionParams.defaultAcceleration,
+            Deceleration := MotionParams.defaultDeceleration,
+            Jerk := MotionParams.defaultJerk
+        );
+
+        ActiveAxesMask := SHL(DWORD#1, 5);  // Axis 6 (slave 7 follows)
+
+        IF moverAxis6.Done THEN
+            moverAxis6(Reset := TRUE);
+            subStep := 3;
+        ELSIF moverAxis6.Error THEN
+            Error := TRUE;
+            ErrorAxisID := 6;
+        END_IF
+
+    // ----------------------------------------------------------------
+    3: // Axes 2,3,4,5 lower (back down below table)
+        StepDescription := 'Lowering load table';
+
+        moverAxis2(
+            Execute := TRUE,
+            AxisRef := Axis_2,
+            Position := Positions.axis2_LowerPosition,
+            Velocity := MotionParams.defaultVelocity,
+            Acceleration := MotionParams.defaultAcceleration,
+            Deceleration := MotionParams.defaultDeceleration,
+            Jerk := MotionParams.defaultJerk
+        );
+
+        ActiveAxesMask := SHL(DWORD#1, 1);  // Axis 2
+
+        IF moverAxis2.Done THEN
+            moverAxis2(Reset := TRUE);
+            subStep := 4;
+        ELSIF moverAxis2.Error THEN
+            Error := TRUE;
+            ErrorAxisID := 2;
+        END_IF
+
+    // ----------------------------------------------------------------
+    4: // Axes 6,7 return to home position
+        StepDescription := 'Returning shift mechanism';
+
+        moverAxis6(
+            Execute := TRUE,
+            AxisRef := Axis_6,
+            Position := Positions.axis6_HomePosition,
+            Velocity := MotionParams.defaultVelocity,
+            Acceleration := MotionParams.defaultAcceleration,
+            Deceleration := MotionParams.defaultDeceleration,
+            Jerk := MotionParams.defaultJerk
+        );
+
+        ActiveAxesMask := SHL(DWORD#1, 5);  // Axis 6
+
+        IF moverAxis6.Done THEN
+            moverAxis6(Reset := TRUE);
+            subStep := 5;
+        ELSIF moverAxis6.Error THEN
+            Error := TRUE;
+            ErrorAxisID := 6;
+        END_IF
+
+    // ----------------------------------------------------------------
+    5: // Axes 10,11,12,13 raise (prepare to receive block)
+        StepDescription := 'Raising unload table';
+
+        moverAxis10(
+            Execute := TRUE,
+            AxisRef := Axis_10,
+            Position := Positions.axis10_RaisePosition,
+            Velocity := MotionParams.defaultVelocity,
+            Acceleration := MotionParams.defaultAcceleration,
+            Deceleration := MotionParams.defaultDeceleration,
+            Jerk := MotionParams.defaultJerk
+        );
+
+        ActiveAxesMask := SHL(DWORD#1, 9);  // Axis 10 (slaves 11,12,13 follow)
+
+        IF moverAxis10.Done THEN
+            moverAxis10(Reset := TRUE);
+            subStep := 6;
+        ELSIF moverAxis10.Error THEN
+            Error := TRUE;
+            ErrorAxisID := 10;
+        END_IF
+
+    // ----------------------------------------------------------------
+    6: // Axes 8,9 shift block to center
+        StepDescription := 'Centering block';
+
+        moverAxis8(
+            Execute := TRUE,
+            AxisRef := Axis_8,
+            Position := Positions.axis8_ShiftPosition,
+            Velocity := MotionParams.defaultVelocity,
+            Acceleration := MotionParams.defaultAcceleration,
+            Deceleration := MotionParams.defaultDeceleration,
+            Jerk := MotionParams.defaultJerk
+        );
+
+        ActiveAxesMask := SHL(DWORD#1, 7);  // Axis 8 (slave 9 follows)
+
+        IF moverAxis8.Done THEN
+            moverAxis8(Reset := TRUE);
+            subStep := 7;
+        ELSIF moverAxis8.Error THEN
+            Error := TRUE;
+            ErrorAxisID := 8;
+        END_IF
+
+    // ----------------------------------------------------------------
+    7: // Wait for suction cups to enable
+        StepDescription := 'Engaging suction cups';
+        ActiveAxesMask := 0;
+
+        // TODO: Add suction cup I/O when available
+        // For now, proceed immediately
+        subStep := 8;
+
+    // ----------------------------------------------------------------
+    8: // Axes 8,9 return to home position
+        StepDescription := 'Returning pusher';
+
+        moverAxis8(
+            Execute := TRUE,
+            AxisRef := Axis_8,
+            Position := Positions.axis8_HomePosition,
+            Velocity := MotionParams.defaultVelocity,
+            Acceleration := MotionParams.defaultAcceleration,
+            Deceleration := MotionParams.defaultDeceleration,
+            Jerk := MotionParams.defaultJerk
+        );
+
+        ActiveAxesMask := SHL(DWORD#1, 7);  // Axis 8
+
+        IF moverAxis8.Done THEN
+            moverAxis8(Reset := TRUE);
+            subStep := 9;
+        ELSIF moverAxis8.Error THEN
+            Error := TRUE;
+            ErrorAxisID := 8;
+        END_IF
+
+    // ----------------------------------------------------------------
+    9: // Axes 10,11,12,13 lower (get out of way)
+        StepDescription := 'Lowering unload table';
+
+        moverAxis10(
+            Execute := TRUE,
+            AxisRef := Axis_10,
+            Position := Positions.axis10_LowerPosition,
+            Velocity := MotionParams.defaultVelocity,
+            Acceleration := MotionParams.defaultAcceleration,
+            Deceleration := MotionParams.defaultDeceleration,
+            Jerk := MotionParams.defaultJerk
+        );
+
+        ActiveAxesMask := SHL(DWORD#1, 9);  // Axis 10
+
+        IF moverAxis10.Done THEN
+            moverAxis10(Reset := TRUE);
+            subStep := 10;
+        ELSIF moverAxis10.Error THEN
+            Error := TRUE;
+            ErrorAxisID := 10;
+        END_IF
+
+    // ----------------------------------------------------------------
+    10: // Complete - block is now in center, ready for carving
+        StepDescription := 'Block positioned - ready for carving';
+        ActiveAxesMask := 0;
+        Done := TRUE;
+        Busy := FALSE;
+
+END_CASE
+
+// Handle errors
+IF Error THEN
+    Busy := FALSE;
+    ActiveAxesMask := 0;
+END_IF

@@ -1,0 +1,340 @@
+FUNCTION_BLOCK FB_AxisGearing
+// Manages all permanent gearing relationships between master and slave axes.
+// Due to VAR_IN_OUT requirements of MB_GearInPos, each pair requires explicit calls.
+// Call this function block to establish/re-establish gearing after any
+// interruption (MC_Halt, E-Stop, fault recovery, etc.)
+
+VAR_INPUT
+    Execute : BOOL;             // Rising edge activates all gearing
+    Reset : BOOL;               // Reset all gearing (disengage)
+END_VAR
+
+VAR_OUTPUT
+    Done : BOOL;                // All gearing successfully engaged
+    Busy : BOOL;                // Gearing in progress
+    Error : BOOL;               // One or more gearing operations failed
+    ErrorAxisID : UINT;         // Which axis had the error (0 = none)
+    ActivePairCount : UINT;     // Number of gearing pairs currently active
+END_VAR
+
+VAR CONSTANT
+    NUM_GEARING_PAIRS : UINT := 18;
+END_VAR
+
+VAR
+    // Individual gearing function blocks (MB_GearInPos requires VAR_IN_OUT for axes)
+    // Load table lift: Axis 2 master, 3,4,5 slaves
+    fbGear_2_3 : MB_GearInPos;
+    fbGear_2_4 : MB_GearInPos;
+    fbGear_2_5 : MB_GearInPos;
+
+    // Shift to center: Axis 6 master, 7 slave
+    fbGear_6_7 : MB_GearInPos;
+
+    // Unload pusher: Axis 8 master, 9 slave
+    fbGear_8_9 : MB_GearInPos;
+
+    // Unload table lift: Axis 10 master, 11,12,13 slaves
+    fbGear_10_11 : MB_GearInPos;
+    fbGear_10_12 : MB_GearInPos;
+    fbGear_10_13 : MB_GearInPos;
+
+    // Stud carving pairs (8 pairs)
+    fbGear_14_16 : MB_GearInPos;
+    fbGear_15_17 : MB_GearInPos;
+    fbGear_18_20 : MB_GearInPos;
+    fbGear_19_21 : MB_GearInPos;
+    fbGear_22_24 : MB_GearInPos;
+    fbGear_23_25 : MB_GearInPos;
+    fbGear_26_28 : MB_GearInPos;
+    fbGear_27_29 : MB_GearInPos;
+
+    // Window/door hot wire (2 pairs)
+    fbGear_30_32 : MB_GearInPos;
+    fbGear_31_33 : MB_GearInPos;
+
+    // Edge detection
+    executePrev : BOOL := FALSE;
+    executeRising : BOOL := FALSE;
+
+    // State tracking
+    gearingActive : BOOL := FALSE;
+
+    // Status tracking
+    allInSync : BOOL;
+    anyError : BOOL;
+    firstErrorAxis : UINT;
+    syncCount : UINT;
+END_VAR
+
+///////////////////////////////////////////////////////////////////////////////
+
+// Edge detection for Execute
+executeRising := Execute AND NOT executePrev;
+executePrev := Execute;
+
+// Reset outputs and state
+IF Reset THEN
+    Done := FALSE;
+    Busy := FALSE;
+    Error := FALSE;
+    ErrorAxisID := 0;
+    ActivePairCount := 0;
+    gearingActive := FALSE;
+
+    // Reset all gearing FBs (must still provide axis references for VAR_IN_OUT)
+    fbGear_2_3(Execute := FALSE, Master := AXIF_CONFIG_INDEXES[2], Slave := AXIF_CONFIG_INDEXES[3]);
+    fbGear_2_4(Execute := FALSE, Master := AXIF_CONFIG_INDEXES[2], Slave := AXIF_CONFIG_INDEXES[4]);
+    fbGear_2_5(Execute := FALSE, Master := AXIF_CONFIG_INDEXES[2], Slave := AXIF_CONFIG_INDEXES[5]);
+    fbGear_6_7(Execute := FALSE, Master := AXIF_CONFIG_INDEXES[6], Slave := AXIF_CONFIG_INDEXES[7]);
+    fbGear_8_9(Execute := FALSE, Master := AXIF_CONFIG_INDEXES[8], Slave := AXIF_CONFIG_INDEXES[9]);
+    fbGear_10_11(Execute := FALSE, Master := AXIF_CONFIG_INDEXES[10], Slave := AXIF_CONFIG_INDEXES[11]);
+    fbGear_10_12(Execute := FALSE, Master := AXIF_CONFIG_INDEXES[10], Slave := AXIF_CONFIG_INDEXES[12]);
+    fbGear_10_13(Execute := FALSE, Master := AXIF_CONFIG_INDEXES[10], Slave := AXIF_CONFIG_INDEXES[13]);
+    fbGear_14_16(Execute := FALSE, Master := AXIF_CONFIG_INDEXES[14], Slave := AXIF_CONFIG_INDEXES[16]);
+    fbGear_15_17(Execute := FALSE, Master := AXIF_CONFIG_INDEXES[15], Slave := AXIF_CONFIG_INDEXES[17]);
+    fbGear_18_20(Execute := FALSE, Master := AXIF_CONFIG_INDEXES[18], Slave := AXIF_CONFIG_INDEXES[20]);
+    fbGear_19_21(Execute := FALSE, Master := AXIF_CONFIG_INDEXES[19], Slave := AXIF_CONFIG_INDEXES[21]);
+    fbGear_22_24(Execute := FALSE, Master := AXIF_CONFIG_INDEXES[22], Slave := AXIF_CONFIG_INDEXES[24]);
+    fbGear_23_25(Execute := FALSE, Master := AXIF_CONFIG_INDEXES[23], Slave := AXIF_CONFIG_INDEXES[25]);
+    fbGear_26_28(Execute := FALSE, Master := AXIF_CONFIG_INDEXES[26], Slave := AXIF_CONFIG_INDEXES[28]);
+    fbGear_27_29(Execute := FALSE, Master := AXIF_CONFIG_INDEXES[27], Slave := AXIF_CONFIG_INDEXES[29]);
+    fbGear_30_32(Execute := FALSE, Master := AXIF_CONFIG_INDEXES[30], Slave := AXIF_CONFIG_INDEXES[32]);
+    fbGear_31_33(Execute := FALSE, Master := AXIF_CONFIG_INDEXES[31], Slave := AXIF_CONFIG_INDEXES[33]);
+
+    RETURN;
+END_IF
+
+// Start gearing on rising edge
+IF executeRising THEN
+    Busy := TRUE;
+    Done := FALSE;
+    Error := FALSE;
+    ErrorAxisID := 0;
+    gearingActive := TRUE;
+END_IF
+
+// ============================================================================
+// GEARING FUNCTION BLOCK CALLS
+// Each pair needs explicit call due to VAR_IN_OUT requirements
+// ============================================================================
+
+// Load table lift: Axis 2 master, 3,4,5 slaves
+fbGear_2_3(
+    Execute := gearingActive,
+    Master := AXIF_CONFIG_INDEXES[2],
+    Slave := AXIF_CONFIG_INDEXES[3],
+    RatioNumerator := 1,
+    RatioDenominator := 1
+);
+
+fbGear_2_4(
+    Execute := gearingActive,
+    Master := AXIF_CONFIG_INDEXES[2],
+    Slave := AXIF_CONFIG_INDEXES[4],
+    RatioNumerator := 1,
+    RatioDenominator := 1
+);
+
+fbGear_2_5(
+    Execute := gearingActive,
+    Master := AXIF_CONFIG_INDEXES[2],
+    Slave := AXIF_CONFIG_INDEXES[5],
+    RatioNumerator := 1,
+    RatioDenominator := 1
+);
+
+// Shift to center: Axis 6 master, 7 slave
+fbGear_6_7(
+    Execute := gearingActive,
+    Master := AXIF_CONFIG_INDEXES[6],
+    Slave := AXIF_CONFIG_INDEXES[7],
+    RatioNumerator := 1,
+    RatioDenominator := 1
+);
+
+// Unload pusher: Axis 8 master, 9 slave
+fbGear_8_9(
+    Execute := gearingActive,
+    Master := AXIF_CONFIG_INDEXES[8],
+    Slave := AXIF_CONFIG_INDEXES[9],
+    RatioNumerator := 1,
+    RatioDenominator := 1
+);
+
+// Unload table lift: Axis 10 master, 11,12,13 slaves
+fbGear_10_11(
+    Execute := gearingActive,
+    Master := AXIF_CONFIG_INDEXES[10],
+    Slave := AXIF_CONFIG_INDEXES[11],
+    RatioNumerator := 1,
+    RatioDenominator := 1
+);
+
+fbGear_10_12(
+    Execute := gearingActive,
+    Master := AXIF_CONFIG_INDEXES[10],
+    Slave := AXIF_CONFIG_INDEXES[12],
+    RatioNumerator := 1,
+    RatioDenominator := 1
+);
+
+fbGear_10_13(
+    Execute := gearingActive,
+    Master := AXIF_CONFIG_INDEXES[10],
+    Slave := AXIF_CONFIG_INDEXES[13],
+    RatioNumerator := 1,
+    RatioDenominator := 1
+);
+
+// Stud carving pairs (8 pairs)
+fbGear_14_16(
+    Execute := gearingActive,
+    Master := AXIF_CONFIG_INDEXES[14],
+    Slave := AXIF_CONFIG_INDEXES[16],
+    RatioNumerator := 1,
+    RatioDenominator := 1
+);
+
+fbGear_15_17(
+    Execute := gearingActive,
+    Master := AXIF_CONFIG_INDEXES[15],
+    Slave := AXIF_CONFIG_INDEXES[17],
+    RatioNumerator := 1,
+    RatioDenominator := 1
+);
+
+fbGear_18_20(
+    Execute := gearingActive,
+    Master := AXIF_CONFIG_INDEXES[18],
+    Slave := AXIF_CONFIG_INDEXES[20],
+    RatioNumerator := 1,
+    RatioDenominator := 1
+);
+
+fbGear_19_21(
+    Execute := gearingActive,
+    Master := AXIF_CONFIG_INDEXES[19],
+    Slave := AXIF_CONFIG_INDEXES[21],
+    RatioNumerator := 1,
+    RatioDenominator := 1
+);
+
+fbGear_22_24(
+    Execute := gearingActive,
+    Master := AXIF_CONFIG_INDEXES[22],
+    Slave := AXIF_CONFIG_INDEXES[24],
+    RatioNumerator := 1,
+    RatioDenominator := 1
+);
+
+fbGear_23_25(
+    Execute := gearingActive,
+    Master := AXIF_CONFIG_INDEXES[23],
+    Slave := AXIF_CONFIG_INDEXES[25],
+    RatioNumerator := 1,
+    RatioDenominator := 1
+);
+
+fbGear_26_28(
+    Execute := gearingActive,
+    Master := AXIF_CONFIG_INDEXES[26],
+    Slave := AXIF_CONFIG_INDEXES[28],
+    RatioNumerator := 1,
+    RatioDenominator := 1
+);
+
+fbGear_27_29(
+    Execute := gearingActive,
+    Master := AXIF_CONFIG_INDEXES[27],
+    Slave := AXIF_CONFIG_INDEXES[29],
+    RatioNumerator := 1,
+    RatioDenominator := 1
+);
+
+// Window/door hot wire (2 pairs)
+fbGear_30_32(
+    Execute := gearingActive,
+    Master := AXIF_CONFIG_INDEXES[30],
+    Slave := AXIF_CONFIG_INDEXES[32],
+    RatioNumerator := 1,
+    RatioDenominator := 1
+);
+
+fbGear_31_33(
+    Execute := gearingActive,
+    Master := AXIF_CONFIG_INDEXES[31],
+    Slave := AXIF_CONFIG_INDEXES[33],
+    RatioNumerator := 1,
+    RatioDenominator := 1
+);
+
+// ============================================================================
+// CHECK GEARING STATUS
+// ============================================================================
+
+IF gearingActive THEN
+    // Initialize status flags
+    allInSync := TRUE;
+    anyError := FALSE;
+    firstErrorAxis := 0;
+    syncCount := 0;
+
+    // Check all gearing pairs for errors (first error wins)
+    IF fbGear_2_3.Error THEN anyError := TRUE; firstErrorAxis := 3; END_IF
+    IF NOT anyError AND fbGear_2_4.Error THEN anyError := TRUE; firstErrorAxis := 4; END_IF
+    IF NOT anyError AND fbGear_2_5.Error THEN anyError := TRUE; firstErrorAxis := 5; END_IF
+    IF NOT anyError AND fbGear_6_7.Error THEN anyError := TRUE; firstErrorAxis := 7; END_IF
+    IF NOT anyError AND fbGear_8_9.Error THEN anyError := TRUE; firstErrorAxis := 9; END_IF
+    IF NOT anyError AND fbGear_10_11.Error THEN anyError := TRUE; firstErrorAxis := 11; END_IF
+    IF NOT anyError AND fbGear_10_12.Error THEN anyError := TRUE; firstErrorAxis := 12; END_IF
+    IF NOT anyError AND fbGear_10_13.Error THEN anyError := TRUE; firstErrorAxis := 13; END_IF
+    IF NOT anyError AND fbGear_14_16.Error THEN anyError := TRUE; firstErrorAxis := 16; END_IF
+    IF NOT anyError AND fbGear_15_17.Error THEN anyError := TRUE; firstErrorAxis := 17; END_IF
+    IF NOT anyError AND fbGear_18_20.Error THEN anyError := TRUE; firstErrorAxis := 20; END_IF
+    IF NOT anyError AND fbGear_19_21.Error THEN anyError := TRUE; firstErrorAxis := 21; END_IF
+    IF NOT anyError AND fbGear_22_24.Error THEN anyError := TRUE; firstErrorAxis := 24; END_IF
+    IF NOT anyError AND fbGear_23_25.Error THEN anyError := TRUE; firstErrorAxis := 25; END_IF
+    IF NOT anyError AND fbGear_26_28.Error THEN anyError := TRUE; firstErrorAxis := 28; END_IF
+    IF NOT anyError AND fbGear_27_29.Error THEN anyError := TRUE; firstErrorAxis := 29; END_IF
+    IF NOT anyError AND fbGear_30_32.Error THEN anyError := TRUE; firstErrorAxis := 32; END_IF
+    IF NOT anyError AND fbGear_31_33.Error THEN anyError := TRUE; firstErrorAxis := 33; END_IF
+
+    // Count pairs in sync
+    IF fbGear_2_3.InSync THEN syncCount := syncCount + 1; ELSE allInSync := FALSE; END_IF
+    IF fbGear_2_4.InSync THEN syncCount := syncCount + 1; ELSE allInSync := FALSE; END_IF
+    IF fbGear_2_5.InSync THEN syncCount := syncCount + 1; ELSE allInSync := FALSE; END_IF
+    IF fbGear_6_7.InSync THEN syncCount := syncCount + 1; ELSE allInSync := FALSE; END_IF
+    IF fbGear_8_9.InSync THEN syncCount := syncCount + 1; ELSE allInSync := FALSE; END_IF
+    IF fbGear_10_11.InSync THEN syncCount := syncCount + 1; ELSE allInSync := FALSE; END_IF
+    IF fbGear_10_12.InSync THEN syncCount := syncCount + 1; ELSE allInSync := FALSE; END_IF
+    IF fbGear_10_13.InSync THEN syncCount := syncCount + 1; ELSE allInSync := FALSE; END_IF
+    IF fbGear_14_16.InSync THEN syncCount := syncCount + 1; ELSE allInSync := FALSE; END_IF
+    IF fbGear_15_17.InSync THEN syncCount := syncCount + 1; ELSE allInSync := FALSE; END_IF
+    IF fbGear_18_20.InSync THEN syncCount := syncCount + 1; ELSE allInSync := FALSE; END_IF
+    IF fbGear_19_21.InSync THEN syncCount := syncCount + 1; ELSE allInSync := FALSE; END_IF
+    IF fbGear_22_24.InSync THEN syncCount := syncCount + 1; ELSE allInSync := FALSE; END_IF
+    IF fbGear_23_25.InSync THEN syncCount := syncCount + 1; ELSE allInSync := FALSE; END_IF
+    IF fbGear_26_28.InSync THEN syncCount := syncCount + 1; ELSE allInSync := FALSE; END_IF
+    IF fbGear_27_29.InSync THEN syncCount := syncCount + 1; ELSE allInSync := FALSE; END_IF
+    IF fbGear_30_32.InSync THEN syncCount := syncCount + 1; ELSE allInSync := FALSE; END_IF
+    IF fbGear_31_33.InSync THEN syncCount := syncCount + 1; ELSE allInSync := FALSE; END_IF
+
+    // Update outputs
+    ActivePairCount := syncCount;
+
+    // Handle error condition
+    IF anyError THEN
+        Error := TRUE;
+        ErrorAxisID := firstErrorAxis;
+        Busy := FALSE;
+        gearingActive := FALSE;
+    END_IF
+
+    // Check if all gearing is complete
+    IF NOT anyError AND allInSync THEN
+        Done := TRUE;
+        Busy := FALSE;
+        // Keep gearingActive TRUE to maintain gearing
+    END_IF
+END_IF

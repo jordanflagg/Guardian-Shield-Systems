@@ -1,36 +1,116 @@
 FUNCTION_BLOCK FB_AxisPower
+// Centralized power management for all 36 axes
+// Handles MC_Power enable and MC_Reset for fault clearing
+// Includes MB_ResetApp for system-wide error recovery (F6 errors)
+
 VAR_INPUT
-	PowerOn : BOOL;
-	Reset : BOOL;
-END_VAR
-VAR_OUTPUT
-	DrivesReady	: BOOL;
-END_VAR
-VAR
-	fbPower : ARRAY[MOTIF_CONFIG.MIN_AXIS_INDEX..MOTIF_CONFIG.MAX_AXIS_INDEX] OF MC_Power;
-	fbReset : ARRAY[MOTIF_CONFIG.MIN_AXIS_INDEX..MOTIF_CONFIG.MAX_AXIS_INDEX] OF MC_Reset;
-	i : UINT;
+    PowerOn : BOOL;         // Enable power to all drives
+    Reset : BOOL;           // Reset drive faults
 END_VAR
 
+VAR_OUTPUT
+    DrivesReady : BOOL;     // TRUE when all drives are powered and ready
+    AllResetDone : BOOL;    // TRUE when all resets complete
+    AppResetDone : BOOL;    // TRUE when application reset complete
+    ErrorAxisID : UINT;     // First axis with error (0 = none)
+END_VAR
+
+VAR
+    fbPower : ARRAY[MOTIF_CONFIG.MIN_AXIS_INDEX..MOTIF_CONFIG.MAX_AXIS_INDEX] OF MC_Power;
+    fbReset : ARRAY[MOTIF_CONFIG.MIN_AXIS_INDEX..MOTIF_CONFIG.MAX_AXIS_INDEX] OF MC_Reset;
+
+    // Data Layer write for confirming/clearing all errors
+    fbConfirmErrors : DL_WriteNode;
+    // Node name for global error clear (for RM21.03+, use 'diagnosis/clear/error' for older versions)
+    strErrorNode : STRING(255) := 'diagnosis/confirm/error';
+
+    i : UINT;
+    allReady : BOOL;
+    allReset : BOOL;
+    firstError : UINT;
+    resetState : INT := 0;          // 0=idle, 1=confirm errors, 2=axis reset
+END_VAR
 
 ///////////////////////////////////////////////////////////////////
 
+// Reset state machine - first confirm all errors via Data Layer, then reset axes
+IF Reset THEN
+    CASE resetState OF
+        0: // Start with Data Layer error confirmation
+            resetState := 1;
 
+        1: // Confirm all errors via Data Layer (Value input left empty)
+            fbConfirmErrors(
+                Execute := TRUE,
+                NodeName := strErrorNode
+                // Value input intentionally not connected
+            );
 
+            IF fbConfirmErrors.Done THEN
+                AppResetDone := TRUE;
+                fbConfirmErrors(Execute := FALSE);
+                resetState := 2;
+            ELSIF fbConfirmErrors.Error THEN
+                // Error confirmation failed, try axis reset anyway
+                fbConfirmErrors(Execute := FALSE);
+                resetState := 2;
+            END_IF
+
+        2: // Axis resets
+            FOR i := MOTIF_CONFIG.MIN_AXIS_INDEX TO MOTIF_CONFIG.MAX_AXIS_INDEX DO
+                fbReset[i](
+                    Execute := TRUE,
+                    Axis := AXIF_CONFIG_INDEXES[i]
+                );
+            END_FOR
+    END_CASE
+ELSE
+    // Reset not active - clear state
+    resetState := 0;
+    AppResetDone := FALSE;
+    fbConfirmErrors(Execute := FALSE);
+    FOR i := MOTIF_CONFIG.MIN_AXIS_INDEX TO MOTIF_CONFIG.MAX_AXIS_INDEX DO
+        fbReset[i](
+            Execute := FALSE,
+            Axis := AXIF_CONFIG_INDEXES[i]
+        );
+    END_FOR
+END_IF
+
+// Power all axes
 FOR i := MOTIF_CONFIG.MIN_AXIS_INDEX TO MOTIF_CONFIG.MAX_AXIS_INDEX DO
-	fbReset[i](
-    	Execute := Reset, 
+    fbPower[i](
+        Enable := PowerOn,
         Axis := AXIF_CONFIG_INDEXES[i]
     );
 END_FOR
 
+// Check if all drives are ready
+allReady := TRUE;
+allReset := TRUE;
+firstError := 0;
 
 FOR i := MOTIF_CONFIG.MIN_AXIS_INDEX TO MOTIF_CONFIG.MAX_AXIS_INDEX DO
-	fbPower[i](
-        Enable := PowerOn, 
-    	Axis := AXIF_CONFIG_INDEXES[i]
-    );
+    // Check power status
+    IF PowerOn AND NOT fbPower[i].Status THEN
+        allReady := FALSE;
+    END_IF
+
+    // Check for errors
+    IF fbPower[i].Error AND firstError = 0 THEN
+        firstError := i;
+    END_IF
+
+    // Check reset status
+    IF Reset AND NOT fbReset[i].Done THEN
+        allReset := FALSE;
+    END_IF
 END_FOR
+
+// Update outputs
+DrivesReady := PowerOn AND allReady AND (firstError = 0);
+AllResetDone := allReset;
+ErrorAxisID := firstError;
 
 
 

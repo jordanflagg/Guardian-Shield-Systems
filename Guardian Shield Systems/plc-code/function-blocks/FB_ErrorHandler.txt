@@ -1,0 +1,164 @@
+FUNCTION_BLOCK FB_ErrorHandler
+// Centralized error handling for motion sequence
+// Collects errors from all motion step FBs and provides unified error reporting
+
+VAR_INPUT
+    Reset : BOOL;                       // Reset all errors
+
+    // Error inputs from motion steps
+    LoadBlockError : BOOL;
+    LoadBlockErrorAxisID : UINT;
+
+    StudsError : BOOL;
+    StudsErrorAxisID : UINT;
+
+    WindowsDoorsError : BOOL;
+    WindowsDoorsErrorAxisID : UINT;
+
+    ElectricalError : BOOL;
+    ElectricalErrorAxisID : UINT;
+
+    UnloadError : BOOL;
+    UnloadErrorAxisID : UINT;
+
+    // Error inputs from other sources
+    GearingError : BOOL;
+    GearingErrorAxisID : UINT;
+
+    PowerError : BOOL;
+    PowerErrorAxisID : UINT;
+
+    // Current motion state for error context
+    CurrentStep : E_MotionStep;
+    CurrentSubStep : INT;
+END_VAR
+
+VAR_OUTPUT
+    HasError : BOOL;                    // TRUE if any error is active
+    ErrorInfo : ST_MotionError;         // Detailed error information
+    ErrorCount : UINT;                  // Total number of errors since last reset
+END_VAR
+
+VAR
+    errorLatched : BOOL := FALSE;       // Latches first error until reset
+    internalErrorCount : UINT := 0;
+END_VAR
+
+///////////////////////////////////////////////////////////////////////////////
+
+// Reset handling
+IF Reset THEN
+    HasError := FALSE;
+    errorLatched := FALSE;
+    internalErrorCount := 0;
+
+    ErrorInfo.hasError := FALSE;
+    ErrorInfo.errorAxisID := 0;
+    ErrorInfo.errorCode := 0;
+    ErrorInfo.errorStep := E_MotionStep.WAIT_FOR_LOAD;
+    ErrorInfo.errorSubStep := 0;
+    ErrorInfo.errorDescription := '';
+
+    RETURN;
+END_IF
+
+// Check for new errors (only latch first error)
+IF NOT errorLatched THEN
+
+    // Check power error first (most critical)
+    IF PowerError THEN
+        errorLatched := TRUE;
+        HasError := TRUE;
+        internalErrorCount := internalErrorCount + 1;
+
+        ErrorInfo.hasError := TRUE;
+        ErrorInfo.errorAxisID := PowerErrorAxisID;
+        ErrorInfo.errorCode := 1001;
+        ErrorInfo.errorStep := CurrentStep;
+        ErrorInfo.errorSubStep := CurrentSubStep;
+        ErrorInfo.errorDescription := 'Drive power error';
+
+    // Check gearing error
+    ELSIF GearingError THEN
+        errorLatched := TRUE;
+        HasError := TRUE;
+        internalErrorCount := internalErrorCount + 1;
+
+        ErrorInfo.hasError := TRUE;
+        ErrorInfo.errorAxisID := GearingErrorAxisID;
+        ErrorInfo.errorCode := 1002;
+        ErrorInfo.errorStep := CurrentStep;
+        ErrorInfo.errorSubStep := CurrentSubStep;
+        ErrorInfo.errorDescription := 'Axis gearing error';
+
+    // Check load block step error
+    ELSIF LoadBlockError THEN
+        errorLatched := TRUE;
+        HasError := TRUE;
+        internalErrorCount := internalErrorCount + 1;
+
+        ErrorInfo.hasError := TRUE;
+        ErrorInfo.errorAxisID := LoadBlockErrorAxisID;
+        ErrorInfo.errorCode := 2001;
+        ErrorInfo.errorStep := E_MotionStep.SHIFT_TO_PROCESSING_AREA;
+        ErrorInfo.errorSubStep := CurrentSubStep;
+        ErrorInfo.errorDescription := 'Load block motion error';
+
+    // Check studs step error
+    ELSIF StudsError THEN
+        errorLatched := TRUE;
+        HasError := TRUE;
+        internalErrorCount := internalErrorCount + 1;
+
+        ErrorInfo.hasError := TRUE;
+        ErrorInfo.errorAxisID := StudsErrorAxisID;
+        ErrorInfo.errorCode := 2002;
+        ErrorInfo.errorStep := E_MotionStep.STUDS;
+        ErrorInfo.errorSubStep := CurrentSubStep;
+        ErrorInfo.errorDescription := 'Stud carving motion error';
+
+    // Check windows/doors step error
+    ELSIF WindowsDoorsError THEN
+        errorLatched := TRUE;
+        HasError := TRUE;
+        internalErrorCount := internalErrorCount + 1;
+
+        ErrorInfo.hasError := TRUE;
+        ErrorInfo.errorAxisID := WindowsDoorsErrorAxisID;
+        ErrorInfo.errorCode := 2003;
+        ErrorInfo.errorStep := E_MotionStep.WINDOWS_DOORS;
+        ErrorInfo.errorSubStep := CurrentSubStep;
+        ErrorInfo.errorDescription := 'Window/door motion error';
+
+    // Check electrical step error
+    ELSIF ElectricalError THEN
+        errorLatched := TRUE;
+        HasError := TRUE;
+        internalErrorCount := internalErrorCount + 1;
+
+        ErrorInfo.hasError := TRUE;
+        ErrorInfo.errorAxisID := ElectricalErrorAxisID;
+        ErrorInfo.errorCode := 2004;
+        ErrorInfo.errorStep := E_MotionStep.ELECTRICAL;
+        ErrorInfo.errorSubStep := CurrentSubStep;
+        ErrorInfo.errorDescription := 'Electrical trough motion error';
+
+    // Check unload step error
+    ELSIF UnloadError THEN
+        errorLatched := TRUE;
+        HasError := TRUE;
+        internalErrorCount := internalErrorCount + 1;
+
+        ErrorInfo.hasError := TRUE;
+        ErrorInfo.errorAxisID := UnloadErrorAxisID;
+        ErrorInfo.errorCode := 2005;
+        ErrorInfo.errorStep := E_MotionStep.SHIFT_TO_UNLOAD_AREA;
+        ErrorInfo.errorSubStep := CurrentSubStep;
+        ErrorInfo.errorDescription := 'Unload motion error';
+
+    END_IF
+
+END_IF
+
+// Update error count output
+ErrorCount := internalErrorCount;

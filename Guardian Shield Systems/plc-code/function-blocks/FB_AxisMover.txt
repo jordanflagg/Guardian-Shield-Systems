@@ -1,0 +1,99 @@
+FUNCTION_BLOCK FB_AxisMover
+// Generic axis movement handler with built-in error handling
+// Wraps MC_MoveAbsolute with cleaner state machine interface
+// Reduces repetitive execute/done/error pattern throughout code
+
+VAR_INPUT
+    Execute : BOOL;             // Rising edge starts move
+    AxisRef : AXIS_REF;         // Axis reference to move
+    Position : LREAL;           // Target position
+    Velocity : LREAL;           // Move velocity
+    Acceleration : LREAL;       // Acceleration
+    Deceleration : LREAL;       // Deceleration
+    Jerk : LREAL;               // Jerk limit
+    Reset : BOOL;               // Reset error state
+END_VAR
+
+VAR_OUTPUT
+    Done : BOOL;                // Move completed successfully
+    Busy : BOOL;                // Move in progress
+    Error : BOOL;               // Move failed
+    ErrorID : DWORD;            // Error code from MC_MoveAbsolute
+    Active : BOOL;              // FB is actively commanding motion
+END_VAR
+
+VAR
+    fbMove : MC_MoveAbsolute;
+    state : INT := 0;           // 0=Idle, 1=Moving, 2=Done, 3=Error
+END_VAR
+
+///////////////////////////////////////////////////////////////////////////////
+
+// Reset handling
+IF Reset THEN
+    state := 0;
+    Done := FALSE;
+    Busy := FALSE;
+    Error := FALSE;
+    ErrorID := 0;
+    Active := FALSE;
+    fbMove(Execute := FALSE, Axis := AxisRef);
+    RETURN;
+END_IF
+
+// State machine
+CASE state OF
+
+    0: // IDLE - waiting for execute
+        Done := FALSE;
+        Busy := FALSE;
+        Error := FALSE;
+        Active := FALSE;
+
+        // Level-triggered: start move when Execute is TRUE
+        IF Execute THEN
+            state := 1;
+            Busy := TRUE;
+            Active := TRUE;
+        END_IF
+
+    1: // MOVING - execute the move
+        fbMove(
+            Execute := TRUE,
+            Axis := AxisRef,
+            Position := Position,
+            Velocity := Velocity,
+            Acceleration := Acceleration,
+            Deceleration := Deceleration,
+            Jerk := Jerk
+        );
+
+        IF fbMove.Done THEN
+            state := 2;
+            Done := TRUE;
+            Busy := FALSE;
+            Active := FALSE;
+        ELSIF fbMove.Error THEN
+            state := 3;
+            Error := TRUE;
+            ErrorID := fbMove.ErrorID;
+            Busy := FALSE;
+            Active := FALSE;
+        END_IF
+
+    2: // DONE - move completed
+        fbMove(Execute := FALSE, Axis := AxisRef);
+
+        // Allow retriggering with new Execute rising edge
+        IF NOT Execute THEN
+            state := 0;
+            Done := FALSE;
+        END_IF
+
+    3: // ERROR - move failed
+        fbMove(Execute := FALSE, Axis := AxisRef);
+
+        // Stay in error state until Reset
+        // (handled at top of FB)
+
+END_CASE

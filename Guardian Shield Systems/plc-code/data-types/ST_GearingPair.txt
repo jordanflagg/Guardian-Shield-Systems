@@ -1,0 +1,8 @@
+TYPE ST_GearingPair :
+STRUCT
+    masterAxisID : UINT;        // Master axis number
+    slaveAxisID : UINT;         // Slave axis number
+    ratioNumerator : INT := 1;  // Gear ratio numerator (default 1:1)
+    ratioDenominator : INT := 1; // Gear ratio denominator (default 1:1)
+END_STRUCT
+END_TYPE

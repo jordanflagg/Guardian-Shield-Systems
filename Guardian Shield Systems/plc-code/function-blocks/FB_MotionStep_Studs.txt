@@ -1,0 +1,321 @@
+FUNCTION_BLOCK FB_MotionStep_Studs
+// Handles STUDS motion sequence
+// Controls 8 stud carving pairs (16 axes total via gearing)
+// 6 substeps total
+
+VAR_INPUT
+    Enable : BOOL;                      // TRUE to run this step
+    Reset : BOOL;                       // Reset to initial state
+    Positions : ST_PositionSetpoints;   // Position setpoints from recipe
+    MotionParams : ST_MotionParameters; // Motion parameters from recipe
+END_VAR
+
+VAR_OUTPUT
+    Done : BOOL;                        // Step completed
+    Busy : BOOL;                        // Step in progress
+    Error : BOOL;                       // Step failed
+    ErrorAxisID : UINT;                 // Which axis caused error
+    CurrentSubStep : INT;               // Current substep (0-5)
+    ActiveAxesMask : DWORD;             // Bitmask of moving axes
+    StepDescription : STRING[80];       // Human-readable description
+END_VAR
+
+VAR
+    subStep : INT := 0;
+
+    // Vertical stud axes (even masters: 14, 18, 22, 26)
+    moverAxis14 : FB_AxisMover;
+    moverAxis18 : FB_AxisMover;
+    moverAxis22 : FB_AxisMover;
+    moverAxis26 : FB_AxisMover;
+
+    // Horizontal stud axes (odd masters: 15, 19, 23, 27)
+    moverAxis15 : FB_AxisMover;
+    moverAxis19 : FB_AxisMover;
+    moverAxis23 : FB_AxisMover;
+    moverAxis27 : FB_AxisMover;
+
+    // State tracking
+    stepStarted : BOOL := FALSE;
+
+    // Completion flags for parallel moves
+    allVerticalDone : BOOL;
+    allHorizontalDone : BOOL;
+    anyError : BOOL;
+    firstErrorAxis : UINT;
+END_VAR
+
+///////////////////////////////////////////////////////////////////////////////
+
+// Reset handling
+IF Reset THEN
+    subStep := 0;
+    Done := FALSE;
+    Busy := FALSE;
+    Error := FALSE;
+    ErrorAxisID := 0;
+    ActiveAxesMask := 0;
+    stepStarted := FALSE;
+
+    moverAxis14(Reset := TRUE);
+    moverAxis15(Reset := TRUE);
+    moverAxis18(Reset := TRUE);
+    moverAxis19(Reset := TRUE);
+    moverAxis22(Reset := TRUE);
+    moverAxis23(Reset := TRUE);
+    moverAxis26(Reset := TRUE);
+    moverAxis27(Reset := TRUE);
+    RETURN;
+END_IF
+
+// Not enabled - idle
+IF NOT Enable THEN
+    Busy := FALSE;
+    ActiveAxesMask := 0;
+    RETURN;
+END_IF
+
+// Start on enable
+IF Enable AND NOT stepStarted THEN
+    stepStarted := TRUE;
+    Busy := TRUE;
+    subStep := 0;
+END_IF
+
+// Update output
+CurrentSubStep := subStep;
+
+// Substep state machine
+CASE subStep OF
+
+    // ----------------------------------------------------------------
+    0: // Vertical axes move to position 1 (14,16)(18,20)(22,24)(26,28)
+        StepDescription := 'Stud axes - moving to position 1';
+
+        moverAxis14(Execute := TRUE, AxisRef := Axis_14, Position := Positions.axis14_TargetPosition_1,
+            Velocity := MotionParams.defaultVelocity, Acceleration := MotionParams.defaultAcceleration,
+            Deceleration := MotionParams.defaultDeceleration, Jerk := MotionParams.defaultJerk);
+        moverAxis18(Execute := TRUE, AxisRef := Axis_18, Position := Positions.axis18_TargetPosition_1,
+            Velocity := MotionParams.defaultVelocity, Acceleration := MotionParams.defaultAcceleration,
+            Deceleration := MotionParams.defaultDeceleration, Jerk := MotionParams.defaultJerk);
+        moverAxis22(Execute := TRUE, AxisRef := Axis_22, Position := Positions.axis22_TargetPosition_1,
+            Velocity := MotionParams.defaultVelocity, Acceleration := MotionParams.defaultAcceleration,
+            Deceleration := MotionParams.defaultDeceleration, Jerk := MotionParams.defaultJerk);
+        moverAxis26(Execute := TRUE, AxisRef := Axis_26, Position := Positions.axis26_TargetPosition_1,
+            Velocity := MotionParams.defaultVelocity, Acceleration := MotionParams.defaultAcceleration,
+            Deceleration := MotionParams.defaultDeceleration, Jerk := MotionParams.defaultJerk);
+
+        // Axes 14, 18, 22, 26 (bits 13, 17, 21, 25)
+        ActiveAxesMask := SHL(DWORD#1, 13) OR SHL(DWORD#1, 17) OR SHL(DWORD#1, 21) OR SHL(DWORD#1, 25);
+
+        // Check completion
+        allVerticalDone := moverAxis14.Done AND moverAxis18.Done AND moverAxis22.Done AND moverAxis26.Done;
+        anyError := moverAxis14.Error OR moverAxis18.Error OR moverAxis22.Error OR moverAxis26.Error;
+
+        IF anyError THEN
+            Error := TRUE;
+            IF moverAxis14.Error THEN ErrorAxisID := 14;
+            ELSIF moverAxis18.Error THEN ErrorAxisID := 18;
+            ELSIF moverAxis22.Error THEN ErrorAxisID := 22;
+            ELSIF moverAxis26.Error THEN ErrorAxisID := 26;
+            END_IF
+        ELSIF allVerticalDone THEN
+            moverAxis14(Reset := TRUE);
+            moverAxis18(Reset := TRUE);
+            moverAxis22(Reset := TRUE);
+            moverAxis26(Reset := TRUE);
+            subStep := 1;
+        END_IF
+
+    // ----------------------------------------------------------------
+    1: // Horizontal axes move to position 1 (15,17)(19,21)(23,25)(27,29)
+        StepDescription := 'Stud axes - horizontal extend';
+
+        moverAxis15(Execute := TRUE, AxisRef := Axis_15, Position := Positions.axis15_TargetPosition_1,
+            Velocity := MotionParams.defaultVelocity, Acceleration := MotionParams.defaultAcceleration,
+            Deceleration := MotionParams.defaultDeceleration, Jerk := MotionParams.defaultJerk);
+        moverAxis19(Execute := TRUE, AxisRef := Axis_19, Position := Positions.axis19_TargetPosition_1,
+            Velocity := MotionParams.defaultVelocity, Acceleration := MotionParams.defaultAcceleration,
+            Deceleration := MotionParams.defaultDeceleration, Jerk := MotionParams.defaultJerk);
+        moverAxis23(Execute := TRUE, AxisRef := Axis_23, Position := Positions.axis23_TargetPosition_1,
+            Velocity := MotionParams.defaultVelocity, Acceleration := MotionParams.defaultAcceleration,
+            Deceleration := MotionParams.defaultDeceleration, Jerk := MotionParams.defaultJerk);
+        moverAxis27(Execute := TRUE, AxisRef := Axis_27, Position := Positions.axis27_TargetPosition_1,
+            Velocity := MotionParams.defaultVelocity, Acceleration := MotionParams.defaultAcceleration,
+            Deceleration := MotionParams.defaultDeceleration, Jerk := MotionParams.defaultJerk);
+
+        // Axes 15, 19, 23, 27 (bits 14, 18, 22, 26)
+        ActiveAxesMask := SHL(DWORD#1, 14) OR SHL(DWORD#1, 18) OR SHL(DWORD#1, 22) OR SHL(DWORD#1, 26);
+
+        allHorizontalDone := moverAxis15.Done AND moverAxis19.Done AND moverAxis23.Done AND moverAxis27.Done;
+        anyError := moverAxis15.Error OR moverAxis19.Error OR moverAxis23.Error OR moverAxis27.Error;
+
+        IF anyError THEN
+            Error := TRUE;
+            IF moverAxis15.Error THEN ErrorAxisID := 15;
+            ELSIF moverAxis19.Error THEN ErrorAxisID := 19;
+            ELSIF moverAxis23.Error THEN ErrorAxisID := 23;
+            ELSIF moverAxis27.Error THEN ErrorAxisID := 27;
+            END_IF
+        ELSIF allHorizontalDone THEN
+            moverAxis15(Reset := TRUE);
+            moverAxis19(Reset := TRUE);
+            moverAxis23(Reset := TRUE);
+            moverAxis27(Reset := TRUE);
+            subStep := 2;
+        END_IF
+
+    // ----------------------------------------------------------------
+    2: // Vertical axes move to position 2 (cutting)
+        StepDescription := 'Stud axes - cutting (vertical)';
+
+        moverAxis14(Execute := TRUE, AxisRef := Axis_14, Position := Positions.axis14_TargetPosition_2,
+            Velocity := MotionParams.defaultVelocity, Acceleration := MotionParams.defaultAcceleration,
+            Deceleration := MotionParams.defaultDeceleration, Jerk := MotionParams.defaultJerk);
+        moverAxis18(Execute := TRUE, AxisRef := Axis_18, Position := Positions.axis18_TargetPosition_2,
+            Velocity := MotionParams.defaultVelocity, Acceleration := MotionParams.defaultAcceleration,
+            Deceleration := MotionParams.defaultDeceleration, Jerk := MotionParams.defaultJerk);
+        moverAxis22(Execute := TRUE, AxisRef := Axis_22, Position := Positions.axis22_TargetPosition_2,
+            Velocity := MotionParams.defaultVelocity, Acceleration := MotionParams.defaultAcceleration,
+            Deceleration := MotionParams.defaultDeceleration, Jerk := MotionParams.defaultJerk);
+        moverAxis26(Execute := TRUE, AxisRef := Axis_26, Position := Positions.axis26_TargetPosition_2,
+            Velocity := MotionParams.defaultVelocity, Acceleration := MotionParams.defaultAcceleration,
+            Deceleration := MotionParams.defaultDeceleration, Jerk := MotionParams.defaultJerk);
+
+        ActiveAxesMask := SHL(DWORD#1, 13) OR SHL(DWORD#1, 17) OR SHL(DWORD#1, 21) OR SHL(DWORD#1, 25);
+
+        allVerticalDone := moverAxis14.Done AND moverAxis18.Done AND moverAxis22.Done AND moverAxis26.Done;
+        anyError := moverAxis14.Error OR moverAxis18.Error OR moverAxis22.Error OR moverAxis26.Error;
+
+        IF anyError THEN
+            Error := TRUE;
+            IF moverAxis14.Error THEN ErrorAxisID := 14;
+            ELSIF moverAxis18.Error THEN ErrorAxisID := 18;
+            ELSIF moverAxis22.Error THEN ErrorAxisID := 22;
+            ELSIF moverAxis26.Error THEN ErrorAxisID := 26;
+            END_IF
+        ELSIF allVerticalDone THEN
+            moverAxis14(Reset := TRUE);
+            moverAxis18(Reset := TRUE);
+            moverAxis22(Reset := TRUE);
+            moverAxis26(Reset := TRUE);
+            subStep := 3;
+        END_IF
+
+    // ----------------------------------------------------------------
+    3: // Horizontal axes move to position 2 (retracting)
+        StepDescription := 'Stud axes - retracting';
+
+        moverAxis15(Execute := TRUE, AxisRef := Axis_15, Position := Positions.axis15_TargetPosition_2,
+            Velocity := MotionParams.defaultVelocity, Acceleration := MotionParams.defaultAcceleration,
+            Deceleration := MotionParams.defaultDeceleration, Jerk := MotionParams.defaultJerk);
+        moverAxis19(Execute := TRUE, AxisRef := Axis_19, Position := Positions.axis19_TargetPosition_2,
+            Velocity := MotionParams.defaultVelocity, Acceleration := MotionParams.defaultAcceleration,
+            Deceleration := MotionParams.defaultDeceleration, Jerk := MotionParams.defaultJerk);
+        moverAxis23(Execute := TRUE, AxisRef := Axis_23, Position := Positions.axis23_TargetPosition_2,
+            Velocity := MotionParams.defaultVelocity, Acceleration := MotionParams.defaultAcceleration,
+            Deceleration := MotionParams.defaultDeceleration, Jerk := MotionParams.defaultJerk);
+        moverAxis27(Execute := TRUE, AxisRef := Axis_27, Position := Positions.axis27_TargetPosition_2,
+            Velocity := MotionParams.defaultVelocity, Acceleration := MotionParams.defaultAcceleration,
+            Deceleration := MotionParams.defaultDeceleration, Jerk := MotionParams.defaultJerk);
+
+        ActiveAxesMask := SHL(DWORD#1, 14) OR SHL(DWORD#1, 18) OR SHL(DWORD#1, 22) OR SHL(DWORD#1, 26);
+
+        allHorizontalDone := moverAxis15.Done AND moverAxis19.Done AND moverAxis23.Done AND moverAxis27.Done;
+        anyError := moverAxis15.Error OR moverAxis19.Error OR moverAxis23.Error OR moverAxis27.Error;
+
+        IF anyError THEN
+            Error := TRUE;
+            IF moverAxis15.Error THEN ErrorAxisID := 15;
+            ELSIF moverAxis19.Error THEN ErrorAxisID := 19;
+            ELSIF moverAxis23.Error THEN ErrorAxisID := 23;
+            ELSIF moverAxis27.Error THEN ErrorAxisID := 27;
+            END_IF
+        ELSIF allHorizontalDone THEN
+            moverAxis15(Reset := TRUE);
+            moverAxis19(Reset := TRUE);
+            moverAxis23(Reset := TRUE);
+            moverAxis27(Reset := TRUE);
+            subStep := 4;
+        END_IF
+
+    // ----------------------------------------------------------------
+    4: // All stud axes return home (14-29)
+        StepDescription := 'Stud axes - returning home';
+
+        // Vertical axes home
+        moverAxis14(Execute := TRUE, AxisRef := Axis_14, Position := Positions.axis14_HomePosition,
+            Velocity := MotionParams.defaultVelocity, Acceleration := MotionParams.defaultAcceleration,
+            Deceleration := MotionParams.defaultDeceleration, Jerk := MotionParams.defaultJerk);
+        moverAxis18(Execute := TRUE, AxisRef := Axis_18, Position := Positions.axis18_HomePosition,
+            Velocity := MotionParams.defaultVelocity, Acceleration := MotionParams.defaultAcceleration,
+            Deceleration := MotionParams.defaultDeceleration, Jerk := MotionParams.defaultJerk);
+        moverAxis22(Execute := TRUE, AxisRef := Axis_22, Position := Positions.axis22_HomePosition,
+            Velocity := MotionParams.defaultVelocity, Acceleration := MotionParams.defaultAcceleration,
+            Deceleration := MotionParams.defaultDeceleration, Jerk := MotionParams.defaultJerk);
+        moverAxis26(Execute := TRUE, AxisRef := Axis_26, Position := Positions.axis26_HomePosition,
+            Velocity := MotionParams.defaultVelocity, Acceleration := MotionParams.defaultAcceleration,
+            Deceleration := MotionParams.defaultDeceleration, Jerk := MotionParams.defaultJerk);
+
+        // Horizontal axes home
+        moverAxis15(Execute := TRUE, AxisRef := Axis_15, Position := Positions.axis15_HomePosition,
+            Velocity := MotionParams.defaultVelocity, Acceleration := MotionParams.defaultAcceleration,
+            Deceleration := MotionParams.defaultDeceleration, Jerk := MotionParams.defaultJerk);
+        moverAxis19(Execute := TRUE, AxisRef := Axis_19, Position := Positions.axis19_HomePosition,
+            Velocity := MotionParams.defaultVelocity, Acceleration := MotionParams.defaultAcceleration,
+            Deceleration := MotionParams.defaultDeceleration, Jerk := MotionParams.defaultJerk);
+        moverAxis23(Execute := TRUE, AxisRef := Axis_23, Position := Positions.axis23_HomePosition,
+            Velocity := MotionParams.defaultVelocity, Acceleration := MotionParams.defaultAcceleration,
+            Deceleration := MotionParams.defaultDeceleration, Jerk := MotionParams.defaultJerk);
+        moverAxis27(Execute := TRUE, AxisRef := Axis_27, Position := Positions.axis27_HomePosition,
+            Velocity := MotionParams.defaultVelocity, Acceleration := MotionParams.defaultAcceleration,
+            Deceleration := MotionParams.defaultDeceleration, Jerk := MotionParams.defaultJerk);
+
+        // All stud axes active
+        ActiveAxesMask := SHL(DWORD#1, 13) OR SHL(DWORD#1, 14) OR SHL(DWORD#1, 17) OR SHL(DWORD#1, 18) OR
+                          SHL(DWORD#1, 21) OR SHL(DWORD#1, 22) OR SHL(DWORD#1, 25) OR SHL(DWORD#1, 26);
+
+        allVerticalDone := moverAxis14.Done AND moverAxis18.Done AND moverAxis22.Done AND moverAxis26.Done;
+        allHorizontalDone := moverAxis15.Done AND moverAxis19.Done AND moverAxis23.Done AND moverAxis27.Done;
+
+        anyError := moverAxis14.Error OR moverAxis15.Error OR moverAxis18.Error OR moverAxis19.Error OR
+                    moverAxis22.Error OR moverAxis23.Error OR moverAxis26.Error OR moverAxis27.Error;
+
+        IF anyError THEN
+            Error := TRUE;
+            // Find first error
+            IF moverAxis14.Error THEN ErrorAxisID := 14;
+            ELSIF moverAxis15.Error THEN ErrorAxisID := 15;
+            ELSIF moverAxis18.Error THEN ErrorAxisID := 18;
+            ELSIF moverAxis19.Error THEN ErrorAxisID := 19;
+            ELSIF moverAxis22.Error THEN ErrorAxisID := 22;
+            ELSIF moverAxis23.Error THEN ErrorAxisID := 23;
+            ELSIF moverAxis26.Error THEN ErrorAxisID := 26;
+            ELSIF moverAxis27.Error THEN ErrorAxisID := 27;
+            END_IF
+        ELSIF allVerticalDone AND allHorizontalDone THEN
+            moverAxis14(Reset := TRUE);
+            moverAxis15(Reset := TRUE);
+            moverAxis18(Reset := TRUE);
+            moverAxis19(Reset := TRUE);
+            moverAxis22(Reset := TRUE);
+            moverAxis23(Reset := TRUE);
+            moverAxis26(Reset := TRUE);
+            moverAxis27(Reset := TRUE);
+            subStep := 5;
+        END_IF
+
+    // ----------------------------------------------------------------
+    5: // Complete - stud carving done
+        StepDescription := 'Stud carving complete';
+        ActiveAxesMask := 0;
+        Done := TRUE;
+        Busy := FALSE;
+
+END_CASE
+
+// Handle errors
+IF Error THEN
+    Busy := FALSE;
+    ActiveAxesMask := 0;
+END_IF

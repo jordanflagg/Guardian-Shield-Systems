@@ -1,4 +1,7 @@
 FUNCTION_BLOCK FB_ButtonManager
+// Button input processing with debouncing, edge detection, and auto-clear
+// Outputs are one-shot pulses (TRUE for one scan cycle after button press)
+
 VAR_INPUT
     btn_Start_In : BOOL;
     btn_Stop_In : BOOL;
@@ -6,6 +9,7 @@ VAR_INPUT
     btn_Manual_In : BOOL;
     btn_Reset_In : BOOL;
     btn_EStop_In : BOOL;
+    ClearCommand : BOOL;                // External clear (from state machine when command processed)
 END_VAR
 
 VAR_OUTPUT
@@ -24,6 +28,9 @@ VAR
     trig_Home : R_TRIG;
     trig_Manual : R_TRIG;
     trig_Reset : R_TRIG;
+
+    // Command was issued this scan (for one-shot behavior)
+    commandIssued : BOOL := FALSE;
 END_VAR
 
 
@@ -39,27 +46,44 @@ trig_Manual(CLK := btn_Manual_In);
 trig_Reset(CLK := btn_Reset_In);
 
 // ============================================================================
+// Clear command if requested or auto-clear after one scan
+// ============================================================================
+IF ClearCommand OR commandIssued THEN
+    activeCommand := E_ActiveCommand.CMD_NONE;
+    commandIssued := FALSE;
+END_IF
+
+// ============================================================================
 // Determine active command based on button presses
+// Priority: E-Stop > Stop > Start > Home > Manual > Reset
 // ============================================================================
 IF btn_EStop_In THEN
+    // E-stop overrides everything
     activeCommand := E_ActiveCommand.CMD_NONE;
-    
+    commandIssued := FALSE;
+
+ELSIF trig_Stop.Q THEN
+    // Stop has priority over start
+    activeCommand := E_ActiveCommand.CMD_STOP;
+    commandIssued := TRUE;
+
 ELSIF trig_Start.Q THEN
     activeCommand := E_ActiveCommand.CMD_START;
-    
-ELSIF trig_Stop.Q THEN
-    activeCommand := E_ActiveCommand.CMD_STOP;
-    
+    commandIssued := TRUE;
+
 ELSIF trig_Home.Q THEN
     activeCommand := E_ActiveCommand.CMD_HOME;
-    
+    commandIssued := TRUE;
+
 ELSIF trig_Manual.Q THEN
     activeCommand := E_ActiveCommand.CMD_MANUAL;
-    
+    commandIssued := TRUE;
+
 ELSIF trig_Reset.Q THEN
     activeCommand := E_ActiveCommand.CMD_RESET;
-    
-END_IF;
+    commandIssued := TRUE;
+
+END_IF
 
 // ============================================================================
 // EXPLICIT: Set outputs based on active command (clear all, set one)
@@ -107,8 +131,8 @@ CASE activeCommand OF
         btn_Home_Out := FALSE;
         btn_Manual_Out := FALSE;
         btn_Reset_Out := FALSE;
-        
-END_CASE;
 
-// E-stop passes through directly
+END_CASE
+
+// E-stop passes through directly (level-sensitive, not edge)
 btn_EStop_Out := btn_EStop_In;

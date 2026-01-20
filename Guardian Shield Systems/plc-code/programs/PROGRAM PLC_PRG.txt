@@ -4,7 +4,7 @@ VAR
     buttonManager : FB_ButtonManager;
     axisPower : FB_AxisPower;
     stateMachine : FB_MachineStateMachine;
-    motionSequence : FB_MotionSequence;
+    // Note: motionSequence is embedded inside stateMachine, not needed here
     
     // Raw button inputs (you toggle these for testing)
     btn_Start : BOOL := FALSE;
@@ -38,6 +38,11 @@ VAR
     HMI_MotionSubStep : INT;                // Current substep number
     HMI_ActiveAxesMask : DWORD;             // Bitmask of currently moving axes
     HMI_StepDescription : STRING[80];       // Human-readable description
+
+    // HMI Error Variables
+    HMI_HasError : BOOL := FALSE;           // TRUE if motion error occurred
+    HMI_ErrorAxisID : UINT := 0;            // Which axis caused the error (0 = none)
+    HMI_DrivesReady : BOOL := FALSE;        // TRUE when all drives are powered
 END_VAR
 
 
@@ -115,3 +120,10 @@ HMI_MotionStep := stateMachine.motionStepOut;
 HMI_MotionSubStep := stateMachine.motionSubStep;
 HMI_ActiveAxesMask := stateMachine.activeAxesMask;
 HMI_StepDescription := stateMachine.stepDescription;
+
+// ============================================================================
+// UPDATE ERROR HMI VARIABLES
+// ============================================================================
+HMI_HasError := stateMachine.hasMotionError;
+HMI_ErrorAxisID := stateMachine.errorAxisID;
+HMI_DrivesReady := axisPower.DrivesReady;

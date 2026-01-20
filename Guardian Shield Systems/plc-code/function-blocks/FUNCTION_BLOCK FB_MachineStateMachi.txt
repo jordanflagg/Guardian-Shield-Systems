@@ -11,7 +11,7 @@ VAR_INPUT
 END_VAR
 
 VAR_OUTPUT
-    currentStateOut : E_MachineState;  // So HMI and other code can see it
+    currentStateOut : E_MachineState;   // So HMI and other code can see it
     isRunning : BOOL;
     isFaulted : BOOL;
     isHomed : BOOL;
@@ -23,25 +23,25 @@ VAR_OUTPUT
     motionSubStep : INT;                // Current substep
     activeAxesMask : DWORD;             // Bitmask of moving axes
     stepDescription : STRING[80];       // Human-readable step description
+
+    // Error information
+    hasMotionError : BOOL;              // Motion sequence error occurred
+    errorAxisID : UINT;                 // Which axis caused error
 END_VAR
 
 VAR
     currentState : E_MachineState := E_MachineState.INIT;  // Internal state
 
-	// Motion sequence variables
-	motionSequence : FB_MotionSequence;
-    motionStep : E_MotionStep := E_MotionStep.WAIT_FOR_LOAD;
-    subStep : INT := 0;  // For tracking sub-movements within a step
+    // Motion sequence controller
+    motionSequence : FB_MotionSequence;
 
     // Axis gearing manager
     axisGearing : FB_AxisGearing;
     gearingNeeded : BOOL := TRUE;       // Flag to trigger gearing re-engagement
 
-    // Flags for position confirmation
-    allAxesInPosition : BOOL := FALSE;
-
-	fbHalt : ARRAY[MOTIF_CONFIG.MIN_AXIS_INDEX..MOTIF_CONFIG.MAX_AXIS_INDEX] OF MC_Halt;
-	i : UINT;
+    // Emergency halt function blocks
+    fbHalt : ARRAY[MOTIF_CONFIG.MIN_AXIS_INDEX..MOTIF_CONFIG.MAX_AXIS_INDEX] OF MC_Halt;
+    i : UINT;
 END_VAR
 
 
@@ -131,15 +131,26 @@ CASE currentState OF
         ELSE
             // Gearing is active - run motion sequence
             motionSequence(
-                enable := startButton,
-                recipeID := activeRecipeID
+                Enable := TRUE,
+                RecipeID := activeRecipeID
             );
+
+            // Check for motion sequence errors
+            IF motionSequence.HasError THEN
+                currentState := E_MachineState.FAULTED;
+            END_IF
+
+            // Check if sequence completed
+            IF motionSequence.SequenceComplete THEN
+                // Could auto-stop or continue for next block
+                // For now, continue running for next cycle
+            END_IF
         END_IF
 
         // Check for stop button
         IF stopButton THEN
             currentState := E_MachineState.STOPPING;
-        END_IF;
+        END_IF
     
     // ------------------------------------------------------------------------
     E_MachineState.STOPPING:
@@ -216,7 +227,11 @@ END_CASE;
 currentStateOut := currentState;
 
 // Copy motion sequence visualization outputs
-motionStepOut := motionSequence.currentStep;
-motionSubStep := motionSequence.currentSubStep;
-activeAxesMask := motionSequence.activeAxesMask;
-stepDescription := motionSequence.stepDescription;
+motionStepOut := motionSequence.CurrentStep;
+motionSubStep := motionSequence.CurrentSubStep;
+activeAxesMask := motionSequence.ActiveAxesMask;
+stepDescription := motionSequence.StepDescription;
+
+// Copy error information
+hasMotionError := motionSequence.HasError;
+errorAxisID := motionSequence.ErrorAxisID;

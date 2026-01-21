@@ -5,7 +5,6 @@ FUNCTION_BLOCK FB_MotionStep_WindowsDoors
 
 VAR_INPUT
     Enable : BOOL;                      // TRUE to run this step
-    Reset : BOOL;                       // Reset to initial state
     Positions : ST_PositionSetpoints;   // Position setpoints from recipe
     MotionParams : ST_MotionParameters; // Motion parameters from recipe
 END_VAR
@@ -32,21 +31,6 @@ VAR
 END_VAR
 
 ///////////////////////////////////////////////////////////////////////////////
-
-// Reset handling
-IF Reset THEN
-    subStep := 0;
-    Done := FALSE;
-    Busy := FALSE;
-    Error := FALSE;
-    ErrorAxisID := 0;
-    ActiveAxesMask := 0;
-    stepStarted := FALSE;
-
-    moverAxis30(Reset := TRUE);
-    moverAxis31(Reset := TRUE);
-    RETURN;
-END_IF
 
 // Not enabled - idle
 IF NOT Enable THEN
@@ -85,7 +69,7 @@ CASE subStep OF
         ActiveAxesMask := SHL(DWORD#1, 29);  // Axis 30 (slave 32 follows)
 
         IF moverAxis30.Done THEN
-            moverAxis30(Reset := TRUE);
+            moverAxis30(Execute := FALSE);
             subStep := 1;
         ELSIF moverAxis30.Error THEN
             Error := TRUE;
@@ -109,7 +93,7 @@ CASE subStep OF
         ActiveAxesMask := SHL(DWORD#1, 30);  // Axis 31 (slave 33 follows)
 
         IF moverAxis31.Done THEN
-            moverAxis31(Reset := TRUE);
+            moverAxis31(Execute := FALSE);
             subStep := 2;
         ELSIF moverAxis31.Error THEN
             Error := TRUE;
@@ -133,7 +117,7 @@ CASE subStep OF
         ActiveAxesMask := SHL(DWORD#1, 29);  // Axis 30
 
         IF moverAxis30.Done THEN
-            moverAxis30(Reset := TRUE);
+            moverAxis30(Execute := FALSE);
             subStep := 3;
         ELSIF moverAxis30.Error THEN
             Error := TRUE;
@@ -157,7 +141,7 @@ CASE subStep OF
         ActiveAxesMask := SHL(DWORD#1, 30);  // Axis 31
 
         IF moverAxis31.Done THEN
-            moverAxis31(Reset := TRUE);
+            moverAxis31(Execute := FALSE);
             subStep := 4;
         ELSIF moverAxis31.Error THEN
             Error := TRUE;
@@ -191,8 +175,8 @@ CASE subStep OF
         ActiveAxesMask := SHL(DWORD#1, 29) OR SHL(DWORD#1, 30);  // Axes 30, 31
 
         IF moverAxis30.Done AND moverAxis31.Done THEN
-            moverAxis30(Reset := TRUE);
-            moverAxis31(Reset := TRUE);
+            moverAxis30(Execute := FALSE);
+            moverAxis31(Execute := FALSE);
             subStep := 5;
         ELSIF moverAxis30.Error OR moverAxis31.Error THEN
             Error := TRUE;

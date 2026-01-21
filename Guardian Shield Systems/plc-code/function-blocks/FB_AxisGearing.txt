@@ -5,8 +5,7 @@ FUNCTION_BLOCK FB_AxisGearing
 // interruption (MC_Halt, E-Stop, fault recovery, etc.)
 
 VAR_INPUT
-    Execute : BOOL;             // Rising edge activates all gearing
-    Reset : BOOL;               // Reset all gearing (disengage)
+    Execute : BOOL;             // TRUE to engage gearing, FALSE to disengage
 END_VAR
 
 VAR_OUTPUT
@@ -73,8 +72,8 @@ END_VAR
 executeRising := Execute AND NOT executePrev;
 executePrev := Execute;
 
-// Reset outputs and state
-IF Reset THEN
+// Disengage gearing when Execute goes FALSE
+IF NOT Execute THEN
     Done := FALSE;
     Busy := FALSE;
     Error := FALSE;
@@ -82,7 +81,7 @@ IF Reset THEN
     ActivePairCount := 0;
     gearingActive := FALSE;
 
-    // Reset all gearing FBs (must still provide axis references for VAR_IN_OUT)
+    // Disengage all gearing FBs (must still provide axis references for VAR_IN_OUT)
     fbGear_2_3(Execute := FALSE, Master := AXIF_CONFIG_INDEXES[2], Slave := AXIF_CONFIG_INDEXES[3]);
     fbGear_2_4(Execute := FALSE, Master := AXIF_CONFIG_INDEXES[2], Slave := AXIF_CONFIG_INDEXES[4]);
     fbGear_2_5(Execute := FALSE, Master := AXIF_CONFIG_INDEXES[2], Slave := AXIF_CONFIG_INDEXES[5]);

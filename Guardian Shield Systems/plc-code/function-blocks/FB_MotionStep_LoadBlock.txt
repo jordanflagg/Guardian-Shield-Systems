@@ -5,7 +5,6 @@ FUNCTION_BLOCK FB_MotionStep_LoadBlock
 
 VAR_INPUT
     Enable : BOOL;                      // TRUE to run this step
-    Reset : BOOL;                       // Reset to initial state
     Positions : ST_PositionSetpoints;   // Position setpoints from recipe
     MotionParams : ST_MotionParameters; // Motion parameters from recipe
 END_VAR
@@ -35,24 +34,6 @@ VAR
 END_VAR
 
 ///////////////////////////////////////////////////////////////////////////////
-
-// Reset handling
-IF Reset THEN
-    subStep := 0;
-    Done := FALSE;
-    Busy := FALSE;
-    Error := FALSE;
-    ErrorAxisID := 0;
-    ActiveAxesMask := 0;
-    stepStarted := FALSE;
-
-    moverAxis1(Reset := TRUE);
-    moverAxis2(Reset := TRUE);
-    moverAxis6(Reset := TRUE);
-    moverAxis8(Reset := TRUE);
-    moverAxis10(Reset := TRUE);
-    RETURN;
-END_IF
 
 // Not enabled - idle
 IF NOT Enable THEN
@@ -91,7 +72,7 @@ CASE subStep OF
         ActiveAxesMask := SHL(DWORD#1, 0);  // Axis 1
 
         IF moverAxis1.Done THEN
-            moverAxis1(Reset := TRUE);
+            moverAxis1(Execute := FALSE);  // Clear execute to prepare for next use
             subStep := 1;
         ELSIF moverAxis1.Error THEN
             Error := TRUE;
@@ -115,7 +96,7 @@ CASE subStep OF
         ActiveAxesMask := SHL(DWORD#1, 1);  // Axis 2 (slaves 3,4,5 follow via gearing)
 
         IF moverAxis2.Done THEN
-            moverAxis2(Reset := TRUE);
+            moverAxis2(Execute := FALSE);  // Clear execute to prepare for next use
             subStep := 2;
         ELSIF moverAxis2.Error THEN
             Error := TRUE;
@@ -139,7 +120,7 @@ CASE subStep OF
         ActiveAxesMask := SHL(DWORD#1, 5);  // Axis 6 (slave 7 follows)
 
         IF moverAxis6.Done THEN
-            moverAxis6(Reset := TRUE);
+            moverAxis6(Execute := FALSE);  // Clear execute to prepare for next use
             subStep := 3;
         ELSIF moverAxis6.Error THEN
             Error := TRUE;
@@ -163,7 +144,7 @@ CASE subStep OF
         ActiveAxesMask := SHL(DWORD#1, 1);  // Axis 2
 
         IF moverAxis2.Done THEN
-            moverAxis2(Reset := TRUE);
+            moverAxis2(Execute := FALSE);  // Clear execute to prepare for next use
             subStep := 4;
         ELSIF moverAxis2.Error THEN
             Error := TRUE;
@@ -187,7 +168,7 @@ CASE subStep OF
         ActiveAxesMask := SHL(DWORD#1, 5);  // Axis 6
 
         IF moverAxis6.Done THEN
-            moverAxis6(Reset := TRUE);
+            moverAxis6(Execute := FALSE);  // Clear execute to prepare for next use
             subStep := 5;
         ELSIF moverAxis6.Error THEN
             Error := TRUE;
@@ -211,7 +192,7 @@ CASE subStep OF
         ActiveAxesMask := SHL(DWORD#1, 9);  // Axis 10 (slaves 11,12,13 follow)
 
         IF moverAxis10.Done THEN
-            moverAxis10(Reset := TRUE);
+            moverAxis10(Execute := FALSE);  // Clear execute to prepare for next use
             subStep := 6;
         ELSIF moverAxis10.Error THEN
             Error := TRUE;
@@ -235,7 +216,7 @@ CASE subStep OF
         ActiveAxesMask := SHL(DWORD#1, 7);  // Axis 8 (slave 9 follows)
 
         IF moverAxis8.Done THEN
-            moverAxis8(Reset := TRUE);
+            moverAxis8(Execute := FALSE);  // Clear execute to prepare for next use
             subStep := 7;
         ELSIF moverAxis8.Error THEN
             Error := TRUE;
@@ -268,7 +249,7 @@ CASE subStep OF
         ActiveAxesMask := SHL(DWORD#1, 7);  // Axis 8
 
         IF moverAxis8.Done THEN
-            moverAxis8(Reset := TRUE);
+            moverAxis8(Execute := FALSE);  // Clear execute to prepare for next use
             subStep := 9;
         ELSIF moverAxis8.Error THEN
             Error := TRUE;
@@ -292,7 +273,7 @@ CASE subStep OF
         ActiveAxesMask := SHL(DWORD#1, 9);  // Axis 10
 
         IF moverAxis10.Done THEN
-            moverAxis10(Reset := TRUE);
+            moverAxis10(Execute := FALSE);  // Clear execute to prepare for next use
             subStep := 10;
         ELSIF moverAxis10.Error THEN
             Error := TRUE;

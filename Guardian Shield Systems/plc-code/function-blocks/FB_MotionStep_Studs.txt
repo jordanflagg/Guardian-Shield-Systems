@@ -5,7 +5,6 @@ FUNCTION_BLOCK FB_MotionStep_Studs
 
 VAR_INPUT
     Enable : BOOL;                      // TRUE to run this step
-    Reset : BOOL;                       // Reset to initial state
     Positions : ST_PositionSetpoints;   // Position setpoints from recipe
     MotionParams : ST_MotionParameters; // Motion parameters from recipe
 END_VAR
@@ -46,27 +45,6 @@ VAR
 END_VAR
 
 ///////////////////////////////////////////////////////////////////////////////
-
-// Reset handling
-IF Reset THEN
-    subStep := 0;
-    Done := FALSE;
-    Busy := FALSE;
-    Error := FALSE;
-    ErrorAxisID := 0;
-    ActiveAxesMask := 0;
-    stepStarted := FALSE;
-
-    moverAxis14(Reset := TRUE);
-    moverAxis15(Reset := TRUE);
-    moverAxis18(Reset := TRUE);
-    moverAxis19(Reset := TRUE);
-    moverAxis22(Reset := TRUE);
-    moverAxis23(Reset := TRUE);
-    moverAxis26(Reset := TRUE);
-    moverAxis27(Reset := TRUE);
-    RETURN;
-END_IF
 
 // Not enabled - idle
 IF NOT Enable THEN
@@ -120,10 +98,10 @@ CASE subStep OF
             ELSIF moverAxis26.Error THEN ErrorAxisID := 26;
             END_IF
         ELSIF allVerticalDone THEN
-            moverAxis14(Reset := TRUE);
-            moverAxis18(Reset := TRUE);
-            moverAxis22(Reset := TRUE);
-            moverAxis26(Reset := TRUE);
+            moverAxis14(Execute := FALSE);
+            moverAxis18(Execute := FALSE);
+            moverAxis22(Execute := FALSE);
+            moverAxis26(Execute := FALSE);
             subStep := 1;
         END_IF
 
@@ -158,10 +136,10 @@ CASE subStep OF
             ELSIF moverAxis27.Error THEN ErrorAxisID := 27;
             END_IF
         ELSIF allHorizontalDone THEN
-            moverAxis15(Reset := TRUE);
-            moverAxis19(Reset := TRUE);
-            moverAxis23(Reset := TRUE);
-            moverAxis27(Reset := TRUE);
+            moverAxis15(Execute := FALSE);
+            moverAxis19(Execute := FALSE);
+            moverAxis23(Execute := FALSE);
+            moverAxis27(Execute := FALSE);
             subStep := 2;
         END_IF
 
@@ -195,10 +173,10 @@ CASE subStep OF
             ELSIF moverAxis26.Error THEN ErrorAxisID := 26;
             END_IF
         ELSIF allVerticalDone THEN
-            moverAxis14(Reset := TRUE);
-            moverAxis18(Reset := TRUE);
-            moverAxis22(Reset := TRUE);
-            moverAxis26(Reset := TRUE);
+            moverAxis14(Execute := FALSE);
+            moverAxis18(Execute := FALSE);
+            moverAxis22(Execute := FALSE);
+            moverAxis26(Execute := FALSE);
             subStep := 3;
         END_IF
 
@@ -232,10 +210,10 @@ CASE subStep OF
             ELSIF moverAxis27.Error THEN ErrorAxisID := 27;
             END_IF
         ELSIF allHorizontalDone THEN
-            moverAxis15(Reset := TRUE);
-            moverAxis19(Reset := TRUE);
-            moverAxis23(Reset := TRUE);
-            moverAxis27(Reset := TRUE);
+            moverAxis15(Execute := FALSE);
+            moverAxis19(Execute := FALSE);
+            moverAxis23(Execute := FALSE);
+            moverAxis27(Execute := FALSE);
             subStep := 4;
         END_IF
 
@@ -294,14 +272,14 @@ CASE subStep OF
             ELSIF moverAxis27.Error THEN ErrorAxisID := 27;
             END_IF
         ELSIF allVerticalDone AND allHorizontalDone THEN
-            moverAxis14(Reset := TRUE);
-            moverAxis15(Reset := TRUE);
-            moverAxis18(Reset := TRUE);
-            moverAxis19(Reset := TRUE);
-            moverAxis22(Reset := TRUE);
-            moverAxis23(Reset := TRUE);
-            moverAxis26(Reset := TRUE);
-            moverAxis27(Reset := TRUE);
+            moverAxis14(Execute := FALSE);
+            moverAxis15(Execute := FALSE);
+            moverAxis18(Execute := FALSE);
+            moverAxis19(Execute := FALSE);
+            moverAxis22(Execute := FALSE);
+            moverAxis23(Execute := FALSE);
+            moverAxis26(Execute := FALSE);
+            moverAxis27(Execute := FALSE);
             subStep := 5;
         END_IF
 

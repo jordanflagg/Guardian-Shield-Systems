@@ -90,15 +90,15 @@ IF RecipeID <> lastRecipeID THEN
 END_IF
 
 // ============================================================================
-// HANDLE DISABLE - Reset all step FBs
+// HANDLE DISABLE - Disable all step FBs
 // ============================================================================
 
 IF NOT Enable THEN
-    stepLoadBlock(Reset := TRUE);
-    stepStuds(Reset := TRUE);
-    stepWindowsDoors(Reset := TRUE);
-    stepElectrical(Reset := TRUE);
-    stepUnload(Reset := TRUE);
+    stepLoadBlock(Enable := FALSE);
+    stepStuds(Enable := FALSE);
+    stepWindowsDoors(Enable := FALSE);
+    stepElectrical(Enable := FALSE);
+    stepUnload(Enable := FALSE);
     errorHandler(Reset := TRUE);
 
     ActiveAxesMask := 0;
@@ -119,12 +119,12 @@ CASE motionStep OF
         StepDescription := 'Waiting for block to load';
         ActiveAxesMask := 0;
 
-        // Reset step FBs for new cycle
-        stepLoadBlock(Reset := TRUE);
-        stepStuds(Reset := TRUE);
-        stepWindowsDoors(Reset := TRUE);
-        stepElectrical(Reset := TRUE);
-        stepUnload(Reset := TRUE);
+        // Disable step FBs while waiting for new cycle
+        stepLoadBlock(Enable := FALSE);
+        stepStuds(Enable := FALSE);
+        stepWindowsDoors(Enable := FALSE);
+        stepElectrical(Enable := FALSE);
+        stepUnload(Enable := FALSE);
 
         IF blockLoaded THEN
             motionStep := E_MotionStep.SHIFT_TO_PROCESSING_AREA;
@@ -134,7 +134,6 @@ CASE motionStep OF
     E_MotionStep.SHIFT_TO_PROCESSING_AREA:
         stepLoadBlock(
             Enable := TRUE,
-            Reset := FALSE,
             Positions := positions,
             MotionParams := motionParams
         );
@@ -147,7 +146,7 @@ CASE motionStep OF
             HasError := TRUE;
             ErrorAxisID := stepLoadBlock.ErrorAxisID;
         ELSIF stepLoadBlock.Done THEN
-            stepLoadBlock(Reset := TRUE);
+            stepLoadBlock(Enable := FALSE);
             // Determine next operation based on recipe
             IF enableStuds THEN
                 motionStep := E_MotionStep.STUDS;
@@ -164,7 +163,6 @@ CASE motionStep OF
     E_MotionStep.STUDS:
         stepStuds(
             Enable := TRUE,
-            Reset := FALSE,
             Positions := positions,
             MotionParams := motionParams
         );
@@ -177,7 +175,7 @@ CASE motionStep OF
             HasError := TRUE;
             ErrorAxisID := stepStuds.ErrorAxisID;
         ELSIF stepStuds.Done THEN
-            stepStuds(Reset := TRUE);
+            stepStuds(Enable := FALSE);
             // Determine next operation
             IF enableWindowsDoors THEN
                 motionStep := E_MotionStep.WINDOWS_DOORS;
@@ -192,7 +190,6 @@ CASE motionStep OF
     E_MotionStep.WINDOWS_DOORS:
         stepWindowsDoors(
             Enable := TRUE,
-            Reset := FALSE,
             Positions := positions,
             MotionParams := motionParams
         );
@@ -205,7 +202,7 @@ CASE motionStep OF
             HasError := TRUE;
             ErrorAxisID := stepWindowsDoors.ErrorAxisID;
         ELSIF stepWindowsDoors.Done THEN
-            stepWindowsDoors(Reset := TRUE);
+            stepWindowsDoors(Enable := FALSE);
             // Determine next operation
             IF enableElectrical THEN
                 motionStep := E_MotionStep.ELECTRICAL;
@@ -218,7 +215,6 @@ CASE motionStep OF
     E_MotionStep.ELECTRICAL:
         stepElectrical(
             Enable := TRUE,
-            Reset := FALSE,
             Positions := positions,
             MotionParams := motionParams
         );
@@ -231,7 +227,7 @@ CASE motionStep OF
             HasError := TRUE;
             ErrorAxisID := stepElectrical.ErrorAxisID;
         ELSIF stepElectrical.Done THEN
-            stepElectrical(Reset := TRUE);
+            stepElectrical(Enable := FALSE);
             motionStep := E_MotionStep.SHIFT_TO_UNLOAD_AREA;
         END_IF
 
@@ -239,7 +235,6 @@ CASE motionStep OF
     E_MotionStep.SHIFT_TO_UNLOAD_AREA:
         stepUnload(
             Enable := TRUE,
-            Reset := FALSE,
             Positions := positions,
             MotionParams := motionParams
         );
@@ -252,7 +247,7 @@ CASE motionStep OF
             HasError := TRUE;
             ErrorAxisID := stepUnload.ErrorAxisID;
         ELSIF stepUnload.Done THEN
-            stepUnload(Reset := TRUE);
+            stepUnload(Enable := FALSE);
             SequenceComplete := TRUE;
             motionStep := E_MotionStep.WAIT_FOR_LOAD;
         END_IF
@@ -267,7 +262,7 @@ CurrentStep := motionStep;
 // ============================================================================
 
 errorHandler(
-    Reset := NOT Enable,
+    Reset := FALSE,  // Error handler still uses Reset for clearing error state
     LoadBlockError := stepLoadBlock.Error,
     LoadBlockErrorAxisID := stepLoadBlock.ErrorAxisID,
     StudsError := stepStuds.Error,

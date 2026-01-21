@@ -4,21 +4,20 @@ FUNCTION_BLOCK FB_AxisMover
 // Reduces repetitive execute/done/error pattern throughout code
 
 VAR_INPUT
-    Execute : BOOL;             // Rising edge starts move
+    Execute : BOOL;             // TRUE to command move, FALSE to stop
     AxisRef : AXIS_REF;         // Axis reference to move
     Position : LREAL;           // Target position
     Velocity : LREAL;           // Move velocity
     Acceleration : LREAL;       // Acceleration
     Deceleration : LREAL;       // Deceleration
     Jerk : LREAL;               // Jerk limit
-    Reset : BOOL;               // Reset error state
 END_VAR
 
 VAR_OUTPUT
     Done : BOOL;                // Move completed successfully
     Busy : BOOL;                // Move in progress
     Error : BOOL;               // Move failed
-    ErrorID : DWORD;            // Error code from MC_MoveAbsolute
+    ErrorID : ERROR_CODE;            // Error code from MC_MoveAbsolute
     Active : BOOL;              // FB is actively commanding motion
 END_VAR
 
@@ -28,18 +27,6 @@ VAR
 END_VAR
 
 ///////////////////////////////////////////////////////////////////////////////
-
-// Reset handling
-IF Reset THEN
-    state := 0;
-    Done := FALSE;
-    Busy := FALSE;
-    Error := FALSE;
-    ErrorID := 0;
-    Active := FALSE;
-    fbMove(Execute := FALSE, Axis := AxisRef);
-    RETURN;
-END_IF
 
 // State machine
 CASE state OF
@@ -93,7 +80,11 @@ CASE state OF
     3: // ERROR - move failed
         fbMove(Execute := FALSE, Axis := AxisRef);
 
-        // Stay in error state until Reset
-        // (handled at top of FB)
+        // Return to idle when Execute goes FALSE (fault cleared by FB_AxisPower)
+        IF NOT Execute THEN
+            state := 0;
+            Error := FALSE;
+            ErrorID := 0;
+        END_IF
 
 END_CASE

@@ -4,7 +4,6 @@ FUNCTION_BLOCK FB_MultiAxisMover
 
 VAR_INPUT
     Execute : BOOL;             // Rising edge starts all moves
-    Reset : BOOL;               // Reset all movers
 
     // Motion parameters (shared by all axes)
     Velocity : LREAL;
@@ -63,21 +62,6 @@ enables[5] := Enable5;
 enables[6] := Enable6;
 enables[7] := Enable7;
 enables[8] := Enable8;
-
-// Reset handling
-IF Reset THEN
-    FOR i := 1 TO 8 DO
-        mover[i](Reset := TRUE);
-    END_FOR
-    state := 0;
-    Done := FALSE;
-    Busy := FALSE;
-    Error := FALSE;
-    ErrorAxisNum := 0;
-    ErrorID := 0;
-    ActiveAxesMask := 0;
-    RETURN;
-END_IF
 
 // State machine
 CASE state OF
@@ -169,6 +153,12 @@ CASE state OF
 
     3: // ERROR
         ActiveAxesMask := 0;
-        // Stay in error until Reset
+        // Return to idle when Execute goes FALSE (fault cleared by FB_AxisPower)
+        IF NOT Execute THEN
+            state := 0;
+            Error := FALSE;
+            ErrorAxisNum := 0;
+            ErrorID := 0;
+        END_IF
 
 END_CASE

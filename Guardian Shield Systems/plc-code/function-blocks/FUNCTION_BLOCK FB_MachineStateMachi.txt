@@ -119,7 +119,7 @@ CASE currentState OF
 
         // Engage/re-engage gearing if needed (after halt, e-stop, etc.)
         IF gearingNeeded THEN
-            axisGearing(Execute := TRUE, Reset := FALSE);
+            axisGearing(Execute := TRUE);
 
             // Wait for gearing to complete before running motion
             IF axisGearing.Done THEN
@@ -160,7 +160,7 @@ CASE currentState OF
 
         // Gearing will need to be re-engaged after stopping
         gearingNeeded := TRUE;
-        axisGearing(Execute := FALSE, Reset := TRUE);
+        axisGearing(Execute := FALSE);
 
         // TODO: Command all active axes to decelerate in a controlled manner
         // In real implementation, you'd use MC_Halt for each axis
@@ -177,7 +177,7 @@ CASE currentState OF
 
         // Gearing will need to be re-engaged after fault recovery
         gearingNeeded := TRUE;
-        axisGearing(Execute := FALSE, Reset := TRUE);
+        axisGearing(Execute := FALSE);
 
         // TODO: Log which axis faulted, display error message
 
@@ -194,7 +194,7 @@ CASE currentState OF
 
         // Gearing will need to be re-engaged after E-stop recovery
         gearingNeeded := TRUE;
-        axisGearing(Execute := FALSE, Reset := TRUE);
+        axisGearing(Execute := FALSE);
 
         // Immediately halt all axes (emergency stop)
 		FOR i := MOTIF_CONFIG.MIN_AXIS_INDEX TO MOTIF_CONFIG.MAX_AXIS_INDEX DO

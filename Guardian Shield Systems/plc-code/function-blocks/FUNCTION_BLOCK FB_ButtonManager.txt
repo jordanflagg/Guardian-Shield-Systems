@@ -1,6 +1,7 @@
 FUNCTION_BLOCK FB_ButtonManager
-// Button input processing with debouncing, edge detection, and auto-clear
-// Outputs are one-shot pulses (TRUE for one scan cycle after button press)
+// Button input processing with debouncing and edge detection
+// Outputs STAY LATCHED until another button is pressed (no auto-clear)
+// This allows state machines to complete their full sequences
 
 VAR_INPUT
     btn_Start_In : BOOL;
@@ -28,9 +29,6 @@ VAR
     trig_Home : R_TRIG;
     trig_Manual : R_TRIG;
     trig_Reset : R_TRIG;
-
-    // Command was issued this scan (for one-shot behavior)
-    commandIssued : BOOL := FALSE;
 END_VAR
 
 
@@ -46,42 +44,36 @@ trig_Manual(CLK := btn_Manual_In);
 trig_Reset(CLK := btn_Reset_In);
 
 // ============================================================================
-// Clear command if requested or auto-clear after one scan
+// Clear command only if explicitly requested
 // ============================================================================
-IF ClearCommand OR commandIssued THEN
+IF ClearCommand THEN
     activeCommand := E_ActiveCommand.CMD_NONE;
-    commandIssued := FALSE;
 END_IF
 
 // ============================================================================
 // Determine active command based on button presses
 // Priority: E-Stop > Stop > Start > Home > Manual > Reset
+// Command stays latched until another button is pressed
 // ============================================================================
 IF btn_EStop_In THEN
     // E-stop overrides everything
     activeCommand := E_ActiveCommand.CMD_NONE;
-    commandIssued := FALSE;
 
 ELSIF trig_Stop.Q THEN
     // Stop has priority over start
     activeCommand := E_ActiveCommand.CMD_STOP;
-    commandIssued := TRUE;
 
 ELSIF trig_Start.Q THEN
     activeCommand := E_ActiveCommand.CMD_START;
-    commandIssued := TRUE;
 
 ELSIF trig_Home.Q THEN
     activeCommand := E_ActiveCommand.CMD_HOME;
-    commandIssued := TRUE;
 
 ELSIF trig_Manual.Q THEN
     activeCommand := E_ActiveCommand.CMD_MANUAL;
-    commandIssued := TRUE;
 
 ELSIF trig_Reset.Q THEN
     activeCommand := E_ActiveCommand.CMD_RESET;
-    commandIssued := TRUE;
 
 END_IF
 

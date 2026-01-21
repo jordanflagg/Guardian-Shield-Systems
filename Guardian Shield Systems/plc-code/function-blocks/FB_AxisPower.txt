@@ -1,7 +1,7 @@
 FUNCTION_BLOCK FB_AxisPower
 // Centralized power management for all 36 axes
 // Handles MC_Power enable and MC_Reset for fault clearing
-// Uses CXAC_Diagnostics for proper error reset/clear sequence
+// Uses CXA_Datalayer DL_WriteNode to clear all errors on the Core
 
 VAR_INPUT
     PowerOn : BOOL;         // Enable power to all drives
@@ -11,31 +11,21 @@ END_VAR
 VAR_OUTPUT
     DrivesReady : BOOL;     // TRUE when all drives are powered and ready
     AllResetDone : BOOL;    // TRUE when all resets complete
-    AppResetDone : BOOL;    // TRUE when application reset complete
     ErrorAxisID : UINT;     // First axis with error (0 = none)
-    DiagResetResult : CXAC_Diagnostics.DIAG_RESULT;  // Result of last diagnostic reset
-    DiagClearResult : CXAC_Diagnostics.DIAG_RESULT;  // Result of last diagnostic clear
 END_VAR
 
 VAR
     fbPower : ARRAY[MOTIF_CONFIG.MIN_AXIS_INDEX..MOTIF_CONFIG.MAX_AXIS_INDEX] OF MC_Power;
     fbReset : ARRAY[MOTIF_CONFIG.MIN_AXIS_INDEX..MOTIF_CONFIG.MAX_AXIS_INDEX] OF MC_Reset;
 
-    // CXAC_Diagnostics for proper error handling
-    pendingElements : WORD;
-    pendingDiagList : ARRAY[0..63] OF CXAC_Diagnostics.Pending_Diagnostics;
-    pendingDiagItem : CXAC_Diagnostics.Pending_Diagnostics;
-    resultGetPending : CXAC_Diagnostics.DIAG_RESULT;
-    resultReset : CXAC_Diagnostics.DIAG_RESULT;
-    resultClear : CXAC_Diagnostics.DIAG_RESULT;
+    // CXA_Datalayer for global error reset
+    fbPLC_Reset : CXA_Datalayer.DL_WriteNode;
 
     i : UINT;
-    j : WORD;
     allReady : BOOL;
     allReset : BOOL;
     firstError : UINT;
-    resetState : INT := 0;          // 0=idle, 1=get pending, 2=reset diags, 3=clear diags, 4=axis reset, 5=done
-    diagIndex : WORD := 0;          // Current diagnostic being processed
+    resetState : INT := 0;          // 0=idle, 1=clearing errors, 2=axis reset, 3=wait for axis reset
     rtrigReset : R_TRIG;            // Rising edge detection for Reset input
 END_VAR
 
@@ -44,70 +34,36 @@ END_VAR
 // Detect rising edge of Reset
 rtrigReset(CLK := Reset);
 
-// Reset state machine - get pending diagnostics, reset them, clear them, then reset axes
-// Note: Reset input must stay TRUE until sequence completes (handled by FB_ButtonManager latching)
+// Reset state machine
 IF Reset THEN
     CASE resetState OF
-        0: // Start - begin reset sequence on rising edge
+        0: // Idle - start reset sequence on rising edge
             IF rtrigReset.Q THEN
-                resetState := 1;
-                diagIndex := 0;
-                AppResetDone := FALSE;
                 AllResetDone := FALSE;
+                resetState := 1;
             END_IF
 
-        1: // Get all pending diagnostics
-            resultGetPending := GetPendingDiagnostics(
-                PendingElements => pendingElements,
-                PendingDiagnosticsList => pendingDiagList
+        1: // Clear all errors via Datalayer
+            fbPLC_Reset(
+                Execute := TRUE,
+                NodeName := 'diagnosis/confirm/all-errors'
             );
 
-            IF pendingElements > 0 THEN
-                diagIndex := 0;
-                resetState := 2;  // Go to reset phase
-            ELSE
-                // No pending diagnostics, skip to axis reset
-                resetState := 4;
+            IF fbPLC_Reset.Done OR fbPLC_Reset.Error THEN
+                fbPLC_Reset(Execute := FALSE);
+                resetState := 2;
             END_IF
 
-        2: // Reset each pending diagnostic (errors must be reset before they can be cleared)
-            IF diagIndex < pendingElements THEN
-                pendingDiagItem := pendingDiagList[diagIndex];
-                resultReset := ResetDiagnostics(IecDiag := pendingDiagItem);
-                DiagResetResult := resultReset;
-                diagIndex := diagIndex + 1;
-            ELSE
-                // All diagnostics reset, now clear them
-                diagIndex := 0;
-                resetState := 3;
-            END_IF
-
-        3: // Clear each reset diagnostic (only reset errors can be cleared)
-            IF diagIndex < pendingElements THEN
-                pendingDiagItem := pendingDiagList[diagIndex];
-                // Only errors need to be cleared; warnings auto-clear on reset
-                // Check if main diagnostic code indicates an error (0x0E0Fxxxx pattern)
-                IF (pendingDiagItem.MainDiagnosticCode AND 16#00F00000) = 16#000F0000 THEN
-                    resultClear := ClearDiagnostics(IecDiag := pendingDiagItem);
-                    DiagClearResult := resultClear;
-                END_IF
-                diagIndex := diagIndex + 1;
-            ELSE
-                // All diagnostics cleared
-                AppResetDone := TRUE;
-                resetState := 4;
-            END_IF
-
-        4: // Axis resets via MC_Reset - execute all at once
+        2: // Axis resets via MC_Reset - execute all at once
             FOR i := MOTIF_CONFIG.MIN_AXIS_INDEX TO MOTIF_CONFIG.MAX_AXIS_INDEX DO
                 fbReset[i](
                     Execute := TRUE,
                     Axis := AXIF_CONFIG_INDEXES[i]
                 );
             END_FOR
-            resetState := 5;  // Move to wait for completion
+            resetState := 3;
 
-        5: // Wait for all axis resets to complete
+        3: // Wait for all axis resets to complete
             // Keep calling MC_Reset with Execute TRUE
             FOR i := MOTIF_CONFIG.MIN_AXIS_INDEX TO MOTIF_CONFIG.MAX_AXIS_INDEX DO
                 fbReset[i](
@@ -140,7 +96,7 @@ IF Reset THEN
 ELSE
     // Reset not active - clear state and MC_Reset execute flags
     resetState := 0;
-    diagIndex := 0;
+    fbPLC_Reset(Execute := FALSE);
     FOR i := MOTIF_CONFIG.MIN_AXIS_INDEX TO MOTIF_CONFIG.MAX_AXIS_INDEX DO
         fbReset[i](
             Execute := FALSE,
@@ -181,8 +137,5 @@ END_FOR
 
 // Update outputs
 DrivesReady := PowerOn AND allReady AND (firstError = 0);
-AllResetDone := allReset;
 ErrorAxisID := firstError;
-
-
 

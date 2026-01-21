@@ -35,10 +35,15 @@ END_VAR
 
 ///////////////////////////////////////////////////////////////////////////////
 
-// Not enabled - idle
+// Not enabled - reset state for next cycle
 IF NOT Enable THEN
     Busy := FALSE;
+    Done := FALSE;
+    Error := FALSE;
+    ErrorAxisID := 0;
     ActiveAxesMask := 0;
+    stepStarted := FALSE;
+    subStep := 0;
     RETURN;
 END_IF
 

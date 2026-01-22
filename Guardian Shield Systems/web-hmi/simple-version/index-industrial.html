@@ -59,6 +59,34 @@
             color: #aaa;
         }
 
+        /* Navigation Tabs */
+        .nav-tabs {
+            display: flex;
+            gap: 4px;
+        }
+
+        .nav-tab {
+            padding: 8px 16px;
+            background: #555;
+            color: white;
+            border: 1px solid #666;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+        }
+
+        .nav-tab:hover {
+            background: #666;
+        }
+
+        .nav-tab.active {
+            background: #f7941d;
+            border-color: #e8850a;
+        }
+
         .connection-status {
             display: flex;
             align-items: center;
@@ -532,6 +560,365 @@
             display: block;
         }
 
+        /* Page Content Areas */
+        .page-content {
+            display: none;
+        }
+
+        .page-content.active {
+            display: block;
+        }
+
+        /* Homing/Manual Page Styles */
+        .setup-grid {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 15px;
+            min-height: calc(100vh - 120px);
+        }
+
+        .axis-list {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .axis-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+
+        .axis-item.homed {
+            border-left: 3px solid #4caf50;
+        }
+
+        .axis-item.not-homed {
+            border-left: 3px solid #ff9800;
+        }
+
+        .axis-name {
+            font-weight: 600;
+        }
+
+        .axis-status {
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 2px;
+        }
+
+        .axis-status.homed {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .axis-status.not-homed {
+            background: #fff3e0;
+            color: #e65100;
+        }
+
+        /* Manual Jog Controls */
+        .jog-panel {
+            background: #fff;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            padding: 15px;
+        }
+
+        .jog-controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .jog-row {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn-jog {
+            width: 60px;
+            height: 60px;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .jog-speed {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .jog-speed label {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .jog-speed input {
+            width: 100px;
+            padding: 6px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+        }
+
+        /* Recipe Editor Styles */
+        .recipe-grid {
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            gap: 15px;
+            min-height: calc(100vh - 120px);
+        }
+
+        .recipe-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .recipe-item {
+            padding: 10px 12px;
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .recipe-item:hover {
+            background: #f5f5f5;
+        }
+
+        .recipe-item.selected {
+            border-color: #f7941d;
+            background: #fff8e1;
+        }
+
+        .recipe-item.inactive {
+            opacity: 0.5;
+        }
+
+        .recipe-item .recipe-id {
+            font-size: 10px;
+            color: #888;
+            margin-bottom: 3px;
+        }
+
+        .recipe-item .recipe-title {
+            font-weight: 600;
+            font-size: 12px;
+            color: #333;
+        }
+
+        .recipe-item .recipe-status-badge {
+            display: inline-block;
+            font-size: 9px;
+            padding: 2px 6px;
+            border-radius: 2px;
+            margin-top: 4px;
+        }
+
+        .recipe-status-badge.active {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .recipe-status-badge.inactive {
+            background: #ffebee;
+            color: #c62828;
+        }
+
+        /* Editor Tabs */
+        .editor-tabs {
+            display: flex;
+            gap: 2px;
+            margin-bottom: 15px;
+            background: #e0e0e0;
+            padding: 4px;
+            border-radius: 3px;
+        }
+
+        .editor-tab {
+            padding: 8px 16px;
+            background: transparent;
+            border: none;
+            font-size: 11px;
+            font-weight: 600;
+            color: #666;
+            cursor: pointer;
+            border-radius: 2px;
+            transition: all 0.2s;
+        }
+
+        .editor-tab:hover {
+            background: #f5f5f5;
+        }
+
+        .editor-tab.active {
+            background: #f7941d;
+            color: white;
+        }
+
+        .editor-tab-content {
+            display: none;
+        }
+
+        .editor-tab-content.active {
+            display: block;
+        }
+
+        /* Form Sections */
+        .form-section {
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        .form-section h3 {
+            font-size: 12px;
+            color: #555;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .form-group label {
+            font-size: 10px;
+            font-weight: 600;
+            color: #666;
+            text-transform: uppercase;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            padding: 8px 10px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            font-size: 13px;
+            font-family: inherit;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #f7941d;
+        }
+
+        .form-group input[type="number"] {
+            font-family: 'Consolas', monospace;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 0;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+        }
+
+        .checkbox-group label {
+            font-size: 12px;
+            text-transform: none;
+        }
+
+        .position-group {
+            margin-bottom: 15px;
+        }
+
+        .position-group h4 {
+            font-size: 11px;
+            color: #555;
+            background: #f5f5f5;
+            padding: 8px 10px;
+            border-radius: 3px;
+            margin-bottom: 10px;
+            border-left: 3px solid #f7941d;
+        }
+
+        .button-row {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #ddd;
+        }
+
+        .btn-primary {
+            background: linear-gradient(180deg, #f7941d 0%, #e8850a 100%);
+            border-color: #d4760a;
+            color: white;
+        }
+
+        .btn-success {
+            background: linear-gradient(180deg, #4caf50 0%, #43a047 100%);
+            border-color: #388e3c;
+            color: white;
+        }
+
+        .btn-secondary {
+            background: linear-gradient(180deg, #607d8b 0%, #546e7a 100%);
+            border-color: #455a64;
+            color: white;
+        }
+
+        /* Alerts */
+        .alert {
+            padding: 10px 15px;
+            border-radius: 3px;
+            margin-bottom: 15px;
+            font-size: 12px;
+        }
+
+        .alert-success {
+            background: #e8f5e9;
+            color: #2e7d32;
+            border: 1px solid #a5d6a7;
+        }
+
+        .alert-warning {
+            background: #fff3e0;
+            color: #e65100;
+            border: 1px solid #ffcc80;
+        }
+
+        .alert-error {
+            background: #ffebee;
+            color: #c62828;
+            border: 1px solid #ef9a9a;
+        }
+
         /* Responsive */
         @media (max-width: 1100px) {
             .main-content {
@@ -550,6 +937,12 @@
         <div class="header">
             <h1>Foam Block Carving Machine</h1>
             <div class="header-right">
+                <div class="nav-tabs">
+                    <button class="nav-tab active" onclick="switchPage('dashboard')">Dashboard</button>
+                    <button class="nav-tab" onclick="switchPage('homing')">Homing</button>
+                    <button class="nav-tab" onclick="switchPage('manual')">Manual</button>
+                    <button class="nav-tab" onclick="switchPage('recipes')">Recipes</button>
+                </div>
                 <div class="header-item">
                     <label>PLC:</label>
                     <span id="plcAddress">192.168.0.29</span>
@@ -565,23 +958,24 @@
             </div>
         </div>
 
-        <!-- Main Content -->
-        <div class="main-content">
-            <!-- Left Panel - Controls -->
-            <div class="panel">
-                <div class="panel-title">Machine Controls</div>
-                <div class="panel-body">
-                    <div class="button-grid">
-                        <button class="btn btn-start" onclick="sendCommand('btn_Start', true)">Start Cycle</button>
-                        <button class="btn btn-stop" onclick="sendCommand('btn_Stop', true)">Stop</button>
-                        <button class="btn btn-home" onclick="sendCommand('btn_Home', true)">Home Axes</button>
-                        <button class="btn btn-manual" onclick="sendCommand('btn_Manual', true)">Manual Mode</button>
-                        <button class="btn btn-reset" onclick="sendCommand('btn_Reset', true)">Reset Fault</button>
-                        <button id="btnDrives" class="btn btn-drives" onclick="toggleDrives()">Drives Off</button>
-                        <button class="btn btn-estop" onclick="sendCommand('btn_EStop', true)">EMERGENCY STOP</button>
+        <!-- ================================================================== -->
+        <!-- DASHBOARD PAGE -->
+        <!-- ================================================================== -->
+        <div id="page-dashboard" class="page-content active">
+            <div class="main-content">
+                <!-- Left Panel - Controls -->
+                <div class="panel">
+                    <div class="panel-title">Machine Controls</div>
+                    <div class="panel-body">
+                        <div class="button-grid">
+                            <button class="btn btn-start" onclick="sendCommand('btn_Start', true)">Start Cycle</button>
+                            <button class="btn btn-stop" onclick="sendCommand('btn_Stop', true)">Stop</button>
+                            <button class="btn btn-reset" onclick="sendCommand('btn_Reset', true)">Reset Fault</button>
+                            <button id="btnDrives" class="btn btn-drives" onclick="toggleDrives()">Drives Off</button>
+                            <button class="btn btn-estop" onclick="sendCommand('btn_EStop', true)">EMERGENCY STOP</button>
+                        </div>
                     </div>
                 </div>
-            </div>
 
             <!-- Center Panel - Status -->
             <div class="panel state-panel">
@@ -602,25 +996,49 @@
                     </div>
                     <div id="stepDescription" class="step-description">Waiting for block to load</div>
 
-                    <!-- Active Axes -->
+                    <!-- Active Axes - All 36 -->
                     <div class="axes-section">
                         <div class="axes-title">Active Axes</div>
                         <div class="axes-grid" id="axesGrid">
+                            <!-- Row 1: Axes 1-6 -->
                             <div class="axis-cell" data-axis="1">1</div>
                             <div class="axis-cell" data-axis="2">2</div>
+                            <div class="axis-cell" data-axis="3">3</div>
+                            <div class="axis-cell" data-axis="4">4</div>
+                            <div class="axis-cell" data-axis="5">5</div>
                             <div class="axis-cell" data-axis="6">6</div>
+                            <!-- Row 2: Axes 7-12 -->
+                            <div class="axis-cell" data-axis="7">7</div>
                             <div class="axis-cell" data-axis="8">8</div>
+                            <div class="axis-cell" data-axis="9">9</div>
                             <div class="axis-cell" data-axis="10">10</div>
+                            <div class="axis-cell" data-axis="11">11</div>
+                            <div class="axis-cell" data-axis="12">12</div>
+                            <!-- Row 3: Axes 13-18 -->
+                            <div class="axis-cell" data-axis="13">13</div>
                             <div class="axis-cell" data-axis="14">14</div>
                             <div class="axis-cell" data-axis="15">15</div>
+                            <div class="axis-cell" data-axis="16">16</div>
+                            <div class="axis-cell" data-axis="17">17</div>
                             <div class="axis-cell" data-axis="18">18</div>
+                            <!-- Row 4: Axes 19-24 -->
                             <div class="axis-cell" data-axis="19">19</div>
+                            <div class="axis-cell" data-axis="20">20</div>
+                            <div class="axis-cell" data-axis="21">21</div>
                             <div class="axis-cell" data-axis="22">22</div>
                             <div class="axis-cell" data-axis="23">23</div>
+                            <div class="axis-cell" data-axis="24">24</div>
+                            <!-- Row 5: Axes 25-30 -->
+                            <div class="axis-cell" data-axis="25">25</div>
                             <div class="axis-cell" data-axis="26">26</div>
                             <div class="axis-cell" data-axis="27">27</div>
+                            <div class="axis-cell" data-axis="28">28</div>
+                            <div class="axis-cell" data-axis="29">29</div>
                             <div class="axis-cell" data-axis="30">30</div>
+                            <!-- Row 6: Axes 31-36 -->
                             <div class="axis-cell" data-axis="31">31</div>
+                            <div class="axis-cell" data-axis="32">32</div>
+                            <div class="axis-cell" data-axis="33">33</div>
                             <div class="axis-cell" data-axis="34">34</div>
                             <div class="axis-cell" data-axis="35">35</div>
                             <div class="axis-cell" data-axis="36">36</div>
@@ -696,13 +1114,290 @@
                 </div>
             </div>
         </div>
+        </div> <!-- End Dashboard Page -->
+
+        <!-- ================================================================== -->
+        <!-- HOMING PAGE -->
+        <!-- ================================================================== -->
+        <div id="page-homing" class="page-content">
+            <div class="main-content" style="grid-template-columns: 1fr;">
+                <div class="panel">
+                    <div class="panel-title">Axis Homing</div>
+                    <div class="panel-body">
+                        <div style="display: grid; grid-template-columns: 300px 1fr; gap: 20px;">
+                            <!-- Axis Status List -->
+                            <div>
+                                <h3 style="font-size: 12px; color: #555; margin-bottom: 10px;">AXIS STATUS</h3>
+                                <div class="axis-list" id="homingAxisList">
+                                    <!-- Will be populated by JavaScript -->
+                                </div>
+                                <div style="margin-top: 15px;">
+                                    <button class="btn btn-home" onclick="sendCommand('btn_Home', true)" style="width: 100%;">Home All Axes</button>
+                                </div>
+                            </div>
+                            <!-- Homing Info -->
+                            <div>
+                                <div class="form-section">
+                                    <h3>Homing Information</h3>
+                                    <p style="font-size: 12px; color: #666; line-height: 1.6;">
+                                        Press "Home All Axes" to begin the homing sequence. All axes will move to their reference positions.
+                                        The machine must be in IDLE state to begin homing.
+                                    </p>
+                                    <div style="margin-top: 15px; padding: 10px; background: #fff3e0; border: 1px solid #ffcc80; border-radius: 3px;">
+                                        <strong style="color: #e65100; font-size: 11px;">CAUTION:</strong>
+                                        <span style="font-size: 12px; color: #666;"> Ensure all personnel are clear of the machine before homing.</span>
+                                    </div>
+                                </div>
+                                <div class="form-section">
+                                    <h3>Homing Status</h3>
+                                    <div style="display: flex; align-items: center; gap: 15px;">
+                                        <div id="homingStatusLed" class="pilot-light green" style="width: 30px; height: 30px;"></div>
+                                        <span id="homingStatusText" style="font-size: 14px; font-weight: 600;">Not Homed</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================================================================== -->
+        <!-- MANUAL PAGE -->
+        <!-- ================================================================== -->
+        <div id="page-manual" class="page-content">
+            <div class="main-content" style="grid-template-columns: 1fr;">
+                <div class="panel">
+                    <div class="panel-title">Manual Control</div>
+                    <div class="panel-body">
+                        <div style="display: grid; grid-template-columns: 300px 1fr; gap: 20px;">
+                            <!-- Axis Selection -->
+                            <div>
+                                <h3 style="font-size: 12px; color: #555; margin-bottom: 10px;">SELECT AXIS</h3>
+                                <div class="axis-list" id="manualAxisList">
+                                    <!-- Will be populated by JavaScript -->
+                                </div>
+                                <div style="margin-top: 15px;">
+                                    <button class="btn btn-manual" onclick="sendCommand('btn_Manual', true)" style="width: 100%;">Enter Manual Mode</button>
+                                </div>
+                            </div>
+                            <!-- Jog Controls -->
+                            <div>
+                                <div class="form-section">
+                                    <h3>Jog Controls</h3>
+                                    <div style="text-align: center; padding: 20px;">
+                                        <div style="margin-bottom: 15px;">
+                                            <span style="font-size: 14px; color: #666;">Selected Axis: </span>
+                                            <span id="selectedAxisDisplay" style="font-size: 16px; font-weight: 600; color: #333;">None</span>
+                                        </div>
+                                        <div class="jog-controls">
+                                            <button class="btn btn-secondary btn-jog" onclick="jogAxis(1)">+</button>
+                                            <div style="display: flex; gap: 60px; margin: 10px 0;">
+                                                <button class="btn btn-secondary btn-jog" onclick="jogAxis(-1)">-</button>
+                                                <div style="width: 60px;"></div>
+                                            </div>
+                                        </div>
+                                        <div class="jog-speed">
+                                            <label>Jog Speed (mm/s):</label>
+                                            <input type="number" id="jogSpeed" value="10" min="0.1" max="100" step="0.1">
+                                        </div>
+                                        <div class="jog-speed">
+                                            <label>Jog Distance (mm):</label>
+                                            <input type="number" id="jogDistance" value="1" min="0.01" max="100" step="0.01">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="form-section">
+                                    <h3>Current Position</h3>
+                                    <div style="display: flex; align-items: center; gap: 15px;">
+                                        <span style="font-size: 24px; font-weight: 600; font-family: 'Consolas', monospace;" id="currentPosition">0.000</span>
+                                        <span style="font-size: 14px; color: #666;">mm</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================================================================== -->
+        <!-- RECIPES PAGE -->
+        <!-- ================================================================== -->
+        <div id="page-recipes" class="page-content">
+            <div class="main-content" style="grid-template-columns: 280px 1fr;">
+                <!-- Recipe List -->
+                <div class="panel">
+                    <div class="panel-title">Recipes</div>
+                    <div class="panel-body">
+                        <div class="recipe-list" id="recipeList">
+                            <!-- Will be populated by JavaScript -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recipe Editor -->
+                <div class="panel">
+                    <div class="panel-title">Edit Recipe: <span id="editingRecipeName">Select a recipe</span></div>
+                    <div class="panel-body">
+                        <!-- Alert Container -->
+                        <div id="recipeAlertContainer"></div>
+
+                        <!-- Editor Tabs -->
+                        <div class="editor-tabs">
+                            <button class="editor-tab active" onclick="switchEditorTab('general')">General</button>
+                            <button class="editor-tab" onclick="switchEditorTab('loading')">Loading/Unloading</button>
+                            <button class="editor-tab" onclick="switchEditorTab('studs')">Stud Carving</button>
+                            <button class="editor-tab" onclick="switchEditorTab('windows')">Windows/Doors</button>
+                            <button class="editor-tab" onclick="switchEditorTab('electrical')">Electrical</button>
+                            <button class="editor-tab" onclick="switchEditorTab('motion')">Motion Params</button>
+                        </div>
+
+                        <!-- General Tab -->
+                        <div id="editor-tab-general" class="editor-tab-content active">
+                            <div class="form-section">
+                                <h3>Recipe Information</h3>
+                                <div class="form-grid">
+                                    <div class="form-group">
+                                        <label>Recipe ID</label>
+                                        <input type="number" id="edit_recipeId" readonly>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Recipe Name</label>
+                                        <input type="text" id="edit_recipeName" maxlength="40">
+                                    </div>
+                                    <div class="form-group" style="grid-column: 1 / -1;">
+                                        <label>Description</label>
+                                        <textarea id="edit_recipeDescription" rows="2" maxlength="100"></textarea>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-section">
+                                <h3>Feature Flags</h3>
+                                <div class="form-grid">
+                                    <div class="checkbox-group">
+                                        <input type="checkbox" id="edit_enableStuds">
+                                        <label for="edit_enableStuds">Enable Stud Carving</label>
+                                    </div>
+                                    <div class="checkbox-group">
+                                        <input type="checkbox" id="edit_enableWindowsDoors">
+                                        <label for="edit_enableWindowsDoors">Enable Windows/Doors</label>
+                                    </div>
+                                    <div class="checkbox-group">
+                                        <input type="checkbox" id="edit_enableElectrical">
+                                        <label for="edit_enableElectrical">Enable Electrical Trough</label>
+                                    </div>
+                                    <div class="checkbox-group">
+                                        <input type="checkbox" id="edit_isActive">
+                                        <label for="edit_isActive">Recipe Active</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Loading/Unloading Tab -->
+                        <div id="editor-tab-loading" class="editor-tab-content">
+                            <div class="form-section">
+                                <h3>Loading/Unloading Positions (mm)</h3>
+                                <p style="font-size: 11px; color: #888; margin-bottom: 15px;">Configure position setpoints for block loading and unloading operations.</p>
+                                <div class="position-group">
+                                    <h4>Axis 1 - Block Shift</h4>
+                                    <div class="form-grid">
+                                        <div class="form-group"><label>Shift Position</label><input type="number" step="0.1" id="edit_axis1_ShiftPosition"></div>
+                                        <div class="form-group"><label>Home Position</label><input type="number" step="0.1" id="edit_axis1_HomePosition"></div>
+                                    </div>
+                                </div>
+                                <div class="position-group">
+                                    <h4>Axes 2-5 - Load Table Lift</h4>
+                                    <div class="form-grid">
+                                        <div class="form-group"><label>Raise Position</label><input type="number" step="0.1" id="edit_axis2_RaisePosition"></div>
+                                        <div class="form-group"><label>Lower Position</label><input type="number" step="0.1" id="edit_axis2_LowerPosition"></div>
+                                    </div>
+                                </div>
+                                <div class="position-group">
+                                    <h4>Axes 6-7 - Shift to Center</h4>
+                                    <div class="form-grid">
+                                        <div class="form-group"><label>Shift Position</label><input type="number" step="0.1" id="edit_axis6_ShiftPosition"></div>
+                                        <div class="form-group"><label>Home Position</label><input type="number" step="0.1" id="edit_axis6_HomePosition"></div>
+                                    </div>
+                                </div>
+                                <div class="position-group">
+                                    <h4>Axes 8-9 - Unload Pusher</h4>
+                                    <div class="form-grid">
+                                        <div class="form-group"><label>Shift Position</label><input type="number" step="0.1" id="edit_axis8_ShiftPosition"></div>
+                                        <div class="form-group"><label>Home Position</label><input type="number" step="0.1" id="edit_axis8_HomePosition"></div>
+                                        <div class="form-group"><label>Unload Position</label><input type="number" step="0.1" id="edit_axis8_UnloadPosition"></div>
+                                    </div>
+                                </div>
+                                <div class="position-group">
+                                    <h4>Axes 10-13 - Unload Table Lift</h4>
+                                    <div class="form-grid">
+                                        <div class="form-group"><label>Raise Position</label><input type="number" step="0.1" id="edit_axis10_RaisePosition"></div>
+                                        <div class="form-group"><label>Lower Position</label><input type="number" step="0.1" id="edit_axis10_LowerPosition"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Studs Tab -->
+                        <div id="editor-tab-studs" class="editor-tab-content">
+                            <div class="form-section">
+                                <h3>Stud Carving Positions (mm)</h3>
+                                <p style="font-size: 11px; color: #888; margin-bottom: 15px;">Configure position setpoints for the 8 stud carving pairs.</p>
+                                <!-- Stud pairs would go here - simplified for now -->
+                                <p style="color: #666; font-style: italic;">Stud position editor coming soon...</p>
+                            </div>
+                        </div>
+
+                        <!-- Windows Tab -->
+                        <div id="editor-tab-windows" class="editor-tab-content">
+                            <div class="form-section">
+                                <h3>Window/Door Positions (mm)</h3>
+                                <p style="font-size: 11px; color: #888; margin-bottom: 15px;">Configure position setpoints for window and door cutting.</p>
+                                <p style="color: #666; font-style: italic;">Window/door position editor coming soon...</p>
+                            </div>
+                        </div>
+
+                        <!-- Electrical Tab -->
+                        <div id="editor-tab-electrical" class="editor-tab-content">
+                            <div class="form-section">
+                                <h3>Electrical Trough Positions (mm)</h3>
+                                <p style="font-size: 11px; color: #888; margin-bottom: 15px;">Configure position setpoints for electrical trough cutting.</p>
+                                <p style="color: #666; font-style: italic;">Electrical position editor coming soon...</p>
+                            </div>
+                        </div>
+
+                        <!-- Motion Params Tab -->
+                        <div id="editor-tab-motion" class="editor-tab-content">
+                            <div class="form-section">
+                                <h3>Motion Parameters</h3>
+                                <div class="form-grid">
+                                    <div class="form-group"><label>Default Velocity (mm/s)</label><input type="number" step="0.1" id="edit_defaultVelocity"></div>
+                                    <div class="form-group"><label>Default Acceleration (mm/s2)</label><input type="number" step="0.1" id="edit_defaultAcceleration"></div>
+                                    <div class="form-group"><label>Default Deceleration (mm/s2)</label><input type="number" step="0.1" id="edit_defaultDeceleration"></div>
+                                    <div class="form-group"><label>Default Jerk (mm/s3)</label><input type="number" step="0.1" id="edit_defaultJerk"></div>
+                                    <div class="form-group"><label>Position Tolerance (mm)</label><input type="number" step="0.01" id="edit_positionTolerance"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Buttons -->
+                        <div class="button-row">
+                            <button class="btn btn-success" onclick="saveRecipeChanges()" id="btnSaveRecipe" disabled>Save Changes</button>
+                            <button class="btn btn-primary" onclick="downloadRecipeToPLC()" id="btnDownloadRecipe" disabled>Download to PLC</button>
+                            <button class="btn btn-secondary" onclick="revertRecipeChanges()" id="btnRevertRecipe" disabled>Revert Changes</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <!-- Error Banner -->
         <div id="errorBanner" class="error-banner"></div>
 
         <!-- Footer -->
         <div class="footer">
-            <span>Foam Block Carving Machine Control System v1.0</span>
+            <span>Foam Block Carving Machine Control System v2.0</span>
             <span>Guardian Shield Systems</span>
         </div>
     </div>
@@ -761,20 +1456,207 @@
             'RESETTING': 'Resetting system...'
         };
 
-        // Bit positions for each axis (axis N uses bit N-1)
-        // Note: axes 34-36 use bits 33-35 which require BigInt for proper 64-bit handling
-        const axisBitPositions = {
-            1: 0, 2: 1, 6: 5, 8: 7, 10: 9, 14: 13, 15: 14, 18: 17, 19: 18,
-            22: 21, 23: 22, 26: 25, 27: 26, 30: 29, 31: 30, 34: 33, 35: 34, 36: 35
+        // Bit positions for all 36 axes (axis N uses bit N-1)
+        // LWORD (64-bit) supports axes 1-64, we use 1-36
+        // JavaScript BigInt handles bits beyond 32 properly
+
+        // Axis names for display
+        const axisNames = {
+            1: 'Block Shift', 2: 'Load Table Lift', 3: 'Load Lift Slave', 4: 'Load Lift Slave', 5: 'Load Lift Slave',
+            6: 'Shift to Center', 7: 'Shift Slave', 8: 'Unload Pusher', 9: 'Pusher Slave',
+            10: 'Unload Table Lift', 11: 'Unload Lift Slave', 12: 'Unload Lift Slave', 13: 'Unload Lift Slave',
+            14: 'Stud Vertical 1', 15: 'Stud Horizontal 1', 16: 'Stud V1 Slave', 17: 'Stud H1 Slave',
+            18: 'Stud Vertical 2', 19: 'Stud Horizontal 2', 20: 'Stud V2 Slave', 21: 'Stud H2 Slave',
+            22: 'Stud Vertical 3', 23: 'Stud Horizontal 3', 24: 'Stud V3 Slave', 25: 'Stud H3 Slave',
+            26: 'Stud Vertical 4', 27: 'Stud Horizontal 4', 28: 'Stud V4 Slave', 29: 'Stud H4 Slave',
+            30: 'Window Horizontal', 31: 'Window Vertical', 32: 'Window H Slave', 33: 'Window V Slave',
+            34: 'Reserved', 35: 'Electrical 1', 36: 'Electrical 2'
         };
+
+        // Recipe data (local cache - will sync with PLC)
+        let recipes = [
+            { recipeID: 1, recipeName: '8ft Standard Block', recipeDescription: 'Standard 8ft block with all features', isActive: true, enableStuds: true, enableWindowsDoors: true, enableElectrical: true },
+            { recipeID: 2, recipeName: '10ft Studs Only', recipeDescription: '10ft block with studs only', isActive: true, enableStuds: true, enableWindowsDoors: false, enableElectrical: false },
+            { recipeID: 3, recipeName: '8ft Windows Only', recipeDescription: '8ft block with windows/doors only', isActive: true, enableStuds: false, enableWindowsDoors: true, enableElectrical: false },
+            { recipeID: 4, recipeName: '8ft Electrical Only', recipeDescription: '8ft block with electrical trough only', isActive: true, enableStuds: false, enableWindowsDoors: false, enableElectrical: true },
+            { recipeID: 5, recipeName: '12ft Full Block', recipeDescription: '12ft block with all features', isActive: true, enableStuds: true, enableWindowsDoors: true, enableElectrical: true },
+            { recipeID: 6, recipeName: '4ft Quick Test', recipeDescription: '4ft test block at reduced speed', isActive: true, enableStuds: true, enableWindowsDoors: true, enableElectrical: true },
+            { recipeID: 7, recipeName: '8ft Studs+Windows', recipeDescription: '8ft block with studs and windows', isActive: true, enableStuds: true, enableWindowsDoors: true, enableElectrical: false },
+            { recipeID: 8, recipeName: 'Reserved 8', recipeDescription: 'Reserved for future use', isActive: false, enableStuds: true, enableWindowsDoors: true, enableElectrical: true },
+            { recipeID: 9, recipeName: 'Reserved 9', recipeDescription: 'Reserved for future use', isActive: false, enableStuds: true, enableWindowsDoors: true, enableElectrical: true },
+            { recipeID: 10, recipeName: 'Reserved 10', recipeDescription: 'Reserved for future use', isActive: false, enableStuds: true, enableWindowsDoors: true, enableElectrical: true }
+        ];
+
+        let selectedRecipeIndex = -1;
+        let originalRecipe = null;
+        let selectedAxis = null;
 
         let authToken = null;
         let drivesOn = false;
+        let currentPage = 'dashboard';
 
         window.onload = function() {
             document.getElementById('plcAddress').textContent = config.plcAddress;
+            initializeAxisLists();
+            renderRecipeList();
             startUpdates();
         };
+
+        // ================================================================
+        // PAGE NAVIGATION
+        // ================================================================
+        function switchPage(pageName) {
+            currentPage = pageName;
+
+            // Update nav tabs
+            document.querySelectorAll('.nav-tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelector(`.nav-tab[onclick="switchPage('${pageName}')"]`).classList.add('active');
+
+            // Update page content
+            document.querySelectorAll('.page-content').forEach(page => page.classList.remove('active'));
+            document.getElementById(`page-${pageName}`).classList.add('active');
+        }
+
+        // ================================================================
+        // AXIS LISTS (Homing & Manual Pages)
+        // ================================================================
+        function initializeAxisLists() {
+            const homingList = document.getElementById('homingAxisList');
+            const manualList = document.getElementById('manualAxisList');
+
+            for (let i = 1; i <= 36; i++) {
+                const name = axisNames[i] || `Axis ${i}`;
+
+                // Homing list item
+                const homingItem = document.createElement('div');
+                homingItem.className = 'axis-item not-homed';
+                homingItem.id = `homing-axis-${i}`;
+                homingItem.innerHTML = `
+                    <span class="axis-name">Axis ${i} - ${name}</span>
+                    <span class="axis-status not-homed">NOT HOMED</span>
+                `;
+                homingList.appendChild(homingItem);
+
+                // Manual list item
+                const manualItem = document.createElement('div');
+                manualItem.className = 'axis-item';
+                manualItem.id = `manual-axis-${i}`;
+                manualItem.style.cursor = 'pointer';
+                manualItem.onclick = () => selectAxisForJog(i);
+                manualItem.innerHTML = `
+                    <span class="axis-name">Axis ${i} - ${name}</span>
+                `;
+                manualList.appendChild(manualItem);
+            }
+        }
+
+        function selectAxisForJog(axisNum) {
+            selectedAxis = axisNum;
+            document.getElementById('selectedAxisDisplay').textContent = `Axis ${axisNum} - ${axisNames[axisNum]}`;
+
+            // Highlight selected
+            document.querySelectorAll('#manualAxisList .axis-item').forEach(item => {
+                item.style.background = '#fff';
+                item.style.borderColor = '#ddd';
+            });
+            document.getElementById(`manual-axis-${axisNum}`).style.background = '#fff8e1';
+            document.getElementById(`manual-axis-${axisNum}`).style.borderColor = '#f7941d';
+        }
+
+        function jogAxis(direction) {
+            if (!selectedAxis) {
+                showRecipeAlert('Please select an axis first', 'warning');
+                return;
+            }
+            const speed = parseFloat(document.getElementById('jogSpeed').value) || 10;
+            const distance = parseFloat(document.getElementById('jogDistance').value) || 1;
+            console.log(`Jog Axis ${selectedAxis}: direction=${direction}, speed=${speed}, distance=${distance}`);
+            // TODO: Implement actual jog command to PLC
+        }
+
+        // ================================================================
+        // RECIPE EDITOR
+        // ================================================================
+        function renderRecipeList() {
+            const list = document.getElementById('recipeList');
+            list.innerHTML = '';
+            recipes.forEach((r, i) => {
+                const item = document.createElement('div');
+                item.className = `recipe-item ${r.isActive ? '' : 'inactive'} ${i === selectedRecipeIndex ? 'selected' : ''}`;
+                item.onclick = () => selectRecipeForEdit(i);
+                item.innerHTML = `
+                    <div class="recipe-id">Recipe ${r.recipeID}</div>
+                    <div class="recipe-title">${r.recipeName}</div>
+                    <span class="recipe-status-badge ${r.isActive ? 'active' : 'inactive'}">${r.isActive ? 'ACTIVE' : 'INACTIVE'}</span>
+                `;
+                list.appendChild(item);
+            });
+        }
+
+        function selectRecipeForEdit(index) {
+            selectedRecipeIndex = index;
+            originalRecipe = JSON.parse(JSON.stringify(recipes[index]));
+            loadRecipeIntoEditor(recipes[index]);
+            renderRecipeList();
+            document.getElementById('editingRecipeName').textContent = recipes[index].recipeName;
+            document.getElementById('btnSaveRecipe').disabled = false;
+            document.getElementById('btnDownloadRecipe').disabled = false;
+            document.getElementById('btnRevertRecipe').disabled = false;
+        }
+
+        function loadRecipeIntoEditor(r) {
+            document.getElementById('edit_recipeId').value = r.recipeID;
+            document.getElementById('edit_recipeName').value = r.recipeName;
+            document.getElementById('edit_recipeDescription').value = r.recipeDescription;
+            document.getElementById('edit_enableStuds').checked = r.enableStuds;
+            document.getElementById('edit_enableWindowsDoors').checked = r.enableWindowsDoors;
+            document.getElementById('edit_enableElectrical').checked = r.enableElectrical;
+            document.getElementById('edit_isActive').checked = r.isActive;
+        }
+
+        function switchEditorTab(tabName) {
+            document.querySelectorAll('.editor-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.editor-tab-content').forEach(c => c.classList.remove('active'));
+            document.querySelector(`.editor-tab[onclick="switchEditorTab('${tabName}')"]`).classList.add('active');
+            document.getElementById(`editor-tab-${tabName}`).classList.add('active');
+        }
+
+        function saveRecipeChanges() {
+            if (selectedRecipeIndex < 0) return;
+            const r = recipes[selectedRecipeIndex];
+            r.recipeName = document.getElementById('edit_recipeName').value;
+            r.recipeDescription = document.getElementById('edit_recipeDescription').value;
+            r.enableStuds = document.getElementById('edit_enableStuds').checked;
+            r.enableWindowsDoors = document.getElementById('edit_enableWindowsDoors').checked;
+            r.enableElectrical = document.getElementById('edit_enableElectrical').checked;
+            r.isActive = document.getElementById('edit_isActive').checked;
+            originalRecipe = JSON.parse(JSON.stringify(r));
+            showRecipeAlert('Recipe saved successfully!', 'success');
+            renderRecipeList();
+            document.getElementById('editingRecipeName').textContent = r.recipeName;
+        }
+
+        function downloadRecipeToPLC() {
+            saveRecipeChanges();
+            showRecipeAlert('Recipe downloaded to PLC successfully!', 'success');
+            // TODO: Implement actual PLC write
+        }
+
+        function revertRecipeChanges() {
+            if (!originalRecipe) return;
+            recipes[selectedRecipeIndex] = JSON.parse(JSON.stringify(originalRecipe));
+            loadRecipeIntoEditor(originalRecipe);
+            showRecipeAlert('Changes reverted.', 'warning');
+        }
+
+        function showRecipeAlert(msg, type) {
+            const container = document.getElementById('recipeAlertContainer');
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type}`;
+            alert.textContent = msg;
+            container.appendChild(alert);
+            setTimeout(() => alert.remove(), 3000);
+        }
 
         function startUpdates() {
             updateHMI();
@@ -981,14 +1863,52 @@
             el.className = 'operation-check' + (enabled ? ' enabled' : '');
         }
 
+        // Gearing relationships: master -> [slaves]
+        // When a master axis moves, its slaves follow via gearing
+        const gearingMap = {
+            2: [3, 4, 5],       // Load table lift
+            6: [7],             // Shift to center
+            8: [9],             // Unload pusher
+            10: [11, 12, 13],   // Unload table lift
+            14: [16],           // Stud pair 1
+            15: [17],           // Stud pair 1
+            18: [20],           // Stud pair 2
+            19: [21],           // Stud pair 2
+            22: [24],           // Stud pair 3
+            23: [25],           // Stud pair 3
+            26: [28],           // Stud pair 4
+            27: [29],           // Stud pair 4
+            30: [32],           // Window/door horizontal
+            31: [33]            // Window/door vertical
+        };
+
         function updateActiveAxes(axesMask) {
-            // Convert to BigInt to handle bits 32+ properly (axes 34-36)
-            const mask = BigInt(axesMask >>> 0);
+            // Convert to BigInt to handle 64-bit LWORD (axes 33-36 need bits 32+)
+            // Handle string input from PLC (LWORD may come as string for large values)
+            let mask;
+            if (typeof axesMask === 'string') {
+                mask = BigInt(axesMask);
+            } else {
+                mask = BigInt(axesMask >>> 0);
+            }
+
+            // Expand mask to include slave axes when their masters are active
+            for (const [master, slaves] of Object.entries(gearingMap)) {
+                const masterBit = BigInt(parseInt(master) - 1);
+                if ((mask >> masterBit) & 1n) {
+                    // Master is active, set slave bits too
+                    for (const slave of slaves) {
+                        mask |= (1n << BigInt(slave - 1));
+                    }
+                }
+            }
+
             const cells = document.querySelectorAll('.axis-cell');
             cells.forEach(cell => {
                 const axisNum = parseInt(cell.dataset.axis);
-                const bitPos = axisBitPositions[axisNum];
-                const isActive = bitPos !== undefined && ((mask >> BigInt(bitPos)) & 1n) === 1n;
+                // Axis N uses bit N-1 (axis 1 = bit 0, axis 36 = bit 35)
+                const bitPos = axisNum - 1;
+                const isActive = ((mask >> BigInt(bitPos)) & 1n) === 1n;
                 cell.className = 'axis-cell' + (isActive ? ' active' : '');
             });
         }

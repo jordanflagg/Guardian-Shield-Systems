@@ -15,7 +15,7 @@ VAR_OUTPUT
     Error : BOOL;                       // Step failed
     ErrorAxisID : UINT;                 // Which axis caused error
     CurrentSubStep : INT;               // Current substep (0-5)
-    ActiveAxesMask : DWORD;             // Bitmask of moving axes
+    ActiveAxesMask : LWORD;             // Bitmask of moving axes (64-bit for 36 axes)
     StepDescription : STRING[80];       // Human-readable description
 END_VAR
 
@@ -71,7 +71,7 @@ CASE subStep OF
             Jerk := MotionParams.defaultJerk
         );
 
-        ActiveAxesMask := SHL(DWORD#1, 29);  // Axis 30 (slave 32 follows)
+        ActiveAxesMask := SHL(LWORD#1, 29);  // Axis 30 (slave 32 follows)
 
         IF moverAxis30.Done THEN
             moverAxis30(Execute := FALSE);
@@ -95,7 +95,7 @@ CASE subStep OF
             Jerk := MotionParams.defaultJerk
         );
 
-        ActiveAxesMask := SHL(DWORD#1, 30);  // Axis 31 (slave 33 follows)
+        ActiveAxesMask := SHL(LWORD#1, 30);  // Axis 31 (slave 33 follows)
 
         IF moverAxis31.Done THEN
             moverAxis31(Execute := FALSE);
@@ -119,7 +119,7 @@ CASE subStep OF
             Jerk := MotionParams.defaultJerk
         );
 
-        ActiveAxesMask := SHL(DWORD#1, 29);  // Axis 30
+        ActiveAxesMask := SHL(LWORD#1, 29);  // Axis 30
 
         IF moverAxis30.Done THEN
             moverAxis30(Execute := FALSE);
@@ -143,7 +143,7 @@ CASE subStep OF
             Jerk := MotionParams.defaultJerk
         );
 
-        ActiveAxesMask := SHL(DWORD#1, 30);  // Axis 31
+        ActiveAxesMask := SHL(LWORD#1, 30);  // Axis 31
 
         IF moverAxis31.Done THEN
             moverAxis31(Execute := FALSE);
@@ -177,7 +177,7 @@ CASE subStep OF
             Jerk := MotionParams.defaultJerk
         );
 
-        ActiveAxesMask := SHL(DWORD#1, 29) OR SHL(DWORD#1, 30);  // Axes 30, 31
+        ActiveAxesMask := SHL(LWORD#1, 29) OR SHL(LWORD#1, 30);  // Axes 30, 31
 
         IF moverAxis30.Done AND moverAxis31.Done THEN
             moverAxis30(Execute := FALSE);

@@ -21,7 +21,7 @@ VAR_OUTPUT
     // Motion sequence visualization (pass-through from FB_MotionSequence)
     motionStepOut : E_MotionStep;       // Current motion step
     motionSubStep : INT;                // Current substep
-    activeAxesMask : DWORD;             // Bitmask of moving axes
+    activeAxesMask : LWORD;             // Bitmask of moving axes (64-bit for 36 axes)
     stepDescription : STRING[80];       // Human-readable step description
 
     // Error information

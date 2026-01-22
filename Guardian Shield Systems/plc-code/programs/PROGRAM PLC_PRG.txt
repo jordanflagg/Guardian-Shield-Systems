@@ -36,7 +36,7 @@ VAR
     // HMI Motion Sequence Visualization Variables
     HMI_MotionStep : E_MotionStep;          // Current motion step
     HMI_MotionSubStep : INT;                // Current substep number
-    HMI_ActiveAxesMask : DWORD;             // Bitmask of currently moving axes
+    HMI_ActiveAxesMask : LWORD;             // Bitmask of currently moving axes (64-bit for 36 axes)
     HMI_StepDescription : STRING[80];       // Human-readable description
 
     // HMI Error Variables
@@ -63,6 +63,11 @@ buttonManager(
 // ============================================================================
 // AXIS POWER
 // ============================================================================
+// Automatically disable drives on fault/E-stop (user must re-enable manually)
+IF stateMachine.isFaulted THEN
+    btn_DriveOn := FALSE;
+END_IF
+
 axisPower(
     PowerOn := btn_DriveOn,
     Reset := buttonManager.btn_Reset_Out

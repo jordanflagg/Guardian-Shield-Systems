@@ -15,7 +15,7 @@ VAR_OUTPUT
     Error : BOOL;                       // Step failed
     ErrorAxisID : UINT;                 // Which axis caused error
     CurrentSubStep : INT;               // Current substep (0-5)
-    ActiveAxesMask : DWORD;             // Bitmask of moving axes
+    ActiveAxesMask : LWORD;             // Bitmask of moving axes (64-bit for 36 axes)
     StepDescription : STRING[80];       // Human-readable description
 END_VAR
 
@@ -89,7 +89,7 @@ CASE subStep OF
             Deceleration := MotionParams.defaultDeceleration, Jerk := MotionParams.defaultJerk);
 
         // Axes 14, 18, 22, 26 (bits 13, 17, 21, 25)
-        ActiveAxesMask := SHL(DWORD#1, 13) OR SHL(DWORD#1, 17) OR SHL(DWORD#1, 21) OR SHL(DWORD#1, 25);
+        ActiveAxesMask := SHL(LWORD#1, 13) OR SHL(LWORD#1, 17) OR SHL(LWORD#1, 21) OR SHL(LWORD#1, 25);
 
         // Check completion
         allVerticalDone := moverAxis14.Done AND moverAxis18.Done AND moverAxis22.Done AND moverAxis26.Done;
@@ -128,7 +128,7 @@ CASE subStep OF
             Deceleration := MotionParams.defaultDeceleration, Jerk := MotionParams.defaultJerk);
 
         // Axes 15, 19, 23, 27 (bits 14, 18, 22, 26)
-        ActiveAxesMask := SHL(DWORD#1, 14) OR SHL(DWORD#1, 18) OR SHL(DWORD#1, 22) OR SHL(DWORD#1, 26);
+        ActiveAxesMask := SHL(LWORD#1, 14) OR SHL(LWORD#1, 18) OR SHL(LWORD#1, 22) OR SHL(LWORD#1, 26);
 
         allHorizontalDone := moverAxis15.Done AND moverAxis19.Done AND moverAxis23.Done AND moverAxis27.Done;
         anyError := moverAxis15.Error OR moverAxis19.Error OR moverAxis23.Error OR moverAxis27.Error;
@@ -165,7 +165,7 @@ CASE subStep OF
             Velocity := MotionParams.defaultVelocity, Acceleration := MotionParams.defaultAcceleration,
             Deceleration := MotionParams.defaultDeceleration, Jerk := MotionParams.defaultJerk);
 
-        ActiveAxesMask := SHL(DWORD#1, 13) OR SHL(DWORD#1, 17) OR SHL(DWORD#1, 21) OR SHL(DWORD#1, 25);
+        ActiveAxesMask := SHL(LWORD#1, 13) OR SHL(LWORD#1, 17) OR SHL(LWORD#1, 21) OR SHL(LWORD#1, 25);
 
         allVerticalDone := moverAxis14.Done AND moverAxis18.Done AND moverAxis22.Done AND moverAxis26.Done;
         anyError := moverAxis14.Error OR moverAxis18.Error OR moverAxis22.Error OR moverAxis26.Error;
@@ -202,7 +202,7 @@ CASE subStep OF
             Velocity := MotionParams.defaultVelocity, Acceleration := MotionParams.defaultAcceleration,
             Deceleration := MotionParams.defaultDeceleration, Jerk := MotionParams.defaultJerk);
 
-        ActiveAxesMask := SHL(DWORD#1, 14) OR SHL(DWORD#1, 18) OR SHL(DWORD#1, 22) OR SHL(DWORD#1, 26);
+        ActiveAxesMask := SHL(LWORD#1, 14) OR SHL(LWORD#1, 18) OR SHL(LWORD#1, 22) OR SHL(LWORD#1, 26);
 
         allHorizontalDone := moverAxis15.Done AND moverAxis19.Done AND moverAxis23.Done AND moverAxis27.Done;
         anyError := moverAxis15.Error OR moverAxis19.Error OR moverAxis23.Error OR moverAxis27.Error;
@@ -255,8 +255,8 @@ CASE subStep OF
             Deceleration := MotionParams.defaultDeceleration, Jerk := MotionParams.defaultJerk);
 
         // All stud axes active
-        ActiveAxesMask := SHL(DWORD#1, 13) OR SHL(DWORD#1, 14) OR SHL(DWORD#1, 17) OR SHL(DWORD#1, 18) OR
-                          SHL(DWORD#1, 21) OR SHL(DWORD#1, 22) OR SHL(DWORD#1, 25) OR SHL(DWORD#1, 26);
+        ActiveAxesMask := SHL(LWORD#1, 13) OR SHL(LWORD#1, 14) OR SHL(LWORD#1, 17) OR SHL(LWORD#1, 18) OR
+                          SHL(LWORD#1, 21) OR SHL(LWORD#1, 22) OR SHL(LWORD#1, 25) OR SHL(LWORD#1, 26);
 
         allVerticalDone := moverAxis14.Done AND moverAxis18.Done AND moverAxis22.Done AND moverAxis26.Done;
         allHorizontalDone := moverAxis15.Done AND moverAxis19.Done AND moverAxis23.Done AND moverAxis27.Done;

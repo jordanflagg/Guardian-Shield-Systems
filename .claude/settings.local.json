@@ -5,7 +5,13 @@
       "Bash(tree:*)",
       "Bash(git commit -m \"$\\(cat <<''EOF''\nReorganize project structure and add web HMI\n\nProject Structure Changes:\n- Moved all files under Guardian Shield Systems/ folder\n- Organized PLC code into logical subfolders:\n  - plc-code/function-blocks/\n  - plc-code/data-types/\n  - plc-code/programs/\n  - plc-code/documentation/\n\nWeb HMI Added:\n- Created custom web-based HMI \\(simple HTML/JS version\\)\n- Modern, responsive design with real-time monitoring\n- Machine control buttons \\(Start, Stop, Home, Manual, Reset, E-Stop\\)\n- Recipe selection interface\n- Status indicators and connection monitoring\n- Mock mode for testing without PLC\n- ctrlX Data Layer API integration guide\n- Complete documentation and deployment instructions\n- React version starter \\(package.json\\)\n\nDocumentation:\n- Added main project README.md\n- Added web HMI README.md with deployment guide\n- Added ctrlX API helper functions and examples\n- Organized existing Project Overview documentation\n\nAll files properly organized for professional project structure.\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
       "Bash(git push)",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(curl.exe:*)",
+      "Bash(git commit:*)",
+      "Bash(cd:*)",
+      "Bash(git checkout:*)",
+      "Bash(git status:*)",
+      "Bash(wc:*)"
     ]
   }
 }

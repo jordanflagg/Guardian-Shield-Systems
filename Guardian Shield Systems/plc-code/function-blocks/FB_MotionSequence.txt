@@ -17,7 +17,7 @@ VAR_OUTPUT
 
     // HMI visualization outputs
     CurrentSubStep : INT;               // Current substep within motion step
-    ActiveAxesMask : DWORD;             // Bitmask of currently moving axes
+    ActiveAxesMask : LWORD;             // Bitmask of currently moving axes (64-bit for 36 axes)
     StepDescription : STRING[80];       // Human-readable description
 
     // Error outputs
@@ -101,6 +101,10 @@ IF NOT Enable THEN
     stepUnload(Enable := FALSE);
     errorHandler(Reset := TRUE);
 
+    // Clear error state when disabled (errors are handled by state machine)
+    HasError := FALSE;
+    ErrorAxisID := 0;
+
     ActiveAxesMask := 0;
     stepStarted := FALSE;
     RETURN;
@@ -118,6 +122,10 @@ CASE motionStep OF
         CurrentSubStep := 0;
         StepDescription := 'Waiting for block to load';
         ActiveAxesMask := 0;
+
+        // Clear any previous error state for new cycle
+        HasError := FALSE;
+        ErrorAxisID := 0;
 
         // Disable step FBs while waiting for new cycle
         stepLoadBlock(Enable := FALSE);

@@ -15,7 +15,7 @@ VAR_OUTPUT
     Error : BOOL;                       // Step failed
     ErrorAxisID : UINT;                 // Which axis caused error
     CurrentSubStep : INT;               // Current substep (0-10)
-    ActiveAxesMask : DWORD;             // Bitmask of moving axes
+    ActiveAxesMask : LWORD;             // Bitmask of moving axes (64-bit for 36 axes)
     StepDescription : STRING[80];       // Human-readable description
 END_VAR
 
@@ -74,7 +74,7 @@ CASE subStep OF
             Jerk := MotionParams.defaultJerk
         );
 
-        ActiveAxesMask := SHL(DWORD#1, 0);  // Axis 1
+        ActiveAxesMask := SHL(LWORD#1, 0);  // Axis 1
 
         IF moverAxis1.Done THEN
             moverAxis1(Execute := FALSE);  // Clear execute to prepare for next use
@@ -98,7 +98,7 @@ CASE subStep OF
             Jerk := MotionParams.defaultJerk
         );
 
-        ActiveAxesMask := SHL(DWORD#1, 1);  // Axis 2 (slaves 3,4,5 follow via gearing)
+        ActiveAxesMask := SHL(LWORD#1, 1);  // Axis 2 (slaves 3,4,5 follow via gearing)
 
         IF moverAxis2.Done THEN
             moverAxis2(Execute := FALSE);  // Clear execute to prepare for next use
@@ -122,7 +122,7 @@ CASE subStep OF
             Jerk := MotionParams.defaultJerk
         );
 
-        ActiveAxesMask := SHL(DWORD#1, 5);  // Axis 6 (slave 7 follows)
+        ActiveAxesMask := SHL(LWORD#1, 5);  // Axis 6 (slave 7 follows)
 
         IF moverAxis6.Done THEN
             moverAxis6(Execute := FALSE);  // Clear execute to prepare for next use
@@ -146,7 +146,7 @@ CASE subStep OF
             Jerk := MotionParams.defaultJerk
         );
 
-        ActiveAxesMask := SHL(DWORD#1, 1);  // Axis 2
+        ActiveAxesMask := SHL(LWORD#1, 1);  // Axis 2
 
         IF moverAxis2.Done THEN
             moverAxis2(Execute := FALSE);  // Clear execute to prepare for next use
@@ -170,7 +170,7 @@ CASE subStep OF
             Jerk := MotionParams.defaultJerk
         );
 
-        ActiveAxesMask := SHL(DWORD#1, 5);  // Axis 6
+        ActiveAxesMask := SHL(LWORD#1, 5);  // Axis 6
 
         IF moverAxis6.Done THEN
             moverAxis6(Execute := FALSE);  // Clear execute to prepare for next use
@@ -194,7 +194,7 @@ CASE subStep OF
             Jerk := MotionParams.defaultJerk
         );
 
-        ActiveAxesMask := SHL(DWORD#1, 9);  // Axis 10 (slaves 11,12,13 follow)
+        ActiveAxesMask := SHL(LWORD#1, 9);  // Axis 10 (slaves 11,12,13 follow)
 
         IF moverAxis10.Done THEN
             moverAxis10(Execute := FALSE);  // Clear execute to prepare for next use
@@ -218,7 +218,7 @@ CASE subStep OF
             Jerk := MotionParams.defaultJerk
         );
 
-        ActiveAxesMask := SHL(DWORD#1, 7);  // Axis 8 (slave 9 follows)
+        ActiveAxesMask := SHL(LWORD#1, 7);  // Axis 8 (slave 9 follows)
 
         IF moverAxis8.Done THEN
             moverAxis8(Execute := FALSE);  // Clear execute to prepare for next use
@@ -251,7 +251,7 @@ CASE subStep OF
             Jerk := MotionParams.defaultJerk
         );
 
-        ActiveAxesMask := SHL(DWORD#1, 7);  // Axis 8
+        ActiveAxesMask := SHL(LWORD#1, 7);  // Axis 8
 
         IF moverAxis8.Done THEN
             moverAxis8(Execute := FALSE);  // Clear execute to prepare for next use
@@ -275,7 +275,7 @@ CASE subStep OF
             Jerk := MotionParams.defaultJerk
         );
 
-        ActiveAxesMask := SHL(DWORD#1, 9);  // Axis 10
+        ActiveAxesMask := SHL(LWORD#1, 9);  // Axis 10
 
         IF moverAxis10.Done THEN
             moverAxis10(Execute := FALSE);  // Clear execute to prepare for next use

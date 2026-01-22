@@ -15,7 +15,7 @@ VAR_OUTPUT
     Error : BOOL;                       // Step failed
     ErrorAxisID : UINT;                 // Which axis caused error
     CurrentSubStep : INT;               // Current substep (0-5)
-    ActiveAxesMask : DWORD;             // Bitmask of moving axes
+    ActiveAxesMask : LWORD;             // Bitmask of moving axes (64-bit for 36 axes)
     StepDescription : STRING[80];       // Human-readable description
 END_VAR
 
@@ -72,7 +72,7 @@ CASE subStep OF
             Jerk := MotionParams.defaultJerk
         );
 
-        ActiveAxesMask := SHL(DWORD#1, 29);  // Axis 30
+        ActiveAxesMask := SHL(LWORD#1, 29);  // Axis 30
 
         IF moverAxis30.Done THEN
             moverAxis30(Execute := FALSE);
@@ -106,7 +106,7 @@ CASE subStep OF
             Jerk := MotionParams.defaultJerk
         );
 
-        ActiveAxesMask := SHL(DWORD#1, 34) OR SHL(DWORD#1, 35);  // Axes 35, 36
+        ActiveAxesMask := SHL(LWORD#1, 34) OR SHL(LWORD#1, 35);  // Axes 35, 36
 
         IF moverAxis35.Done AND moverAxis36.Done THEN
             moverAxis35(Execute := FALSE);
@@ -133,7 +133,7 @@ CASE subStep OF
             Jerk := MotionParams.defaultJerk
         );
 
-        ActiveAxesMask := SHL(DWORD#1, 29);  // Axis 30
+        ActiveAxesMask := SHL(LWORD#1, 29);  // Axis 30
 
         IF moverAxis30.Done THEN
             moverAxis30(Execute := FALSE);
@@ -167,7 +167,7 @@ CASE subStep OF
             Jerk := MotionParams.defaultJerk
         );
 
-        ActiveAxesMask := SHL(DWORD#1, 34) OR SHL(DWORD#1, 35);  // Axes 35, 36
+        ActiveAxesMask := SHL(LWORD#1, 34) OR SHL(LWORD#1, 35);  // Axes 35, 36
 
         IF moverAxis35.Done AND moverAxis36.Done THEN
             moverAxis35(Execute := FALSE);
@@ -214,7 +214,7 @@ CASE subStep OF
             Jerk := MotionParams.defaultJerk
         );
 
-        ActiveAxesMask := SHL(DWORD#1, 29) OR SHL(DWORD#1, 34) OR SHL(DWORD#1, 35);  // Axes 30, 35, 36
+        ActiveAxesMask := SHL(LWORD#1, 29) OR SHL(LWORD#1, 34) OR SHL(LWORD#1, 35);  // Axes 30, 35, 36
 
         IF moverAxis30.Done AND moverAxis35.Done AND moverAxis36.Done THEN
             moverAxis30(Execute := FALSE);

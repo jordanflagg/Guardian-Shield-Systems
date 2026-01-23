@@ -59,6 +59,24 @@
             color: #aaa;
         }
 
+        .header-mode {
+            padding: 3px 10px;
+            border-radius: 3px;
+            font-weight: 600;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+
+        .header-mode.INIT { color: #757575; background: #424242; }
+        .header-mode.IDLE { color: #1976d2; background: #1a237e; }
+        .header-mode.HOMING { color: #e1bee7; background: #4a148c; }
+        .header-mode.MANUAL { color: #ffe0b2; background: #e65100; }
+        .header-mode.RUNNING { color: #c8e6c9; background: #1b5e20; }
+        .header-mode.STOPPING { color: #ffccbc; background: #bf360c; }
+        .header-mode.FAULTED { color: #ffcdd2; background: #b71c1c; animation: fault-flash 0.5s infinite; }
+        .header-mode.E_STOPPED { color: #ffcdd2; background: #b71c1c; animation: estop-flash 0.3s infinite; }
+        .header-mode.RESETTING { color: #fff9c4; background: #f9a825; }
+
         /* Navigation Tabs */
         .nav-tabs {
             display: flex;
@@ -944,6 +962,10 @@
                     <button class="nav-tab" onclick="switchPage('recipes')">Recipes</button>
                 </div>
                 <div class="header-item">
+                    <label>Mode:</label>
+                    <span id="headerMachineMode" class="header-mode INIT">INIT</span>
+                </div>
+                <div class="header-item">
                     <label>PLC:</label>
                     <span id="plcAddress">192.168.0.29</span>
                 </div>
@@ -1121,23 +1143,41 @@
                     <div class="panel-title">Axis Homing</div>
                     <div class="panel-body">
                         <div style="display: grid; grid-template-columns: 300px 1fr; gap: 20px;">
-                            <!-- Axis Status List -->
+                            <!-- Axis Selection List -->
                             <div>
-                                <h3 style="font-size: 12px; color: #555; margin-bottom: 10px;">AXIS STATUS</h3>
+                                <h3 style="font-size: 12px; color: #555; margin-bottom: 10px;">SELECT AXIS (Master Axes Only)</h3>
                                 <div class="axis-list" id="homingAxisList">
                                     <!-- Will be populated by JavaScript -->
                                 </div>
-                                <div style="margin-top: 15px;">
-                                    <button class="btn btn-home" onclick="sendCommand('btn_Home', true)" style="width: 100%;">Home All Axes</button>
+                                <div style="margin-top: 15px; display: flex; flex-direction: column; gap: 10px;">
+                                    <button class="btn btn-home" onclick="sendCommand('btn_Home', true)" style="width: 100%;" id="btnToggleHoming">Enter Homing Mode</button>
+                                    <button class="btn btn-secondary" onclick="homeSingleAxis()" style="width: 100%;" id="btnHomeSingle" disabled>Home Selected Axis</button>
+                                    <button class="btn btn-home" onclick="homeAllAxes()" style="width: 100%;" id="btnHomeAll" disabled>Home All Axes</button>
                                 </div>
                             </div>
-                            <!-- Homing Info -->
+                            <!-- Homing Controls and Info -->
                             <div>
+                                <div class="form-section">
+                                    <h3>Selected Axis</h3>
+                                    <div style="margin-bottom: 15px;">
+                                        <span style="font-size: 14px; color: #666;">Axis: </span>
+                                        <span id="selectedHomingAxisDisplay" style="font-size: 16px; font-weight: 600; color: #333;">None Selected</span>
+                                    </div>
+                                    <div style="margin-bottom: 15px;">
+                                        <span style="font-size: 14px; color: #666;">Position: </span>
+                                        <span id="homingAxisPosition" style="font-size: 20px; font-weight: 600; font-family: 'Consolas', monospace;">0.000</span>
+                                        <span style="font-size: 14px; color: #666;"> mm</span>
+                                    </div>
+                                    <div class="jog-speed">
+                                        <label>Homing Speed (mm/s):</label>
+                                        <input type="number" id="homeSpeed" value="10" min="0.1" max="100" step="0.1">
+                                    </div>
+                                </div>
                                 <div class="form-section">
                                     <h3>Homing Information</h3>
                                     <p style="font-size: 12px; color: #666; line-height: 1.6;">
-                                        Press "Home All Axes" to begin the homing sequence. All axes will move to their reference positions.
-                                        The machine must be in IDLE state to begin homing.
+                                        Select an axis and press "Home Selected Axis" to move it to position 0, or press "Home All Axes" to move all master axes to their home positions.
+                                        The machine must be in HOMING mode to perform homing operations.
                                     </p>
                                     <div style="margin-top: 15px; padding: 10px; background: #fff3e0; border: 1px solid #ffcc80; border-radius: 3px;">
                                         <strong style="color: #e65100; font-size: 11px;">CAUTION:</strong>
@@ -1146,9 +1186,13 @@
                                 </div>
                                 <div class="form-section">
                                     <h3>Homing Status</h3>
-                                    <div style="display: flex; align-items: center; gap: 15px;">
+                                    <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 10px;">
                                         <div id="homingStatusLed" class="pilot-light green" style="width: 30px; height: 30px;"></div>
                                         <span id="homingStatusText" style="font-size: 14px; font-weight: 600;">Not Homed</span>
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: 15px;">
+                                        <div id="homingBusyLed" class="pilot-light" style="width: 24px; height: 24px; background: #ffeb3b;"></div>
+                                        <span id="homingBusyText" style="font-size: 13px;">Homing Busy</span>
                                     </div>
                                 </div>
                             </div>
@@ -1448,6 +1492,20 @@
             jogSpeed: 'PLC_PRG.HMI_JogSpeed',
             jogEnable: 'PLC_PRG.HMI_JogEnable',
             jogPosition: 'PLC_PRG.HMI_JogPosition',
+            // Homing control
+            homeAxis: 'PLC_PRG.HMI_HomeAxis',
+            homeSingle: 'PLC_PRG.HMI_HomeSingle',
+            homeAll: 'PLC_PRG.HMI_HomeAll',
+            homeSpeed: 'PLC_PRG.HMI_HomeSpeed',
+            homeBusy: 'PLC_PRG.HMI_HomeBusy',
+            homeDone: 'PLC_PRG.HMI_HomeDone',
+            homeError: 'PLC_PRG.HMI_HomeError',
+            homeErrorAxisID: 'PLC_PRG.HMI_HomeErrorAxisID',
+            homeInvalidAxis: 'PLC_PRG.HMI_HomeInvalidAxis',
+            allAxesHomed: 'PLC_PRG.HMI_AllAxesHomed',
+            homePosition: 'PLC_PRG.HMI_HomePosition',
+            // Per-axis homed status (array base path - append [n] for individual axes)
+            axisIsHomedBase: 'PLC_PRG.HMI_AxisIsHomed',
             // Loaded recipe tracking
             loadedRecipeId: 'PLC_PRG.HMI_LoadedRecipeId'
         };
@@ -1522,24 +1580,34 @@
 
         let selectedRecipeIndex = -1;
         let originalRecipe = null;
-        let selectedAxis = 1; // Default to axis 1
+        let selectedAxis = 1; // Default to axis 1 for manual jog
+        let selectedHomingAxis = 1; // Default to axis 1 for homing
         let loadedRecipeId = 1; // The recipe currently loaded in PLC memory
 
         let authToken = null;
         let drivesOn = false;
         let currentPage = 'dashboard';
 
-        window.onload = function() {
+        window.onload = async function() {
             document.getElementById('plcAddress').textContent = config.plcAddress;
             initializeAxisLists();
             renderRecipeList();
             startUpdates();
+
+            // Initialize PLC axis selection variables to match JavaScript defaults
+            // This ensures position readings are correct from the start
+            try {
+                await writePLCVariable('PLC_PRG.HMI_JogAxis', selectedAxis || 1, 'UINT');
+                await writePLCVariable('PLC_PRG.HMI_HomeAxis', selectedHomingAxis || 1, 'UINT');
+            } catch (e) {
+                console.error('Failed to initialize axis selection:', e);
+            }
         };
 
         // ================================================================
         // PAGE NAVIGATION
         // ================================================================
-        function switchPage(pageName) {
+        async function switchPage(pageName) {
             currentPage = pageName;
 
             // Update nav tabs
@@ -1549,6 +1617,18 @@
             // Update page content
             document.querySelectorAll('.page-content').forEach(page => page.classList.remove('active'));
             document.getElementById(`page-${pageName}`).classList.add('active');
+
+            // Sync PLC axis selection when switching to manual or homing pages
+            // This ensures the PLC reads the correct axis position immediately
+            try {
+                if (pageName === 'manual' && selectedAxis) {
+                    await writePLCVariable('PLC_PRG.HMI_JogAxis', selectedAxis, 'UINT');
+                } else if (pageName === 'homing' && selectedHomingAxis) {
+                    await writePLCVariable('PLC_PRG.HMI_HomeAxis', selectedHomingAxis, 'UINT');
+                }
+            } catch (e) {
+                console.error('Failed to sync axis selection on page switch:', e);
+            }
         }
 
         // ================================================================
@@ -1558,16 +1638,22 @@
             const homingList = document.getElementById('homingAxisList');
             const manualList = document.getElementById('manualAxisList');
 
-            // Homing list - show all 36 axes
-            for (let i = 1; i <= 36; i++) {
-                const name = axisNames[i] || `Axis ${i}`;
+            // Homing list - show only master axes (selectable, like manual list)
+            for (const [axisNum, config] of Object.entries(masterAxes)) {
+                const i = parseInt(axisNum);
+                let label = `Axis ${i} - ${config.name}`;
+                if (config.slaves.length > 0) {
+                    label += ` (+ ${config.slaves.join(', ')})`;
+                }
 
                 const homingItem = document.createElement('div');
-                homingItem.className = 'axis-item not-homed';
+                homingItem.className = 'axis-item';
                 homingItem.id = `homing-axis-${i}`;
+                homingItem.style.cursor = 'pointer';
+                homingItem.onclick = () => selectAxisForHoming(i);
                 homingItem.innerHTML = `
-                    <span class="axis-name">Axis ${i} - ${name}</span>
-                    <span class="axis-status not-homed">NOT HOMED</span>
+                    <span class="axis-name">${label}</span>
+                    <span class="axis-status homed" id="homing-status-${i}">AT HOME</span>
                 `;
                 homingList.appendChild(homingItem);
             }
@@ -1643,6 +1729,175 @@
                 console.log('Jog stopped');
             } catch (error) {
                 console.error('Jog stop failed:', error);
+            }
+        }
+
+        // ================================================================
+        // HOMING CONTROL
+        // ================================================================
+        let isHomingMode = false;
+
+        async function selectAxisForHoming(axisNum) {
+            selectedHomingAxis = axisNum;
+            document.getElementById('selectedHomingAxisDisplay').textContent = `Axis ${axisNum} - ${axisNames[axisNum]}`;
+
+            // Write selected axis to PLC
+            try {
+                await writePLCVariable('PLC_PRG.HMI_HomeAxis', axisNum, 'UINT');
+            } catch (e) {
+                console.error('Failed to update selected homing axis:', e);
+            }
+
+            // Highlight selected in the list
+            document.querySelectorAll('#homingAxisList .axis-item').forEach(item => {
+                item.style.background = '#fff';
+                item.style.borderColor = '#ddd';
+            });
+            const selectedItem = document.getElementById(`homing-axis-${axisNum}`);
+            if (selectedItem) {
+                selectedItem.style.background = '#e8f5e9';
+                selectedItem.style.borderColor = '#4caf50';
+            }
+        }
+
+        async function homeSingleAxis() {
+            if (!selectedHomingAxis) {
+                showRecipeAlert('Please select an axis first', 'warning');
+                return;
+            }
+            const speed = parseFloat(document.getElementById('homeSpeed').value) || 10;
+
+            try {
+                // Write homing parameters to PLC
+                await writePLCVariable('PLC_PRG.HMI_HomeAxis', selectedHomingAxis, 'UINT');
+                await writePLCVariable('PLC_PRG.HMI_HomeSpeed', speed, 'LREAL');
+                await writePLCVariable('PLC_PRG.HMI_HomeSingle', true);
+                console.log(`Homing Axis ${selectedHomingAxis} at speed ${speed}`);
+
+                // Clear the trigger after a short delay
+                setTimeout(async () => {
+                    await writePLCVariable('PLC_PRG.HMI_HomeSingle', false);
+                }, 500);
+            } catch (error) {
+                console.error('Home single axis failed:', error);
+                showError('Homing command failed: ' + error.message);
+            }
+        }
+
+        async function homeAllAxes() {
+            const speed = parseFloat(document.getElementById('homeSpeed').value) || 10;
+
+            try {
+                await writePLCVariable('PLC_PRG.HMI_HomeSpeed', speed, 'LREAL');
+                await writePLCVariable('PLC_PRG.HMI_HomeAll', true);
+                console.log(`Homing all axes at speed ${speed}`);
+
+                // Clear the trigger after a short delay
+                setTimeout(async () => {
+                    await writePLCVariable('PLC_PRG.HMI_HomeAll', false);
+                }, 500);
+            } catch (error) {
+                console.error('Home all axes failed:', error);
+                showError('Homing command failed: ' + error.message);
+            }
+        }
+
+        function updateHomingButtonStates(machineState) {
+            const inHomingMode = machineState === 'HOMING';
+            const inIdleMode = machineState === 'IDLE';
+
+            const toggleBtn = document.getElementById('btnToggleHoming');
+            if (toggleBtn) {
+                // Button is enabled when in IDLE (to enter) or HOMING (to exit)
+                toggleBtn.disabled = !(inIdleMode || inHomingMode);
+
+                // Update button text and style based on current mode
+                if (inHomingMode) {
+                    toggleBtn.textContent = 'Exit Homing Mode';
+                    toggleBtn.classList.remove('btn-home');
+                    toggleBtn.classList.add('btn-stop');
+                } else {
+                    toggleBtn.textContent = 'Enter Homing Mode';
+                    toggleBtn.classList.remove('btn-stop');
+                    toggleBtn.classList.add('btn-home');
+                }
+            }
+
+            document.getElementById('btnHomeSingle').disabled = !inHomingMode;
+            document.getElementById('btnHomeAll').disabled = !inHomingMode;
+
+            isHomingMode = inHomingMode;
+        }
+
+        // Cache for per-axis homed status to avoid unnecessary DOM updates
+        const axisHomedCache = {};
+
+        // Update per-axis homed status badges in the homing axis list
+        async function updatePerAxisHomedStatus() {
+            // Only update if we're on the homing page
+            if (currentPage !== 'homing') return;
+
+            try {
+                // Read the entire AxisIsHomed array from PLC (returns as JSON array)
+                // The array is 1-indexed in PLC (1..36), but JSON array is 0-indexed
+                const axisHomedArray = await readPLCVariable(plcVars.axisIsHomedBase);
+
+                // Handle if response is an array or needs parsing
+                let homedStatus = axisHomedArray;
+                if (typeof axisHomedArray === 'string') {
+                    try {
+                        homedStatus = JSON.parse(axisHomedArray);
+                    } catch (e) {
+                        console.debug('AxisIsHomed response is not JSON array:', axisHomedArray);
+                        return;
+                    }
+                }
+
+                // If we got an array, update all master axes
+                if (Array.isArray(homedStatus)) {
+                    for (const axisNum of Object.keys(masterAxes)) {
+                        const i = parseInt(axisNum);
+                        // PLC array is 1-indexed, so axis 1 is at index 0 in the returned array
+                        const isHomed = homedStatus[i - 1] === true || homedStatus[i - 1] === 1;
+
+                        // Only update DOM if value changed (prevents flickering)
+                        if (axisHomedCache[i] !== isHomed) {
+                            axisHomedCache[i] = isHomed;
+                            updateAxisHomedDisplay(i, isHomed);
+                        }
+                    }
+                } else {
+                    console.debug('AxisIsHomed response is not an array:', homedStatus);
+                }
+            } catch (e) {
+                console.debug('Failed to read AxisIsHomed array:', e);
+            }
+        }
+
+        // Helper function to update a single axis homed status display
+        function updateAxisHomedDisplay(axisNum, isHomed) {
+            // Update the status badge
+            const statusEl = document.getElementById(`homing-status-${axisNum}`);
+            if (statusEl) {
+                if (isHomed) {
+                    statusEl.textContent = 'AT HOME';
+                    statusEl.className = 'axis-status homed';
+                } else {
+                    statusEl.textContent = 'NOT HOME';
+                    statusEl.className = 'axis-status not-homed';
+                }
+            }
+
+            // Update the axis item border styling
+            const itemEl = document.getElementById(`homing-axis-${axisNum}`);
+            if (itemEl) {
+                if (isHomed) {
+                    itemEl.classList.add('homed');
+                    itemEl.classList.remove('not-homed');
+                } else {
+                    itemEl.classList.remove('homed');
+                    itemEl.classList.add('not-homed');
+                }
             }
         }
 
@@ -1835,8 +2090,41 @@
 
                 // Update homing page status
                 if (document.getElementById('homingStatusLed')) {
-                    updatePilotLight('homingStatusLed', homed, 'green');
-                    document.getElementById('homingStatusText').textContent = homed ? 'All Axes Homed' : 'Not Homed';
+                    // Read all homing status variables at once to avoid race conditions
+                    try {
+                        const homeBusy = await readPLCVariable(plcVars.homeBusy);
+                        const homeError = await readPLCVariable(plcVars.homeError);
+                        const allAxesHomed = await readPLCVariable(plcVars.allAxesHomed);
+
+                        // Update busy status
+                        updatePilotLight('homingBusyLed', homeBusy, 'yellow');
+                        document.getElementById('homingBusyText').textContent = homeBusy ? 'Homing in Progress...' : 'Homing Idle';
+
+                        // Calculate current status state to detect changes
+                        const newStatusState = homeError ? 'error' : (allAxesHomed ? 'homed' : 'not_homed');
+
+                        // Only update DOM if status actually changed (prevents flickering)
+                        if (window.lastHomingStatusState !== newStatusState) {
+                            window.lastHomingStatusState = newStatusState;
+
+                            if (homeError) {
+                                const errorAxisID = await readPLCVariable(plcVars.homeErrorAxisID);
+                                document.getElementById('homingStatusText').textContent = `ERROR on Axis ${errorAxisID}`;
+                                updatePilotLight('homingStatusLed', false, 'green');
+                            } else if (allAxesHomed) {
+                                updatePilotLight('homingStatusLed', true, 'green');
+                                document.getElementById('homingStatusText').textContent = 'All Axes Homed';
+                            } else {
+                                updatePilotLight('homingStatusLed', false, 'green');
+                                document.getElementById('homingStatusText').textContent = 'Not All Axes Homed';
+                            }
+                        }
+
+                        // Update per-axis homed status in the axis list
+                        await updatePerAxisHomedStatus();
+                    } catch (e) {
+                        console.error('Failed to read homing status:', e);
+                    }
                 }
 
                 drivesOn = drivesState;
@@ -1878,6 +2166,16 @@
                     if (selectedAxis && currentPage === 'manual') {
                         const position = await readPLCVariable(plcVars.jogPosition);
                         document.getElementById('currentPosition').textContent = (position || 0).toFixed(3);
+                    }
+                } catch (e) {}
+
+                // Update homing page position display (uses separate homePosition variable)
+                try {
+                    if (selectedHomingAxis && currentPage === 'homing') {
+                        // Read position from the dedicated homing axis position variable
+                        // (HMI_HomeAxis is already set when axis is selected, PLC reads it via axisDataHome)
+                        const position = await readPLCVariable(plcVars.homePosition);
+                        document.getElementById('homingAxisPosition').textContent = (position || 0).toFixed(3);
                     }
                 } catch (e) {}
 
@@ -2031,10 +2329,20 @@
 
             const stateEl = document.getElementById('machineState');
             const descEl = document.getElementById('stateDescription');
+            const headerModeEl = document.getElementById('headerMachineMode');
 
             stateEl.textContent = stateText;
             stateEl.className = 'state-value ' + stateText;
             descEl.textContent = stateDescriptions[stateText] || '';
+
+            // Update header machine mode (visible on all pages)
+            if (headerModeEl) {
+                headerModeEl.textContent = stateText;
+                headerModeEl.className = 'header-mode ' + stateText;
+            }
+
+            // Update homing button states based on machine mode
+            updateHomingButtonStates(stateText);
         }
 
         function updatePilotLight(id, isOn, color) {

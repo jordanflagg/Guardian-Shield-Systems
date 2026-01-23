@@ -9,16 +9,13 @@ VAR_INPUT
     eStopActive : BOOL;
     resetButton : BOOL;
     selectedRecipe : UINT := 1;     // Recipe selection from HMI (1-10)
-
-    // Power error inputs (from FB_AxisPower in PLC_PRG)
-    powerError : BOOL;              // TRUE if any axis has power error
-    powerErrorAxisID : UINT;        // Which axis has the power error
 END_VAR
 
 VAR_OUTPUT
     currentStateOut : E_MachineState;   // So HMI and other code can see it
     isRunning : BOOL;
     isFaulted : BOOL;
+	isManualMode : BOOL;
     isHomed : BOOL;
     activeRecipeID : UINT;              // Currently active recipe
     recipeLocked : BOOL;                // TRUE when recipe cannot be changed
@@ -34,8 +31,7 @@ VAR_OUTPUT
     errorInfo : ST_MotionError;         // Detailed error information
     errorCount : UINT;                  // Total error count since last reset
 
-    // Manual mode indicator (for PLC_PRG to enable jog control)
-    inManualMode : BOOL;                // TRUE when machine is in MANUAL state
+    
 END_VAR
 
 VAR
@@ -50,13 +46,14 @@ VAR
 
     // Centralized error handler (collects errors from all subsystems)
     errorHandler : FB_ErrorHandler;
+	
+	axisManual : FB_AxisManual;         // Jog control for manual mode
+	fbHome : FB_AxisHome;				// Axis control for home mode
 
     // Emergency halt function blocks
     fbHalt : ARRAY[MOTIF_CONFIG.MIN_AXIS_INDEX..MOTIF_CONFIG.MAX_AXIS_INDEX] OF MC_Halt;
     i : UINT;
 END_VAR
-
-
 
 /////////////////////////////////////////////////////////////////////
 
@@ -105,18 +102,54 @@ CASE currentState OF
     
     // ------------------------------------------------------------------------
     E_MachineState.HOMING:
-        // TODO: Add actual homing logic for axes here later
-        // For now, we'll just set the flag and return to IDLE
-        
-        isHomed := TRUE;
-        
-        // Return to IDLE (in real code, you'd wait for homing to complete)
-        currentState := E_MachineState.IDLE;
+        // Homing mode: move selected axis or all axes to position 0
+        // Uses FB_AxisHome with HMI controls
+
+        fbHome(
+            Enable := TRUE,
+            HomeAxis := PLC_PRG.HMI_HomeAxis,
+            HomeSingle := PLC_PRG.HMI_HomeSingle,
+            HomeAll := PLC_PRG.HMI_HomeAll,
+            Velocity := PLC_PRG.HMI_HomeSpeed,
+            Acceleration := 5.0,
+            Deceleration := 5.0,
+            Jerk := 10.0,
+            PositionTolerance := 0.5
+        );
+
+        // Update isHomed based on actual axis positions
+        isHomed := fbHome.AllAxesHomed;
+
+        // Check for errors during homing
+        IF fbHome.Error THEN
+            currentState := E_MachineState.FAULTED;
+        END_IF
+
+        // Exit homing mode when operator deselects it
+        IF NOT homeButton THEN
+            fbHome(Enable := FALSE);
+            currentState := E_MachineState.IDLE;
+        END_IF
     
     // ------------------------------------------------------------------------
-    E_MachineState.MANUAL:
+    E_MachineState.MANUAL:	
+		// ============================================================================
+		// HMI MANUAL JOG CONTROL - Only active when machine is in MANUAL state
+		// Called directly from PLC_PRG for explicit control
+		// ============================================================================
+		isManualMode := TRUE;
+		
+		axisManual(
+			Enable := isManualMode,
+			AxisSelect := PLC_PRG.HMI_JogAxis,
+			JogPositive := PLC_PRG.HMI_JogEnable AND PLC_PRG.HMI_JogDirection,      // Enable + positive direction
+			JogNegative := PLC_PRG.HMI_JogEnable AND NOT PLC_PRG.HMI_JogDirection,  // Enable + negative direction
+			JogVelocity := PLC_PRG.HMI_JogSpeed
+		);
+		
         // Exit manual mode when operator deselects it
         IF NOT manualMode THEN
+			isManualMode := FALSE;
             currentState := E_MachineState.IDLE;
         END_IF;
     
@@ -232,11 +265,31 @@ CASE currentState OF
 
 END_CASE;
 
+// ============================================================================
+// ALWAYS UPDATE AXIS HOMED STATUS
+// FB_AxisHome reads all axis positions to determine if they're at home position.
+// We call it in every scan (even when not in HOMING mode) so the AxisIsHomed
+// status is always up-to-date for HMI display. When Enable=FALSE, only the
+// position reading logic runs (no homing operations are executed).
+// ============================================================================
+IF currentState <> E_MachineState.HOMING THEN
+    fbHome(
+        Enable := FALSE,
+        HomeAxis := 0,
+        HomeSingle := FALSE,
+        HomeAll := FALSE,
+        Velocity := 10.0,
+        Acceleration := 5.0,
+        Deceleration := 5.0,
+        Jerk := 10.0,
+        PositionTolerance := 0.5
+    );
+    // Update isHomed based on actual axis positions (always, not just in HOMING mode)
+    isHomed := fbHome.AllAxesHomed;
+END_IF
+
 // Copy internal state to output so other code/HMI can see it
 currentStateOut := currentState;
-
-// Indicate when in manual mode (for PLC_PRG to enable jog control)
-inManualMode := (currentState = E_MachineState.MANUAL);
 
 // Copy motion sequence visualization outputs
 motionStepOut := motionSequence.CurrentStep;
@@ -269,9 +322,9 @@ errorHandler(
     GearingError := axisGearing.Error,
     GearingErrorAxisID := axisGearing.ErrorAxisID,
 
-    // Power errors (from FB_AxisPower via inputs)
-    PowerError := powerError,
-    PowerErrorAxisID := powerErrorAxisID,
+//     // Power errors (from FB_AxisPower via inputs)
+//     PowerError := powerError,
+//     PowerErrorAxisID := powerErrorAxisID,
 
     // Context for error reporting
     CurrentStep := motionSequence.CurrentStep,

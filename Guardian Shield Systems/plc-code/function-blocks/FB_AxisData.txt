@@ -35,6 +35,9 @@ VAR
     // Axis reference
     axisRef         : AXIS_REF;
     lastAxisSelect  : UINT;
+
+    // State for cycling Enable on axis change
+    axisChanging    : BOOL := FALSE;
 END_VAR
 
 // ============================================================================
@@ -51,13 +54,30 @@ IF NOT AxisValid THEN
     RETURN;
 END_IF
 
-// Update axis reference when selection changes
+// Detect axis change - need to cycle Enable to switch axis reference
 IF AxisSelect <> lastAxisSelect THEN
+    // Disable the FBs first (will re-enable next scan)
+    axisChanging := TRUE;
     axisRef := AXIF_CONFIG_INDEXES[AxisSelect];
     lastAxisSelect := AxisSelect;
+
+    // Call with Enable FALSE to release the old axis
+    fbReadPosition(
+        Axis := axisRef,
+        Enable := FALSE
+    );
+    fbReadVelocity(
+        Axis := axisRef,
+        Enable := FALSE
+    );
+
+    RETURN;  // Wait one scan before re-enabling
 END_IF
 
-// Read current position
+// Clear the changing flag after one scan
+axisChanging := FALSE;
+
+// Read current position (Enable TRUE for continuous reading)
 fbReadPosition(
     Axis := axisRef,
     Enable := TRUE

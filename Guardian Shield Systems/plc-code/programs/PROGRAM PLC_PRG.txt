@@ -6,9 +6,9 @@ VAR
     stateMachine : FB_MachineStateMachine;
 
     // HMI Data Exchange - Called directly from PLC_PRG (not buried in FBs)
-    axisData : FB_AxisData;             // Reads position/velocity for selected axis
-    axisManual : FB_AxisManual;         // Jog control for manual mode
-
+    axisData : FB_AxisData;             // Reads position/velocity for jog axis
+    axisDataHome : FB_AxisData;         // Reads position/velocity for homing axis (separate instance)
+    
     // Raw button inputs (you toggle these for testing)
     btn_Start : BOOL := FALSE;
     btn_Stop : BOOL := FALSE;
@@ -60,10 +60,25 @@ VAR
     HMI_JogError : BOOL := FALSE;           // TRUE if jog error occurred
     HMI_JogInvalidAxis : BOOL := FALSE;     // TRUE if selected axis is not a master axis
 
+    // HMI Homing Control Variables (written by web HMI)
+    HMI_HomeAxis : UINT := 1;               // Selected axis for homing (1-36, master axes only)
+    HMI_HomeSingle : BOOL := FALSE;         // Trigger: home selected axis
+    HMI_HomeAll : BOOL := FALSE;            // Trigger: home all master axes
+    HMI_HomeSpeed : LREAL := 10.0;          // Homing velocity in mm/s
+
+    // HMI Homing Feedback Variables (read by web HMI)
+    HMI_HomeBusy : BOOL := FALSE;           // TRUE when homing operation in progress
+    HMI_HomeDone : BOOL := FALSE;           // TRUE when homing operation completed
+    HMI_HomeError : BOOL := FALSE;          // TRUE if homing error occurred
+    HMI_HomeErrorAxisID : UINT := 0;        // Axis that caused homing error
+    HMI_HomeInvalidAxis : BOOL := FALSE;    // TRUE if selected axis is not a master axis
+    HMI_AllAxesHomed : BOOL := FALSE;       // TRUE when all master axes are at position 0
+    HMI_AxisIsHomed : ARRAY[1..36] OF BOOL; // Individual axis homed status
+    HMI_HomePosition : LREAL := 0.0;        // Current position of selected homing axis
+
     // HMI Loaded Recipe Tracking
     HMI_LoadedRecipeId : UINT := 1;         // Recipe currently loaded in PLC memory
 END_VAR
-
 
 /////////////////////////////////////////////////
 
@@ -103,41 +118,42 @@ stateMachine(
     eStopActive := buttonManager.btn_EStop_Out,
     resetButton := buttonManager.btn_Reset_Out,
     selectedRecipe := HMI_RecipeSelect,
-    // Power error inputs (for centralized error handler)
-    powerError := (axisPower.ErrorAxisID <> 0),
-    powerErrorAxisID := axisPower.ErrorAxisID
 );
 
 MACHINE_STATE := stateMachine.currentStateOut;
 
 // ============================================================================
-// HMI AXIS DATA - Always reads position/velocity for selected axis
+// HMI AXIS DATA - Always reads position/velocity for selected axes
 // Called directly from PLC_PRG, independent of machine state
+// Separate instances for Manual (jog) and Homing pages to avoid interference
 // ============================================================================
 axisData(
     AxisSelect := HMI_JogAxis
+);
+axisDataHome(
+    AxisSelect := HMI_HomeAxis
 );
 
 // Update HMI with real-time axis data (always available)
 HMI_JogPosition := axisData.Position;
 HMI_JogVelocity := axisData.Velocity;
+HMI_HomePosition := axisDataHome.Position;
 
-// ============================================================================
-// HMI MANUAL JOG CONTROL - Only active when machine is in MANUAL state
-// Called directly from PLC_PRG for explicit control
-// ============================================================================
-axisManual(
-    Enable := stateMachine.inManualMode,
-    AxisSelect := HMI_JogAxis,
-    JogPositive := HMI_JogEnable AND HMI_JogDirection,      // Enable + positive direction
-    JogNegative := HMI_JogEnable AND NOT HMI_JogDirection,  // Enable + negative direction
-    JogVelocity := HMI_JogSpeed
-);
+
 
 // Update HMI with jog feedback
-HMI_JogActive := axisManual.Active;
-HMI_JogError := axisManual.Error;
-HMI_JogInvalidAxis := axisManual.InvalidAxis;
+HMI_JogActive := stateMachine.axisManual.Active;
+HMI_JogError := stateMachine.axisManual.Error;
+HMI_JogInvalidAxis := stateMachine.axisManual.InvalidAxis;
+
+// Update HMI with homing feedback
+HMI_HomeBusy := stateMachine.fbHome.Busy;
+HMI_HomeDone := stateMachine.fbHome.Done;
+HMI_HomeError := stateMachine.fbHome.Error;
+HMI_HomeErrorAxisID := stateMachine.fbHome.ErrorAxisID;
+HMI_HomeInvalidAxis := stateMachine.fbHome.InvalidAxis;
+HMI_AllAxesHomed := stateMachine.fbHome.AllAxesHomed;
+HMI_AxisIsHomed := stateMachine.fbHome.AxisIsHomed;
 
 // ============================================================================
 // UPDATE HMI STATUS VARIABLES

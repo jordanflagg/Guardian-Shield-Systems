@@ -1,0 +1,320 @@
+FUNCTION_BLOCK FB_AxisHome
+// Handles homing (moving to position 0) for single axis or all master axes
+// Uses FB_AxisMover for single axis, FB_MultiAxisMover for batch homing
+// Note: All axes use absolute encoders, so "homing" just means moving to position 0
+
+VAR_INPUT
+    Enable : BOOL;                  // Enable homing mode
+    HomeAxis : UINT;                // Axis to home (1-36 for single, 0 for all)
+    HomeSingle : BOOL;              // Rising edge: home selected axis
+    HomeAll : BOOL;                 // Rising edge: home all master axes
+    Velocity : LREAL := 10.0;       // Homing velocity (mm/s)
+    Acceleration : LREAL := 5.0;    // Acceleration (mm/s^2)
+    Deceleration : LREAL := 5.0;    // Deceleration (mm/s^2)
+    Jerk : LREAL := 10.0;           // Jerk limit (mm/s^3)
+    PositionTolerance : LREAL := 0.5; // Tolerance for "at home" check (mm)
+END_VAR
+
+VAR_OUTPUT
+    Busy : BOOL;                    // Homing operation in progress
+    Done : BOOL;                    // Homing operation completed
+    Error : BOOL;                   // Homing error occurred
+    ErrorAxisID : UINT;             // Axis that caused error
+    AllAxesHomed : BOOL;            // TRUE when all master axes are at position 0
+    AxisIsHomed : ARRAY[1..36] OF BOOL;  // Individual axis homed status
+    InvalidAxis : BOOL;             // Selected axis is not a master axis
+END_VAR
+
+VAR
+    // Single axis mover
+    fbMoveSingle : FB_AxisMover;
+
+    // Multi-axis movers for batch homing (need 3 to cover 18 master axes)
+    fbMoveGroup1 : FB_MultiAxisMover;  // Axes 1, 2, 6, 8, 10, 14, 15, 18
+    fbMoveGroup2 : FB_MultiAxisMover;  // Axes 19, 22, 23, 26, 27, 30, 31, 34
+    fbMoveGroup3 : FB_MultiAxisMover;  // Axes 35, 36
+
+    // State machine
+    state : INT := 0;
+    homeSinglePrev : BOOL;
+    homeAllPrev : BOOL;
+    homeSingleRising : BOOL;
+    homeAllRising : BOOL;
+
+    // Tracking
+    selectedAxis : UINT;
+    homeAllPhase : INT := 0;  // 0=idle, 1=group1, 2=group2, 3=group3, 4=done
+
+    // Master axis validation
+    masterAxes : ARRAY[1..18] OF UINT := [1, 2, 6, 8, 10, 14, 15, 18, 19, 22, 23, 26, 27, 30, 31, 34, 35, 36];
+    isMaster : BOOL;
+    i : INT;
+
+    // Position reading for homed status
+    fbReadPos : ARRAY[1..36] OF MC_ReadActualPosition;
+    currentPos : LREAL;
+END_VAR
+
+///////////////////////////////////////////////////////////////////////////////
+
+// Edge detection
+homeSingleRising := HomeSingle AND NOT homeSinglePrev;
+homeSinglePrev := HomeSingle;
+homeAllRising := HomeAll AND NOT homeAllPrev;
+homeAllPrev := HomeAll;
+
+// Check if selected axis is a master axis
+isMaster := FALSE;
+FOR i := 1 TO 18 DO
+    IF HomeAxis = masterAxes[i] THEN
+        isMaster := TRUE;
+        EXIT;
+    END_IF
+END_FOR
+InvalidAxis := (HomeAxis > 0) AND NOT isMaster;
+
+// Read all axis positions and update homed status
+// NOTE: Position reading is ALWAYS enabled (independent of homing mode Enable)
+// This ensures AxisIsHomed status is always up-to-date for HMI display
+FOR i := 1 TO 36 DO
+    fbReadPos[i](
+        Enable := TRUE,
+        Axis := AXIF_CONFIG_INDEXES[i]
+    );
+
+    IF fbReadPos[i].Valid THEN
+        currentPos := fbReadPos[i].Position;
+        // Axis is "homed" if within tolerance of position 0
+        AxisIsHomed[i] := ABS(currentPos) <= PositionTolerance;
+    ELSE
+        AxisIsHomed[i] := FALSE;
+    END_IF
+END_FOR
+
+// Check if all master axes are homed
+AllAxesHomed := TRUE;
+FOR i := 1 TO 18 DO
+    IF NOT AxisIsHomed[masterAxes[i]] THEN
+        AllAxesHomed := FALSE;
+        EXIT;
+    END_IF
+END_FOR
+
+// State machine
+CASE state OF
+
+    0: // IDLE - waiting for command
+        Done := FALSE;
+        Busy := FALSE;
+        Error := FALSE;
+        ErrorAxisID := 0;
+        homeAllPhase := 0;
+
+        IF NOT Enable THEN
+            // Stay idle when disabled
+            ;
+        ELSIF homeSingleRising AND HomeAxis > 0 AND HomeAxis <= 36 THEN
+            // Start single axis homing
+            IF isMaster THEN
+                selectedAxis := HomeAxis;
+                state := 1;
+                Busy := TRUE;
+            ELSE
+                InvalidAxis := TRUE;
+            END_IF
+
+        ELSIF homeAllRising THEN
+            // Start homing all master axes
+            state := 10;
+            Busy := TRUE;
+        END_IF
+
+    // =========================================================================
+    // SINGLE AXIS HOMING (states 1-2)
+    // =========================================================================
+    1: // HOME SINGLE - execute move to position 0
+        fbMoveSingle(
+            Execute := TRUE,
+            AxisRef := AXIF_CONFIG_INDEXES[selectedAxis],
+            Position := 0.0,
+            Velocity := Velocity,
+            Acceleration := Acceleration,
+            Deceleration := Deceleration,
+            Jerk := Jerk
+        );
+
+        IF fbMoveSingle.Done THEN
+            state := 2;
+            Done := TRUE;
+            Busy := FALSE;
+        ELSIF fbMoveSingle.Error THEN
+            state := 99;  // Error state
+            Error := TRUE;
+            ErrorAxisID := selectedAxis;
+            Busy := FALSE;
+        END_IF
+
+    2: // SINGLE DONE - wait for command to clear
+        fbMoveSingle(Execute := FALSE, AxisRef := AXIF_CONFIG_INDEXES[selectedAxis]);
+
+        IF NOT HomeSingle THEN
+            state := 0;
+            Done := FALSE;
+        END_IF
+
+    // =========================================================================
+    // HOME ALL AXES (states 10-14)
+    // Uses 3 groups to home all 18 master axes in parallel batches
+    // =========================================================================
+    10: // HOME ALL - Group 1 (axes 1, 2, 6, 8, 10, 14, 15, 18)
+        homeAllPhase := 1;
+
+        fbMoveGroup1(
+            Execute := TRUE,
+            Velocity := Velocity,
+            Acceleration := Acceleration,
+            Deceleration := Deceleration,
+            Jerk := Jerk,
+            Enable1 := TRUE, Axis1 := AXIF_CONFIG_INDEXES[1],  Position1 := 0.0,
+            Enable2 := TRUE, Axis2 := AXIF_CONFIG_INDEXES[2],  Position2 := 0.0,
+            Enable3 := TRUE, Axis3 := AXIF_CONFIG_INDEXES[6],  Position3 := 0.0,
+            Enable4 := TRUE, Axis4 := AXIF_CONFIG_INDEXES[8],  Position4 := 0.0,
+            Enable5 := TRUE, Axis5 := AXIF_CONFIG_INDEXES[10], Position5 := 0.0,
+            Enable6 := TRUE, Axis6 := AXIF_CONFIG_INDEXES[14], Position6 := 0.0,
+            Enable7 := TRUE, Axis7 := AXIF_CONFIG_INDEXES[15], Position7 := 0.0,
+            Enable8 := TRUE, Axis8 := AXIF_CONFIG_INDEXES[18], Position8 := 0.0
+        );
+
+        IF fbMoveGroup1.Done THEN
+            state := 11;
+        ELSIF fbMoveGroup1.Error THEN
+            // Map error axis number back to actual axis
+            CASE fbMoveGroup1.ErrorAxisNum OF
+                1: ErrorAxisID := 1;
+                2: ErrorAxisID := 2;
+                3: ErrorAxisID := 6;
+                4: ErrorAxisID := 8;
+                5: ErrorAxisID := 10;
+                6: ErrorAxisID := 14;
+                7: ErrorAxisID := 15;
+                8: ErrorAxisID := 18;
+            END_CASE
+            state := 99;
+            Error := TRUE;
+            Busy := FALSE;
+        END_IF
+
+    11: // HOME ALL - Clear Group 1, start Group 2 (axes 19, 22, 23, 26, 27, 30, 31, 34)
+        fbMoveGroup1(Execute := FALSE);
+        homeAllPhase := 2;
+
+        fbMoveGroup2(
+            Execute := TRUE,
+            Velocity := Velocity,
+            Acceleration := Acceleration,
+            Deceleration := Deceleration,
+            Jerk := Jerk,
+            Enable1 := TRUE, Axis1 := AXIF_CONFIG_INDEXES[19], Position1 := 0.0,
+            Enable2 := TRUE, Axis2 := AXIF_CONFIG_INDEXES[22], Position2 := 0.0,
+            Enable3 := TRUE, Axis3 := AXIF_CONFIG_INDEXES[23], Position3 := 0.0,
+            Enable4 := TRUE, Axis4 := AXIF_CONFIG_INDEXES[26], Position4 := 0.0,
+            Enable5 := TRUE, Axis5 := AXIF_CONFIG_INDEXES[27], Position5 := 0.0,
+            Enable6 := TRUE, Axis6 := AXIF_CONFIG_INDEXES[30], Position6 := 0.0,
+            Enable7 := TRUE, Axis7 := AXIF_CONFIG_INDEXES[31], Position7 := 0.0,
+            Enable8 := TRUE, Axis8 := AXIF_CONFIG_INDEXES[34], Position8 := 0.0
+        );
+
+        IF fbMoveGroup2.Done THEN
+            state := 12;
+        ELSIF fbMoveGroup2.Error THEN
+            CASE fbMoveGroup2.ErrorAxisNum OF
+                1: ErrorAxisID := 19;
+                2: ErrorAxisID := 22;
+                3: ErrorAxisID := 23;
+                4: ErrorAxisID := 26;
+                5: ErrorAxisID := 27;
+                6: ErrorAxisID := 30;
+                7: ErrorAxisID := 31;
+                8: ErrorAxisID := 34;
+            END_CASE
+            state := 99;
+            Error := TRUE;
+            Busy := FALSE;
+        END_IF
+
+    12: // HOME ALL - Clear Group 2, start Group 3 (axes 35, 36)
+        fbMoveGroup2(Execute := FALSE);
+        homeAllPhase := 3;
+
+        fbMoveGroup3(
+            Execute := TRUE,
+            Velocity := Velocity,
+            Acceleration := Acceleration,
+            Deceleration := Deceleration,
+            Jerk := Jerk,
+            Enable1 := TRUE, Axis1 := AXIF_CONFIG_INDEXES[35], Position1 := 0.0,
+            Enable2 := TRUE, Axis2 := AXIF_CONFIG_INDEXES[36], Position2 := 0.0,
+            Enable3 := FALSE,
+            Enable4 := FALSE,
+            Enable5 := FALSE,
+            Enable6 := FALSE,
+            Enable7 := FALSE,
+            Enable8 := FALSE
+        );
+
+        IF fbMoveGroup3.Done THEN
+            state := 13;
+        ELSIF fbMoveGroup3.Error THEN
+            CASE fbMoveGroup3.ErrorAxisNum OF
+                1: ErrorAxisID := 35;
+                2: ErrorAxisID := 36;
+            END_CASE
+            state := 99;
+            Error := TRUE;
+            Busy := FALSE;
+        END_IF
+
+    13: // HOME ALL DONE
+        fbMoveGroup3(Execute := FALSE);
+        homeAllPhase := 0;
+        Done := TRUE;
+        Busy := FALSE;
+        state := 14;
+
+    14: // WAIT FOR CLEAR
+        IF NOT HomeAll THEN
+            state := 0;
+            Done := FALSE;
+        END_IF
+
+    // =========================================================================
+    // ERROR STATE
+    // =========================================================================
+    99: // ERROR - wait for command to clear
+        fbMoveSingle(Execute := FALSE, AxisRef := AXIF_CONFIG_INDEXES[1]);
+        fbMoveGroup1(Execute := FALSE);
+        fbMoveGroup2(Execute := FALSE);
+        fbMoveGroup3(Execute := FALSE);
+        homeAllPhase := 0;
+
+        // Return to idle when both commands go FALSE
+        IF NOT HomeSingle AND NOT HomeAll THEN
+            state := 0;
+            Error := FALSE;
+            ErrorAxisID := 0;
+        END_IF
+
+END_CASE
+
+// Disable all operations when not enabled
+IF NOT Enable THEN
+    fbMoveSingle(Execute := FALSE, AxisRef := AXIF_CONFIG_INDEXES[1]);
+    fbMoveGroup1(Execute := FALSE);
+    fbMoveGroup2(Execute := FALSE);
+    fbMoveGroup3(Execute := FALSE);
+    state := 0;
+    Busy := FALSE;
+    Done := FALSE;
+    Error := FALSE;
+    homeAllPhase := 0;
+END_IF

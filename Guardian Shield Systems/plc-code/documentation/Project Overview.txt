@@ -2,40 +2,43 @@
 //                     FOAM BLOCK PROCESSING MACHINE
 //                     MOTION CONTROL SYSTEM OVERVIEW
 // ================================================================================
-// 
+//
 // Project: Automated Foam Block Carving Machine
 // Controller: Bosch ctrlX CORE
 // Language: Structured Text (IEC 61131-3)
 // Total Axes: 36 servo axes
 // Date: January 2026
-// 
+// Version: 2.1 - Centralized Error Handling
+//
 // ================================================================================
 // MACHINE DESCRIPTION
 // ================================================================================
-// 
+//
 // This machine processes foam blocks (4-16 ft long, 4 ft high, 8-24 in deep) for
 // building panel construction. The process flow is:
-// 
+//
 // 1. Fork truck loads raw foam block onto load table
 // 2. Block is shifted and centered in the processing area
 // 3. Hot wire cutting carves stud cavities (for wall framing)
 // 4. Hot wire cutting carves window/door openings
 // 5. Hot wire cutting carves vertical electrical conduit troughs
 // 6. Finished block is shifted to unload table for fork truck removal
-// 
+//
 // The machine uses:
 // - 36 coordinated servo axes with absolute encoders (no homing required)
 // - 18 permanent electronic gearing pairs (slave axes follow masters 1:1)
 // - 6 hot wires controlled by PWM for temperature regulation
 // - Suction cups to hold blocks during processing
 // - Target accuracy: ±1/8 inch (gaps filled with liquid foam later)
-// 
+//
 // ================================================================================
-// PROGRAM ARCHITECTURE
+// PROGRAM ARCHITECTURE (v2.0 - Modular)
 // ================================================================================
-// 
-// The program follows a hierarchical structure with clear separation of concerns:
-// 
+//
+// The program follows a hierarchical, modular structure with clear separation
+// of concerns. Motion steps are now encapsulated in dedicated function blocks
+// for improved maintainability and testability.
+//
 // PLC_PRG (Main Program - Orchestrator)
 // │
 // ├── FB_ButtonManager
@@ -45,17 +48,41 @@
 // ├── FB_AxisPower
 // │   └── Centralized power management for all 36 axes
 // │   └── Manages MC_Power and MC_Reset function blocks
-// │   └── Output: DrivesReady status
+// │   └── Uses CXA_Datalayer DL_WriteNode for global error clearing
+// │   └── Output: DrivesReady status, AllResetDone, ErrorAxisID
+// │
+// ├── FB_AxisGearing
+// │   └── Manages all 18 permanent gearing relationships
+// │   └── Can engage/disengage gearing (for E-stop recovery)
+// │   └── Monitors InSync status for all pairs
+// │   └── Outputs: Done, Error, ErrorAxisID, ActivePairCount
 // │
 // ├── FB_MachineStateMachine
 // │   └── Top-level machine state control (safety layer)
 // │   └── States: INIT → IDLE → HOMING/MANUAL/RUNNING → STOPPING/FAULTED/E_STOPPED
-// │   └── Contains FB_MotionSequence instance
+// │   └── Contains FB_MotionSequence, FB_AxisGearing, FB_AxisManual instances
+// │   └── Contains FB_ErrorHandler (centralized error collection from all subsystems)
+// │   └── Manages recipe selection and locking
+// │   └── Outputs visualization data and error info for HMI
 // │
-// └── FB_MotionSequence
-//     └── Detailed motion choreography
-//     └── Two-level state machine: Main States + Substeps
-//     └── Commands only master axes; slaves follow via gearing
+// ├── FB_AxisManual
+// │   └── Manual jog control for single axis via HMI
+// │   └── Uses MC_Jog for velocity-controlled jogging
+// │   └── Only allows jogging of master axes
+// │   └── Provides position/velocity feedback to HMI
+// │
+// └── FB_MotionSequence (Orchestrator for motion steps)
+//     │
+//     ├── FB_MotionStep_LoadBlock     (SHIFT_TO_PROCESSING_AREA - 11 substeps)
+//     ├── FB_MotionStep_Studs         (STUDS - 6 substeps)
+//     ├── FB_MotionStep_WindowsDoors  (WINDOWS_DOORS - 6 substeps)
+//     ├── FB_MotionStep_Electrical    (ELECTRICAL - 6 substeps)
+//     └── FB_MotionStep_Unload        (SHIFT_TO_UNLOAD_AREA - 5 substeps)
+//
+// HELPER FUNCTION BLOCKS:
+// ───────────────────────
+// ├── FB_AxisMover       - Wraps MC_MoveAbsolute with state machine
+// └── FB_MultiAxisMover  - Coordinates up to 8 parallel axis moves
 // 
 // ================================================================================
 // AXIS CONFIGURATION
@@ -282,90 +309,287 @@
 //   Contains all target positions for every axis at every step.
 //   Positions are named: axis#_FunctionPosition
 //   Example: axis2_RaisePosition, axis30_TargetPosition_1
-//   Values are placeholders - will be loaded from HMI/recipes.
+//   Values loaded from GVL_Recipes.RecipeLibrary[RecipeID].positions
+//
+// ST_MotionError (structure)
+// ──────────────────────────
+//   hasError : BOOL               - Error is active
+//   errorAxisID : UINT            - Axis that caused error
+//   errorCode : DWORD             - Error code (1001-2005)
+//   errorStep : E_MotionStep      - Which motion step had error
+//   errorSubStep : INT            - Which substep within the step
+//   errorDescription : STRING     - Human-readable error message
+//
+// GVL_Recipes (Global Variable List)
+// ──────────────────────────────────
+//   RecipeLibrary : ARRAY[1..10] OF ST_Recipe
+//     Each recipe contains:
+//       - isActive : BOOL         - Recipe is valid and usable
+//       - positions : ST_PositionSetpoints
+//       - motionParams : ST_MotionParameters
+//       - enableStuds : BOOL      - Run stud carving step
+//       - enableWindowsDoors : BOOL - Run window/door step
+//       - enableElectrical : BOOL - Run electrical trough step
 // 
 // ================================================================================
 // FUNCTION BLOCK DESCRIPTIONS
 // ================================================================================
-// 
+//
 // FB_ButtonManager
 // ────────────────
-//   Purpose: Centralized button input processing
-//   
+//   Purpose: Centralized button input processing with latching
+//
 //   Inputs:
-//     btn_Start_In, btn_Stop_In, btn_Home_In, 
+//     btn_Start_In, btn_Stop_In, btn_Home_In,
 //     btn_Manual_In, btn_Reset_In, btn_EStop_In : BOOL
-//   
+//     ClearCommand : BOOL         - External clear from state machine
+//
 //   Outputs:
 //     btn_Start_Out, btn_Stop_Out, btn_Home_Out,
 //     btn_Manual_Out, btn_Reset_Out, btn_EStop_Out : BOOL
 //     activeCommand : E_ActiveCommand
-//   
+//
 //   Behavior:
 //     - Uses R_TRIG for edge detection on all buttons except E-stop
 //     - E-stop is level-sensitive (active while held)
-//     - Only one command can be active at a time
+//     - Commands STAY LATCHED until another button pressed or ClearCommand
+//     - Priority: E-Stop > Stop > Start > Home > Manual > Reset
 //     - Outputs are mutually exclusive (CASE statement ensures this)
-// 
+//
 // FB_AxisPower
 // ────────────
 //   Purpose: Centralized axis power and reset management
-//   
+//
 //   Inputs:
-//     PowerOn : BOOL    - Enable all drives
-//     Reset : BOOL      - Reset all drive faults
-//   
+//     PowerOn : BOOL              - Enable all drives
+//     Reset : BOOL                - Reset all drive faults
+//
 //   Outputs:
-//     DrivesReady : BOOL - All drives powered and ready
-//   
+//     DrivesReady : BOOL          - All drives powered and ready
+//     AllResetDone : BOOL         - All axis resets complete
+//     ErrorAxisID : UINT          - First axis with error (0 = none)
+//
 //   Behavior:
 //     - Loops through all axes using MOTIF_CONFIG index range
 //     - Calls MC_Power for each axis
-//     - Calls MC_Reset for each axis (edge-triggered)
-//     - DrivesReady = TRUE only when ALL axes report ready
-// 
+//     - Reset sequence: 1) Clear all errors via DL_WriteNode, 2) MC_Reset all axes
+//     - Uses CXA_Datalayer 'diagnosis/confirm/all-errors' for global error clear
+//     - DrivesReady = TRUE only when ALL axes report ready with no errors
+//
+// FB_AxisGearing
+// ──────────────
+//   Purpose: Manages all 18 permanent gearing relationships
+//
+//   Inputs:
+//     Execute : BOOL              - TRUE to engage gearing, FALSE to disengage
+//
+//   Outputs:
+//     Done : BOOL                 - All gearing successfully engaged
+//     Busy : BOOL                 - Gearing in progress
+//     Error : BOOL                - One or more gearing operations failed
+//     ErrorAxisID : UINT          - Which slave axis had the error
+//     ActivePairCount : UINT      - Number of gearing pairs currently in sync
+//
+//   Behavior:
+//     - Manages 18 MB_GearInPos function blocks (one per master-slave pair)
+//     - All gearing uses 1:1 ratio
+//     - Can be disengaged during E-stop and re-engaged for recovery
+//     - Monitors InSync status for all pairs
+//     - Required by MB_GearInPos: explicit calls for each pair (VAR_IN_OUT)
+//
+// FB_AxisManual
+// ─────────────
+//   Purpose: Manual jog control for single axis via HMI
+//
+//   Inputs:
+//     Enable : BOOL               - Enable manual mode
+//     AxisSelect : UINT           - Selected axis (1-36, only masters allowed)
+//     JogPositive : BOOL          - Jog positive direction (hold to jog)
+//     JogNegative : BOOL          - Jog negative direction (hold to jog)
+//     JogVelocity : LREAL         - Jog velocity in mm/s
+//
+//   Outputs:
+//     Active : BOOL               - Jog is currently active
+//     Error : BOOL                - Error occurred
+//     ErrorID : ERROR_CODE        - Error code from MC_Jog
+//     CurrentPosition : LREAL     - Current position of selected axis (mm)
+//     CurrentVelocity : LREAL     - Current velocity of selected axis (mm/s)
+//
+//   Behavior:
+//     - Uses MC_Jog for velocity-controlled jogging
+//     - Only allows jogging of 18 master axes (slaves follow via gearing)
+//     - Position/velocity reading works even when disabled (for HMI display)
+//     - Invalid axis selection returns error code 0x8001
+//
 // FB_MachineStateMachine
 // ──────────────────────
 //   Purpose: Top-level machine control and safety management
-//   
+//
 //   Inputs:
-//     startButton, stopButton, homeButton, 
+//     startButton, stopButton, homeButton,
 //     manualMode, eStopActive, resetButton : BOOL
-//   
+//     selectedRecipe : UINT       - Recipe selection from HMI (1-10)
+//     jogAxisSelect, jogPositive, jogNegative : for manual mode
+//     jogVelocity : LREAL         - Jog speed in mm/s
+//     powerError : BOOL           - Power error from FB_AxisPower
+//     powerErrorAxisID : UINT     - Which axis has power error
+//
 //   Outputs:
 //     currentStateOut : E_MachineState
 //     isRunning, isFaulted, isHomed : BOOL
-//   
+//     activeRecipeID : UINT       - Currently active recipe
+//     recipeLocked : BOOL         - TRUE when recipe cannot be changed
+//     motionStepOut, motionSubStep, activeAxesMask, stepDescription : HMI viz
+//     hasError : BOOL             - Any error (power, gearing, or motion)
+//     errorInfo : ST_MotionError  - Detailed error information from FB_ErrorHandler
+//     errorCount : UINT           - Total error count since last reset
+//     jogActive, jogCurrentPosition, jogCurrentVelocity, jogError : Jog feedback
+//
 //   Behavior:
 //     - E-stop can interrupt ANY state (highest priority)
-//     - Contains instance of FB_MotionSequence
-//     - Calls motion sequence when in RUNNING state
-//     - Uses MC_Halt for controlled stops in E_STOPPED state
-// 
+//     - Contains instances of FB_MotionSequence, FB_AxisGearing, FB_AxisManual
+//     - Contains FB_ErrorHandler for centralized error collection
+//     - Collects errors from: FB_AxisPower, FB_AxisGearing, FB_MotionSequence
+//     - Manages gearing engagement/disengagement during state transitions
+//     - Recipe is locked when entering RUNNING state
+//     - Uses MC_Halt for all axes in E_STOPPED state
+//     - MANUAL state enables FB_AxisManual for jog control
+//     - Transitions to FAULTED state when FB_ErrorHandler reports any error
+//
 // FB_MotionSequence
 // ─────────────────
-//   Purpose: Detailed motion choreography for block processing
-//   
+//   Purpose: Orchestrates modular motion step FBs for block processing
+//
 //   Inputs:
-//     enable : BOOL - TRUE when machine in RUNNING state
-//   
+//     Enable : BOOL               - TRUE when machine in RUNNING state
+//     RecipeID : UINT             - Recipe number to load (1-10)
+//
 //   Outputs:
-//     sequenceComplete : BOOL
-//     currentStep : E_MotionStep
-//   
-//   Internal Variables:
-//     - motionStep : current main state
-//     - subStep : current substep within main state
-//     - 18 executeAxis#Move flags (one per master/independent)
-//     - 18 targetPosAxis# values
-//     - 18 MC_MoveAbsolute function blocks
-//     - 18 MB_GearInPos function blocks (permanent gearing)
-//   
+//     SequenceComplete : BOOL     - Full cycle completed
+//     CurrentStep : E_MotionStep  - Current motion phase
+//     ActiveRecipeID : UINT       - Currently loaded recipe
+//     RecipeLoadComplete : BOOL   - Recipe loaded successfully
+//     RecipeLoadError : BOOL      - Recipe load failed
+//     CurrentSubStep : INT        - Current substep within motion step
+//     ActiveAxesMask : LWORD      - Bitmask of moving axes (64-bit)
+//     StepDescription : STRING    - Human-readable description for HMI
+//     HasError : BOOL             - Motion error occurred
+//     ErrorAxisID : UINT          - Which axis caused error
+//
+//   Additional Outputs (for FB_ErrorHandler in state machine):
+//     LoadBlockError, LoadBlockErrorAxisID : Error from load block step
+//     StudsError, StudsErrorAxisID : Error from studs step
+//     WindowsDoorsError, WindowsDoorsErrorAxisID : Error from windows/doors step
+//     ElectricalError, ElectricalErrorAxisID : Error from electrical step
+//     UnloadError, UnloadErrorAxisID : Error from unload step
+//
+//   Internal Components:
+//     - FB_MotionStep_LoadBlock, FB_MotionStep_Studs, FB_MotionStep_WindowsDoors
+//     - FB_MotionStep_Electrical, FB_MotionStep_Unload
+//
 //   Behavior:
-//     - Gearing runs continuously (Execute := TRUE)
-//     - Motion commands only sent to master axes
-//     - Each substep: set target → set execute → wait for Done → clear execute
-//     - Error in any substep clears execute (TODO: transition to fault)
+//     - Loads recipe from GVL_Recipes.RecipeLibrary when RecipeID changes
+//     - Supports skip logic for optional steps (studs, windows, electrical)
+//     - Each motion step FB handles its own substeps and error reporting
+//     - Exposes individual step errors for FB_ErrorHandler in state machine
+//
+// FB_MotionStep_LoadBlock (SHIFT_TO_PROCESSING_AREA)
+// ──────────────────────────────────────────────────
+//   Purpose: Moves block from load table to processing center
+//   Substeps: 11 (0-10)
+//   Axes Used: 1, 2 (master), 6 (master), 8 (master), 10 (master)
+//
+// FB_MotionStep_Studs
+// ───────────────────
+//   Purpose: Carves stud cavities using 4 parallel stations
+//   Substeps: 6 (0-5)
+//   Axes Used: 14, 15, 18, 19, 22, 23, 26, 27 (masters for 8 pairs)
+//
+// FB_MotionStep_WindowsDoors
+// ──────────────────────────
+//   Purpose: Carves window and door openings
+//   Substeps: 6 (0-5)
+//   Axes Used: 30, 31 (masters for 2 pairs)
+//
+// FB_MotionStep_Electrical
+// ────────────────────────
+//   Purpose: Carves electrical conduit troughs
+//   Substeps: 6 (0-5)
+//   Axes Used: 30, 35, 36 (30 for positioning, 35/36 independent cutters)
+//
+// FB_MotionStep_Unload (SHIFT_TO_UNLOAD_AREA)
+// ───────────────────────────────────────────
+//   Purpose: Moves completed block to unload table
+//   Substeps: 5 (0-4)
+//   Axes Used: 8 (master), 10 (master)
+//
+// FB_AxisMover (Helper)
+// ─────────────────────
+//   Purpose: Wraps MC_MoveAbsolute with cleaner state machine interface
+//
+//   Inputs:
+//     Execute, AxisRef, Position, Velocity, Acceleration, Deceleration, Jerk
+//
+//   Outputs:
+//     Done, Busy, Error, ErrorID, Active
+//
+//   Behavior:
+//     - State machine: IDLE → MOVING → DONE/ERROR
+//     - Reduces repetitive execute/done/error patterns
+//     - Level-triggered: starts move when Execute is TRUE
+//
+// FB_MultiAxisMover (Helper)
+// ──────────────────────────
+//   Purpose: Coordinates multiple axis moves and waits for all to complete
+//
+//   Inputs:
+//     Execute : BOOL              - Rising edge starts all moves
+//     Enable1..8, Axis1..8, Position1..8 : per-axis configuration
+//     Velocity, Acceleration, Deceleration, Jerk : shared motion params
+//
+//   Outputs:
+//     Done, Busy, Error, ErrorAxisNum, ErrorID, ActiveAxesMask
+//
+//   Behavior:
+//     - Uses array of FB_AxisMover internally
+//     - Supports up to 8 parallel axis moves
+//     - Edge-triggered execution
+//     - Reports first error encountered
+//
+// FB_ErrorHandler (Located in FB_MachineStateMachine)
+// ───────────────────────────────────────────────────
+//   Purpose: Centralized error handling for the entire machine
+//   Location: Inside FB_MachineStateMachine (supervisor level)
+//
+//   Inputs:
+//     Reset : BOOL                - Reset all errors (triggered in RESETTING state)
+//     PowerError, PowerErrorAxisID : From FB_AxisPower via state machine inputs
+//     GearingError, GearingErrorAxisID : From FB_AxisGearing
+//     LoadBlockError, LoadBlockErrorAxisID : From FB_MotionSequence
+//     StudsError, StudsErrorAxisID : From FB_MotionSequence
+//     WindowsDoorsError, WindowsDoorsErrorAxisID : From FB_MotionSequence
+//     ElectricalError, ElectricalErrorAxisID : From FB_MotionSequence
+//     UnloadError, UnloadErrorAxisID : From FB_MotionSequence
+//     CurrentStep, CurrentSubStep : Context from FB_MotionSequence
+//
+//   Outputs:
+//     HasError : BOOL             - TRUE if any error is active
+//     ErrorInfo : ST_MotionError  - Detailed error information
+//     ErrorCount : UINT           - Total errors since last reset
+//
+//   Behavior:
+//     - Latches first error until reset
+//     - Priority: Power > Gearing > LoadBlock > Studs > WindowsDoors > Electrical > Unload
+//     - Error codes: 1001=Power, 1002=Gearing, 2001-2005=Motion steps
+//     - Reset triggered when state machine enters RESETTING state
+//
+//   Data Flow:
+//     FB_AxisPower ──────────────┐
+//     FB_AxisGearing ────────────┼──► FB_ErrorHandler ──► hasError, errorInfo
+//     FB_MotionSequence (5 steps)┘         │
+//                                          ▼
+//                                 State machine uses hasError
+//                                 to transition to FAULTED
 // 
 // ================================================================================
 // MOTION CONTROL PATTERNS
@@ -437,28 +661,59 @@
 // ================================================================================
 // KNOWN LIMITATIONS / TODO ITEMS
 // ================================================================================
-// 
+//
 // IMMEDIATE:
 //   □ Add suction cup I/O (enable output, active confirmation input)
-//   □ Implement proper error handling with fault identification
-//   □ Add SEQUENCE_COMPLETE state handling (loop back or signal HMI)
-//   □ Add sequence reset on disable (return to WAIT_FOR_LOAD)
-//   □ Implement DrivesReady check before allowing RUNNING state
 //   □ Add hot wire PWM control for temperature regulation
-// 
+//   □ Implement DrivesReady check before allowing RUNNING state
+//
 // FUTURE:
-//   □ Recipe system for loading position setpoints
-//   □ HMI integration
-//   □ Skip logic for optional steps (windows/doors, electrical)
-//   □ Multiple window/door openings per block
+//   □ Multiple window/door openings per block (recipe-driven)
 //   □ Axis 34 implementation (unload table shift)
 //   □ Diagnostic displays and fault logging
 //   □ Production tracking and statistics
-// 
+//
+// COMPLETED (v2.0):
+//   ✓ Implement proper error handling with fault identification (FB_ErrorHandler)
+//   ✓ Add SEQUENCE_COMPLETE state handling (loops back to WAIT_FOR_LOAD)
+//   ✓ Add sequence reset on disable (each step FB resets independently)
+//   ✓ Recipe system for loading position setpoints (GVL_Recipes)
+//   ✓ HMI integration (visualization outputs in FB_MotionSequence)
+//   ✓ Skip logic for optional steps (enableStuds, enableWindowsDoors, enableElectrical)
+//   ✓ Modular motion step architecture (5 dedicated FBs)
+//   ✓ Manual jog mode (FB_AxisManual)
+//   ✓ Gearing management with engage/disengage (FB_AxisGearing)
+//   ✓ Global error clearing via CXA_Datalayer
+//
 // ================================================================================
 // REVISION HISTORY
 // ================================================================================
-// 
+//
+// Version 2.1 - January 2026
+//   - Moved FB_ErrorHandler from FB_MotionSequence to FB_MachineStateMachine
+//   - FB_ErrorHandler now collects errors from all subsystems (power, gearing, motion)
+//   - FB_MotionSequence now exposes individual step errors as outputs
+//   - FB_MachineStateMachine accepts powerError inputs from PLC_PRG
+//   - Cleaner data flow: all error sources feed into centralized handler
+//
+// Version 2.0 - January 2026
+//   - MAJOR REFACTOR: Modular motion step architecture
+//   - Added FB_AxisMover helper for cleaner single-axis moves
+//   - Added FB_MultiAxisMover helper for parallel axis coordination
+//   - Added FB_MotionStep_LoadBlock (11 substeps)
+//   - Added FB_MotionStep_Studs (6 substeps)
+//   - Added FB_MotionStep_WindowsDoors (6 substeps)
+//   - Added FB_MotionStep_Electrical (6 substeps)
+//   - Added FB_MotionStep_Unload (5 substeps)
+//   - Added FB_ErrorHandler for centralized error collection
+//   - Added FB_AxisGearing for manageable gearing control
+//   - Added FB_AxisManual for HMI-driven jog control
+//   - FB_AxisPower now uses CXA_Datalayer for global error clearing
+//   - FB_MotionSequence now orchestrates modular step FBs
+//   - Recipe system with skip logic for optional operations
+//   - HMI visualization outputs (step description, active axes bitmask)
+//   - Recipe locking during RUNNING state
+//
 // Version 1.0 - January 2026
 //   - Initial implementation
 //   - 6 main motion states with substeps
@@ -466,7 +721,7 @@
 //   - Basic sequential motion control
 //   - Button management with edge detection
 //   - Machine state machine with E-stop handling
-// 
+//
 // ================================================================================
 // END OF DOCUMENT
 // ================================================================================

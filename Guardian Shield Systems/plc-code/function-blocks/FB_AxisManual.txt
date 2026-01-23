@@ -1,0 +1,133 @@
+// ============================================================================
+// FB_AxisManual - Manual Jog Control for Single Axis
+// ============================================================================
+// Purpose: Provides jog control for manual axis movement via HMI
+// Uses PLCopen MC_Jog function block for velocity-controlled jogging
+// Only master axes should be jogged - slaves follow via gearing
+// Note: Position reading is handled separately by FB_AxisData in PLC_PRG
+// ============================================================================
+
+{attribute 'no_assign'}
+FUNCTION_BLOCK FB_AxisManual
+VAR_INPUT
+    Enable          : BOOL;         // Enable manual mode (machine must be in MANUAL state)
+    AxisSelect      : UINT;         // Selected axis number (1-36, only master axes allowed)
+    JogPositive     : BOOL;         // Jog in positive direction (hold to jog)
+    JogNegative     : BOOL;         // Jog in negative direction (hold to jog)
+    JogVelocity     : LREAL := 10;  // Jog velocity in mm/s
+END_VAR
+
+VAR_OUTPUT
+    Active          : BOOL;         // Jog is currently active
+    Error           : BOOL;         // Error occurred
+    ErrorID         : ERROR_CODE;   // Error code from MC_Jog
+    InvalidAxis     : BOOL;         // TRUE if selected axis is not a valid master axis
+END_VAR
+
+VAR
+    // MC_Jog function block for velocity-controlled jogging
+    fbJog           : MC_Jog;
+
+    // Internal state
+    lastAxisSelect  : UINT;
+    jogDirection    : INT;          // 1 = positive, -1 = negative, 0 = stopped
+    axisRef         : AXIS_REF;
+
+    // Valid master axes (only these can be jogged)
+    // Slaves follow automatically via electronic gearing
+    validMasterAxes : ARRAY[1..18] OF UINT := [1, 2, 6, 8, 10, 14, 15, 18, 19, 22, 23, 26, 27, 30, 31, 34, 35, 36];
+    isValidAxis     : BOOL;
+    i               : INT;
+END_VAR
+
+// ============================================================================
+// IMPLEMENTATION
+// ============================================================================
+
+// Reset outputs when disabled
+IF NOT Enable THEN
+    Active := FALSE;
+    Error := FALSE;
+    ErrorID := 0;
+    InvalidAxis := FALSE;
+    jogDirection := 0;
+
+    // Stop any active jog (need valid axis ref)
+    IF AxisSelect >= 1 AND AxisSelect <= 36 THEN
+        axisRef := AXIF_CONFIG_INDEXES[AxisSelect];
+        fbJog(
+            Axis := axisRef,
+            JogForward := FALSE,
+            JogBackward := FALSE,
+            Velocity := 0
+        );
+    END_IF
+
+    RETURN;
+END_IF
+
+// Validate axis selection - only master axes allowed for jogging
+isValidAxis := FALSE;
+FOR i := 1 TO 18 DO
+    IF AxisSelect = validMasterAxes[i] THEN
+        isValidAxis := TRUE;
+        EXIT;
+    END_IF
+END_FOR
+
+IF NOT isValidAxis THEN
+    Error := TRUE;
+    ErrorID := 16#8001;  // Invalid axis selection
+    InvalidAxis := TRUE;
+    Active := FALSE;
+    RETURN;
+END_IF
+
+InvalidAxis := FALSE;
+
+// Get axis reference for selected axis
+axisRef := AXIF_CONFIG_INDEXES[AxisSelect];
+
+// Handle axis change - stop jog before switching
+IF AxisSelect <> lastAxisSelect THEN
+    fbJog(
+        Axis := axisRef,
+        JogForward := FALSE,
+        JogBackward := FALSE,
+        Velocity := 0
+    );
+    jogDirection := 0;
+    lastAxisSelect := AxisSelect;
+END_IF
+
+// Determine jog direction
+// Only one direction at a time - positive takes precedence
+IF JogPositive AND NOT JogNegative THEN
+    jogDirection := 1;
+ELSIF JogNegative AND NOT JogPositive THEN
+    jogDirection := -1;
+ELSE
+    jogDirection := 0;
+END_IF
+
+// Execute MC_Jog
+// JogForward = positive direction, JogBackward = negative direction
+// Jog continues while the respective input is TRUE
+fbJog(
+    Axis := axisRef,
+    JogForward := (jogDirection = 1),
+    JogBackward := (jogDirection = -1),
+    Velocity := ABS(JogVelocity),
+    Acceleration := 100.0,          // Default acceleration mm/s^2
+    Deceleration := 100.0,          // Default deceleration mm/s^2
+    Jerk := 1000.0                  // Default jerk mm/s^3
+);
+
+// Update outputs
+Active := fbJog.Active;
+Error := fbJog.Error;
+ErrorID := fbJog.ErrorID;
+
+// ============================================================================
+// END FB_AxisManual
+// ============================================================================

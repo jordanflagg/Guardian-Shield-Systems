@@ -1,3 +1,4 @@
+{attribute 'no_assign'}
 FUNCTION_BLOCK FB_MachineStateMachine
 
 VAR_INPUT
@@ -8,6 +9,10 @@ VAR_INPUT
     eStopActive : BOOL;
     resetButton : BOOL;
     selectedRecipe : UINT := 1;     // Recipe selection from HMI (1-10)
+
+    // Power error inputs (from FB_AxisPower in PLC_PRG)
+    powerError : BOOL;              // TRUE if any axis has power error
+    powerErrorAxisID : UINT;        // Which axis has the power error
 END_VAR
 
 VAR_OUTPUT
@@ -21,12 +26,16 @@ VAR_OUTPUT
     // Motion sequence visualization (pass-through from FB_MotionSequence)
     motionStepOut : E_MotionStep;       // Current motion step
     motionSubStep : INT;                // Current substep
-    activeAxesMask : LWORD;             // Bitmask of moving axes (64-bit for 36 axes)
+    activeAxesMask : LWORD;             // Bitmask of moving axes
     stepDescription : STRING[80];       // Human-readable step description
 
-    // Error information
-    hasMotionError : BOOL;              // Motion sequence error occurred
-    errorAxisID : UINT;                 // Which axis caused error
+    // Centralized error information (from FB_ErrorHandler)
+    hasError : BOOL;                    // Any error occurred (power, gearing, motion)
+    errorInfo : ST_MotionError;         // Detailed error information
+    errorCount : UINT;                  // Total error count since last reset
+
+    // Manual mode indicator (for PLC_PRG to enable jog control)
+    inManualMode : BOOL;                // TRUE when machine is in MANUAL state
 END_VAR
 
 VAR
@@ -38,6 +47,9 @@ VAR
     // Axis gearing manager
     axisGearing : FB_AxisGearing;
     gearingNeeded : BOOL := TRUE;       // Flag to trigger gearing re-engagement
+
+    // Centralized error handler (collects errors from all subsystems)
+    errorHandler : FB_ErrorHandler;
 
     // Emergency halt function blocks
     fbHalt : ARRAY[MOTIF_CONFIG.MIN_AXIS_INDEX..MOTIF_CONFIG.MAX_AXIS_INDEX] OF MC_Halt;
@@ -103,9 +115,6 @@ CASE currentState OF
     
     // ------------------------------------------------------------------------
     E_MachineState.MANUAL:
-        // TODO: Manual/jog mode logic goes here
-        // Allow individual axis jogging
-        
         // Exit manual mode when operator deselects it
         IF NOT manualMode THEN
             currentState := E_MachineState.IDLE;
@@ -135,16 +144,16 @@ CASE currentState OF
                 RecipeID := activeRecipeID
             );
 
-            // Check for motion sequence errors
-            IF motionSequence.HasError THEN
-                currentState := E_MachineState.FAULTED;
-            END_IF
-
             // Check if sequence completed
             IF motionSequence.SequenceComplete THEN
                 // Could auto-stop or continue for next block
                 // For now, continue running for next cycle
             END_IF
+        END_IF
+
+        // Check for any errors (motion, gearing, or power) via centralized handler
+        IF errorHandler.HasError THEN
+            currentState := E_MachineState.FAULTED;
         END_IF
 
         // Check for stop button
@@ -226,12 +235,50 @@ END_CASE;
 // Copy internal state to output so other code/HMI can see it
 currentStateOut := currentState;
 
+// Indicate when in manual mode (for PLC_PRG to enable jog control)
+inManualMode := (currentState = E_MachineState.MANUAL);
+
 // Copy motion sequence visualization outputs
 motionStepOut := motionSequence.CurrentStep;
 motionSubStep := motionSequence.CurrentSubStep;
 activeAxesMask := motionSequence.ActiveAxesMask;
 stepDescription := motionSequence.StepDescription;
 
-// Copy error information
-hasMotionError := motionSequence.HasError;
-errorAxisID := motionSequence.ErrorAxisID;
+// ============================================================================
+// CENTRALIZED ERROR HANDLER
+// Collects errors from all subsystems: power, gearing, and motion steps
+// ============================================================================
+
+errorHandler(
+    // Reset errors when entering RESETTING state or when reset button pressed in FAULTED
+    Reset := (currentState = E_MachineState.RESETTING),
+
+    // Motion step errors (from FB_MotionSequence)
+    LoadBlockError := motionSequence.LoadBlockError,
+    LoadBlockErrorAxisID := motionSequence.LoadBlockErrorAxisID,
+    StudsError := motionSequence.StudsError,
+    StudsErrorAxisID := motionSequence.StudsErrorAxisID,
+    WindowsDoorsError := motionSequence.WindowsDoorsError,
+    WindowsDoorsErrorAxisID := motionSequence.WindowsDoorsErrorAxisID,
+    ElectricalError := motionSequence.ElectricalError,
+    ElectricalErrorAxisID := motionSequence.ElectricalErrorAxisID,
+    UnloadError := motionSequence.UnloadError,
+    UnloadErrorAxisID := motionSequence.UnloadErrorAxisID,
+
+    // Gearing errors (from FB_AxisGearing)
+    GearingError := axisGearing.Error,
+    GearingErrorAxisID := axisGearing.ErrorAxisID,
+
+    // Power errors (from FB_AxisPower via inputs)
+    PowerError := powerError,
+    PowerErrorAxisID := powerErrorAxisID,
+
+    // Context for error reporting
+    CurrentStep := motionSequence.CurrentStep,
+    CurrentSubStep := motionSequence.CurrentSubStep
+);
+
+// Copy error handler outputs
+hasError := errorHandler.HasError;
+errorInfo := errorHandler.ErrorInfo;
+errorCount := errorHandler.ErrorCount;

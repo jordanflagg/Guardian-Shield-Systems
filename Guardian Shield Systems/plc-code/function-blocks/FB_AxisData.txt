@@ -1,0 +1,76 @@
+// ============================================================================
+// FB_AxisData - Axis Data Reader for HMI Display
+// ============================================================================
+// Purpose: Reads position, velocity, and status information for any axis
+// Called directly from PLC_PRG for real-time HMI updates
+// Independent of machine state - always provides current axis data
+// ============================================================================
+
+{attribute 'no_assign'}
+FUNCTION_BLOCK FB_AxisData
+VAR_INPUT
+    AxisSelect      : UINT;         // Selected axis number (1-36)
+END_VAR
+
+VAR_OUTPUT
+    // Position and velocity
+    Position        : LREAL;        // Current position (mm)
+    Velocity        : LREAL;        // Current velocity (mm/s)
+
+    // Axis status (expandable for future use)
+    AxisValid       : BOOL;         // TRUE if axis selection is valid (1-36)
+    // Future expansion:
+    // InPosition    : BOOL;        // TRUE when axis is at commanded position
+    // IsMoving      : BOOL;        // TRUE when axis is in motion
+    // HasError      : BOOL;        // TRUE if axis has an error
+    // ErrorCode     : DWORD;       // Axis error code
+    // Torque        : LREAL;       // Current torque (%)
+END_VAR
+
+VAR
+    // PLCopen function blocks for reading axis data
+    fbReadPosition  : MC_ReadActualPosition;
+    fbReadVelocity  : MC_ReadActualVelocity;
+
+    // Axis reference
+    axisRef         : AXIS_REF;
+    lastAxisSelect  : UINT;
+END_VAR
+
+// ============================================================================
+// IMPLEMENTATION
+// ============================================================================
+
+// Validate axis selection
+AxisValid := (AxisSelect >= 1) AND (AxisSelect <= 36);
+
+IF NOT AxisValid THEN
+    // Invalid axis - return zeros
+    Position := 0.0;
+    Velocity := 0.0;
+    RETURN;
+END_IF
+
+// Update axis reference when selection changes
+IF AxisSelect <> lastAxisSelect THEN
+    axisRef := AXIF_CONFIG_INDEXES[AxisSelect];
+    lastAxisSelect := AxisSelect;
+END_IF
+
+// Read current position
+fbReadPosition(
+    Axis := axisRef,
+    Enable := TRUE
+);
+Position := fbReadPosition.Position;
+
+// Read current velocity
+fbReadVelocity(
+    Axis := axisRef,
+    Enable := TRUE
+);
+Velocity := fbReadVelocity.Velocity;
+
+// ============================================================================
+// END FB_AxisData
+// ============================================================================

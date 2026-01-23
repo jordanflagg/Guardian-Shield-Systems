@@ -1063,10 +1063,6 @@
                                 <div id="ledFaulted" class="pilot-light red"></div>
                             </div>
                             <div class="status-row">
-                                <span class="status-label">Axes Homed</span>
-                                <div id="ledHomed" class="pilot-light green"></div>
-                            </div>
-                            <div class="status-row">
                                 <span class="status-label">Drives Enabled</span>
                                 <div id="ledDrives" class="pilot-light green"></div>
                             </div>
@@ -1188,14 +1184,11 @@
                                     <div style="text-align: center; padding: 20px;">
                                         <div style="margin-bottom: 15px;">
                                             <span style="font-size: 14px; color: #666;">Selected Axis: </span>
-                                            <span id="selectedAxisDisplay" style="font-size: 16px; font-weight: 600; color: #333;">None</span>
+                                            <span id="selectedAxisDisplay" style="font-size: 16px; font-weight: 600; color: #333;">Axis 1 - Block Shift</span>
                                         </div>
-                                        <div class="jog-controls">
-                                            <button class="btn btn-secondary btn-jog" onclick="jogAxis(1)">+</button>
-                                            <div style="display: flex; gap: 60px; margin: 10px 0;">
-                                                <button class="btn btn-secondary btn-jog" onclick="jogAxis(-1)">-</button>
-                                                <div style="width: 60px;"></div>
-                                            </div>
+                                        <div class="jog-controls" style="flex-direction: row; gap: 20px; justify-content: center;">
+                                            <button class="btn btn-secondary btn-jog" onmousedown="startJog(1)" onmouseup="stopJog()" onmouseleave="stopJog()">+</button>
+                                            <button class="btn btn-secondary btn-jog" onmousedown="startJog(-1)" onmouseup="stopJog()" onmouseleave="stopJog()">-</button>
                                         </div>
                                         <div class="jog-speed">
                                             <label>Jog Speed (mm/s):</label>
@@ -1212,6 +1205,17 @@
                                     <div style="display: flex; align-items: center; gap: 15px;">
                                         <span style="font-size: 24px; font-weight: 600; font-family: 'Consolas', monospace;" id="currentPosition">0.000</span>
                                         <span style="font-size: 14px; color: #666;">mm</span>
+                                    </div>
+                                </div>
+                                <div class="form-section">
+                                    <h3>System Status</h3>
+                                    <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 10px;">
+                                        <div id="manualHomedLed" class="pilot-light green" style="width: 24px; height: 24px;"></div>
+                                        <span style="font-size: 13px;">Axes Homed</span>
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: 15px;">
+                                        <div id="manualDrivesLed" class="pilot-light green" style="width: 24px; height: 24px;"></div>
+                                        <span style="font-size: 13px;">Drives Enabled</span>
                                     </div>
                                 </div>
                             </div>
@@ -1274,22 +1278,19 @@
                             </div>
                             <div class="form-section">
                                 <h3>Feature Flags</h3>
+                                <p style="font-size: 11px; color: #888; margin-bottom: 10px;">Enable or disable processing sections. Disabled sections will be skipped during the cycle.</p>
                                 <div class="form-grid">
                                     <div class="checkbox-group">
-                                        <input type="checkbox" id="edit_enableStuds">
+                                        <input type="checkbox" id="edit_enableStuds" onchange="updateTabVisibility()">
                                         <label for="edit_enableStuds">Enable Stud Carving</label>
                                     </div>
                                     <div class="checkbox-group">
-                                        <input type="checkbox" id="edit_enableWindowsDoors">
+                                        <input type="checkbox" id="edit_enableWindowsDoors" onchange="updateTabVisibility()">
                                         <label for="edit_enableWindowsDoors">Enable Windows/Doors</label>
                                     </div>
                                     <div class="checkbox-group">
-                                        <input type="checkbox" id="edit_enableElectrical">
+                                        <input type="checkbox" id="edit_enableElectrical" onchange="updateTabVisibility()">
                                         <label for="edit_enableElectrical">Enable Electrical Trough</label>
-                                    </div>
-                                    <div class="checkbox-group">
-                                        <input type="checkbox" id="edit_isActive">
-                                        <label for="edit_isActive">Recipe Active</label>
                                     </div>
                                 </div>
                             </div>
@@ -1299,41 +1300,44 @@
                         <div id="editor-tab-loading" class="editor-tab-content">
                             <div class="form-section">
                                 <h3>Loading/Unloading Positions (mm)</h3>
-                                <p style="font-size: 11px; color: #888; margin-bottom: 15px;">Configure position setpoints for block loading and unloading operations.</p>
+                                <p style="font-size: 11px; color: #888; margin-bottom: 15px;">Configure position setpoints for block loading and unloading operations. Home position is always 0.</p>
                                 <div class="position-group">
                                     <h4>Axis 1 - Block Shift</h4>
                                     <div class="form-grid">
                                         <div class="form-group"><label>Shift Position</label><input type="number" step="0.1" id="edit_axis1_ShiftPosition"></div>
-                                        <div class="form-group"><label>Home Position</label><input type="number" step="0.1" id="edit_axis1_HomePosition"></div>
                                     </div>
                                 </div>
                                 <div class="position-group">
-                                    <h4>Axes 2-5 - Load Table Lift</h4>
+                                    <h4>Axes 2-5 - Load Table Lift (+ slaves 3, 4, 5)</h4>
                                     <div class="form-grid">
                                         <div class="form-group"><label>Raise Position</label><input type="number" step="0.1" id="edit_axis2_RaisePosition"></div>
                                         <div class="form-group"><label>Lower Position</label><input type="number" step="0.1" id="edit_axis2_LowerPosition"></div>
                                     </div>
                                 </div>
                                 <div class="position-group">
-                                    <h4>Axes 6-7 - Shift to Center</h4>
+                                    <h4>Axes 6-7 - Shift to Center (+ slave 7)</h4>
                                     <div class="form-grid">
                                         <div class="form-group"><label>Shift Position</label><input type="number" step="0.1" id="edit_axis6_ShiftPosition"></div>
-                                        <div class="form-group"><label>Home Position</label><input type="number" step="0.1" id="edit_axis6_HomePosition"></div>
                                     </div>
                                 </div>
                                 <div class="position-group">
-                                    <h4>Axes 8-9 - Unload Pusher</h4>
+                                    <h4>Axes 8-9 - Unload Pusher (+ slave 9)</h4>
                                     <div class="form-grid">
                                         <div class="form-group"><label>Shift Position</label><input type="number" step="0.1" id="edit_axis8_ShiftPosition"></div>
-                                        <div class="form-group"><label>Home Position</label><input type="number" step="0.1" id="edit_axis8_HomePosition"></div>
                                         <div class="form-group"><label>Unload Position</label><input type="number" step="0.1" id="edit_axis8_UnloadPosition"></div>
                                     </div>
                                 </div>
                                 <div class="position-group">
-                                    <h4>Axes 10-13 - Unload Table Lift</h4>
+                                    <h4>Axes 10-13 - Unload Table Lift (+ slaves 11, 12, 13)</h4>
                                     <div class="form-grid">
                                         <div class="form-group"><label>Raise Position</label><input type="number" step="0.1" id="edit_axis10_RaisePosition"></div>
                                         <div class="form-group"><label>Lower Position</label><input type="number" step="0.1" id="edit_axis10_LowerPosition"></div>
+                                    </div>
+                                </div>
+                                <div class="position-group">
+                                    <h4>Axis 34 - Unload Shift Wall</h4>
+                                    <div class="form-grid">
+                                        <div class="form-group"><label>Shift Position</label><input type="number" step="0.1" id="edit_axis34_ShiftPosition"></div>
                                     </div>
                                 </div>
                             </div>
@@ -1386,6 +1390,7 @@
                             <button class="btn btn-success" onclick="saveRecipeChanges()" id="btnSaveRecipe" disabled>Save Changes</button>
                             <button class="btn btn-primary" onclick="downloadRecipeToPLC()" id="btnDownloadRecipe" disabled>Download to PLC</button>
                             <button class="btn btn-secondary" onclick="revertRecipeChanges()" id="btnRevertRecipe" disabled>Revert Changes</button>
+                            <button class="btn btn-estop" style="margin-left: auto; padding: 14px 16px; font-size: 13px;" onclick="deleteCurrentRecipe()" id="btnDeleteRecipe" disabled>Delete Recipe</button>
                         </div>
                     </div>
                 </div>
@@ -1436,7 +1441,15 @@
             motionStep: 'PLC_PRG.HMI_MotionStep',
             motionSubStep: 'PLC_PRG.HMI_MotionSubStep',
             activeAxesMask: 'PLC_PRG.HMI_ActiveAxesMask',
-            stepDescription: 'PLC_PRG.HMI_StepDescription'
+            stepDescription: 'PLC_PRG.HMI_StepDescription',
+            // Manual jog control
+            jogAxis: 'PLC_PRG.HMI_JogAxis',
+            jogDirection: 'PLC_PRG.HMI_JogDirection',
+            jogSpeed: 'PLC_PRG.HMI_JogSpeed',
+            jogEnable: 'PLC_PRG.HMI_JogEnable',
+            jogPosition: 'PLC_PRG.HMI_JogPosition',
+            // Loaded recipe tracking
+            loadedRecipeId: 'PLC_PRG.HMI_LoadedRecipeId'
         };
 
         const machineStates = {
@@ -1470,26 +1483,47 @@
             22: 'Stud Vertical 3', 23: 'Stud Horizontal 3', 24: 'Stud V3 Slave', 25: 'Stud H3 Slave',
             26: 'Stud Vertical 4', 27: 'Stud Horizontal 4', 28: 'Stud V4 Slave', 29: 'Stud H4 Slave',
             30: 'Window Horizontal', 31: 'Window Vertical', 32: 'Window H Slave', 33: 'Window V Slave',
-            34: 'Reserved', 35: 'Electrical 1', 36: 'Electrical 2'
+            34: 'Unload Shift Wall', 35: 'Electrical 1', 36: 'Electrical 2'
+        };
+
+        // Master axes configuration for manual control (only masters can be jogged)
+        // Format: { axisNum: { name: 'display name', slaves: [slave axis numbers] } }
+        const masterAxes = {
+            1:  { name: 'Block Shift', slaves: [] },
+            2:  { name: 'Load Table Lift', slaves: [3, 4, 5] },
+            6:  { name: 'Shift to Center', slaves: [7] },
+            8:  { name: 'Unload Pusher', slaves: [9] },
+            10: { name: 'Unload Table Lift', slaves: [11, 12, 13] },
+            14: { name: 'Stud Vertical 1', slaves: [16] },
+            15: { name: 'Stud Horizontal 1', slaves: [17] },
+            18: { name: 'Stud Vertical 2', slaves: [20] },
+            19: { name: 'Stud Horizontal 2', slaves: [21] },
+            22: { name: 'Stud Vertical 3', slaves: [24] },
+            23: { name: 'Stud Horizontal 3', slaves: [25] },
+            26: { name: 'Stud Vertical 4', slaves: [28] },
+            27: { name: 'Stud Horizontal 4', slaves: [29] },
+            30: { name: 'Window Horizontal', slaves: [32] },
+            31: { name: 'Window Vertical', slaves: [33] },
+            34: { name: 'Unload Shift Wall', slaves: [] },
+            35: { name: 'Electrical 1', slaves: [] },
+            36: { name: 'Electrical 2', slaves: [] }
         };
 
         // Recipe data (local cache - will sync with PLC)
         let recipes = [
-            { recipeID: 1, recipeName: '8ft Standard Block', recipeDescription: 'Standard 8ft block with all features', isActive: true, enableStuds: true, enableWindowsDoors: true, enableElectrical: true },
-            { recipeID: 2, recipeName: '10ft Studs Only', recipeDescription: '10ft block with studs only', isActive: true, enableStuds: true, enableWindowsDoors: false, enableElectrical: false },
-            { recipeID: 3, recipeName: '8ft Windows Only', recipeDescription: '8ft block with windows/doors only', isActive: true, enableStuds: false, enableWindowsDoors: true, enableElectrical: false },
-            { recipeID: 4, recipeName: '8ft Electrical Only', recipeDescription: '8ft block with electrical trough only', isActive: true, enableStuds: false, enableWindowsDoors: false, enableElectrical: true },
-            { recipeID: 5, recipeName: '12ft Full Block', recipeDescription: '12ft block with all features', isActive: true, enableStuds: true, enableWindowsDoors: true, enableElectrical: true },
-            { recipeID: 6, recipeName: '4ft Quick Test', recipeDescription: '4ft test block at reduced speed', isActive: true, enableStuds: true, enableWindowsDoors: true, enableElectrical: true },
-            { recipeID: 7, recipeName: '8ft Studs+Windows', recipeDescription: '8ft block with studs and windows', isActive: true, enableStuds: true, enableWindowsDoors: true, enableElectrical: false },
-            { recipeID: 8, recipeName: 'Reserved 8', recipeDescription: 'Reserved for future use', isActive: false, enableStuds: true, enableWindowsDoors: true, enableElectrical: true },
-            { recipeID: 9, recipeName: 'Reserved 9', recipeDescription: 'Reserved for future use', isActive: false, enableStuds: true, enableWindowsDoors: true, enableElectrical: true },
-            { recipeID: 10, recipeName: 'Reserved 10', recipeDescription: 'Reserved for future use', isActive: false, enableStuds: true, enableWindowsDoors: true, enableElectrical: true }
+            { recipeID: 1, recipeName: '8ft Standard Block', recipeDescription: 'Standard 8ft block with all features', enableStuds: true, enableWindowsDoors: true, enableElectrical: true },
+            { recipeID: 2, recipeName: '10ft Studs Only', recipeDescription: '10ft block with studs only', enableStuds: true, enableWindowsDoors: false, enableElectrical: false },
+            { recipeID: 3, recipeName: '8ft Windows Only', recipeDescription: '8ft block with windows/doors only', enableStuds: false, enableWindowsDoors: true, enableElectrical: false },
+            { recipeID: 4, recipeName: '8ft Electrical Only', recipeDescription: '8ft block with electrical trough only', enableStuds: false, enableWindowsDoors: false, enableElectrical: true },
+            { recipeID: 5, recipeName: '12ft Full Block', recipeDescription: '12ft block with all features', enableStuds: true, enableWindowsDoors: true, enableElectrical: true },
+            { recipeID: 6, recipeName: '4ft Quick Test', recipeDescription: '4ft test block at reduced speed', enableStuds: true, enableWindowsDoors: true, enableElectrical: true },
+            { recipeID: 7, recipeName: '8ft Studs+Windows', recipeDescription: '8ft block with studs and windows', enableStuds: true, enableWindowsDoors: true, enableElectrical: false }
         ];
 
         let selectedRecipeIndex = -1;
         let originalRecipe = null;
-        let selectedAxis = null;
+        let selectedAxis = 1; // Default to axis 1
+        let loadedRecipeId = 1; // The recipe currently loaded in PLC memory
 
         let authToken = null;
         let drivesOn = false;
@@ -1524,10 +1558,10 @@
             const homingList = document.getElementById('homingAxisList');
             const manualList = document.getElementById('manualAxisList');
 
+            // Homing list - show all 36 axes
             for (let i = 1; i <= 36; i++) {
                 const name = axisNames[i] || `Axis ${i}`;
 
-                // Homing list item
                 const homingItem = document.createElement('div');
                 homingItem.className = 'axis-item not-homed';
                 homingItem.id = `homing-axis-${i}`;
@@ -1536,23 +1570,36 @@
                     <span class="axis-status not-homed">NOT HOMED</span>
                 `;
                 homingList.appendChild(homingItem);
+            }
 
-                // Manual list item
+            // Manual list - show only master axes with slave info
+            for (const [axisNum, config] of Object.entries(masterAxes)) {
+                const i = parseInt(axisNum);
+                let label = `Axis ${i} - ${config.name}`;
+                if (config.slaves.length > 0) {
+                    label += ` (+ ${config.slaves.join(', ')})`;
+                }
+
                 const manualItem = document.createElement('div');
                 manualItem.className = 'axis-item';
                 manualItem.id = `manual-axis-${i}`;
                 manualItem.style.cursor = 'pointer';
                 manualItem.onclick = () => selectAxisForJog(i);
-                manualItem.innerHTML = `
-                    <span class="axis-name">Axis ${i} - ${name}</span>
-                `;
+                manualItem.innerHTML = `<span class="axis-name">${label}</span>`;
                 manualList.appendChild(manualItem);
             }
         }
 
-        function selectAxisForJog(axisNum) {
+        async function selectAxisForJog(axisNum) {
             selectedAxis = axisNum;
             document.getElementById('selectedAxisDisplay').textContent = `Axis ${axisNum} - ${axisNames[axisNum]}`;
+
+            // Write selected axis to PLC so it reads the correct position
+            try {
+                await writePLCVariable('PLC_PRG.HMI_JogAxis', axisNum, 'UINT');
+            } catch (e) {
+                console.error('Failed to update selected axis:', e);
+            }
 
             // Highlight selected
             document.querySelectorAll('#manualAxisList .axis-item').forEach(item => {
@@ -1563,15 +1610,40 @@
             document.getElementById(`manual-axis-${axisNum}`).style.borderColor = '#f7941d';
         }
 
-        function jogAxis(direction) {
+        // Jog control functions
+        let jogActive = false;
+
+        async function startJog(direction) {
             if (!selectedAxis) {
                 showRecipeAlert('Please select an axis first', 'warning');
                 return;
             }
+            jogActive = true;
             const speed = parseFloat(document.getElementById('jogSpeed').value) || 10;
-            const distance = parseFloat(document.getElementById('jogDistance').value) || 1;
-            console.log(`Jog Axis ${selectedAxis}: direction=${direction}, speed=${speed}, distance=${distance}`);
-            // TODO: Implement actual jog command to PLC
+
+            try {
+                // Write jog parameters to PLC
+                await writePLCVariable(`PLC_PRG.HMI_JogAxis`, selectedAxis, 'UINT');
+                await writePLCVariable(`PLC_PRG.HMI_JogDirection`, direction > 0, null); // true = positive, false = negative
+                await writePLCVariable(`PLC_PRG.HMI_JogSpeed`, speed, 'LREAL');
+                await writePLCVariable(`PLC_PRG.HMI_JogEnable`, true);
+                console.log(`Jog Axis ${selectedAxis}: direction=${direction}, speed=${speed}`);
+            } catch (error) {
+                console.error('Jog start failed:', error);
+                showError('Jog command failed: ' + error.message);
+            }
+        }
+
+        async function stopJog() {
+            if (!jogActive) return;
+            jogActive = false;
+
+            try {
+                await writePLCVariable(`PLC_PRG.HMI_JogEnable`, false);
+                console.log('Jog stopped');
+            } catch (error) {
+                console.error('Jog stop failed:', error);
+            }
         }
 
         // ================================================================
@@ -1581,16 +1653,73 @@
             const list = document.getElementById('recipeList');
             list.innerHTML = '';
             recipes.forEach((r, i) => {
+                const isLoaded = r.recipeID === loadedRecipeId;
                 const item = document.createElement('div');
-                item.className = `recipe-item ${r.isActive ? '' : 'inactive'} ${i === selectedRecipeIndex ? 'selected' : ''}`;
+                item.className = `recipe-item ${i === selectedRecipeIndex ? 'selected' : ''}`;
                 item.onclick = () => selectRecipeForEdit(i);
                 item.innerHTML = `
                     <div class="recipe-id">Recipe ${r.recipeID}</div>
                     <div class="recipe-title">${r.recipeName}</div>
-                    <span class="recipe-status-badge ${r.isActive ? 'active' : 'inactive'}">${r.isActive ? 'ACTIVE' : 'INACTIVE'}</span>
+                    ${isLoaded ? '<span class="recipe-status-badge active">ACTIVE</span>' : ''}
                 `;
                 list.appendChild(item);
             });
+
+            // Add "Add New Recipe" button at the bottom
+            const addBtn = document.createElement('div');
+            addBtn.className = 'recipe-item';
+            addBtn.style.textAlign = 'center';
+            addBtn.style.color = '#4caf50';
+            addBtn.style.fontWeight = '600';
+            addBtn.style.border = '2px dashed #4caf50';
+            addBtn.style.background = '#e8f5e9';
+            addBtn.onclick = () => addNewRecipe();
+            addBtn.innerHTML = '+ Add New Recipe';
+            list.appendChild(addBtn);
+        }
+
+        function addNewRecipe() {
+            const newId = recipes.length > 0 ? Math.max(...recipes.map(r => r.recipeID)) + 1 : 1;
+            const newRecipe = {
+                recipeID: newId,
+                recipeName: `New Recipe ${newId}`,
+                recipeDescription: 'New recipe description',
+                enableStuds: true,
+                enableWindowsDoors: true,
+                enableElectrical: true
+            };
+            recipes.push(newRecipe);
+            renderRecipeList();
+            selectRecipeForEdit(recipes.length - 1);
+            showRecipeAlert('New recipe created. Edit and save to keep changes.', 'success');
+        }
+
+        function deleteCurrentRecipe() {
+            if (selectedRecipeIndex < 0) return;
+            const r = recipes[selectedRecipeIndex];
+
+            if (r.recipeID === loadedRecipeId) {
+                showRecipeAlert('Cannot delete the currently loaded recipe!', 'error');
+                return;
+            }
+
+            if (recipes.length <= 1) {
+                showRecipeAlert('Cannot delete the last recipe!', 'error');
+                return;
+            }
+
+            if (!confirm(`Are you sure you want to delete "${r.recipeName}"?`)) return;
+
+            recipes.splice(selectedRecipeIndex, 1);
+            selectedRecipeIndex = -1;
+            originalRecipe = null;
+            document.getElementById('editingRecipeName').textContent = 'Select a recipe';
+            document.getElementById('btnSaveRecipe').disabled = true;
+            document.getElementById('btnDownloadRecipe').disabled = true;
+            document.getElementById('btnRevertRecipe').disabled = true;
+            document.getElementById('btnDeleteRecipe').disabled = true;
+            renderRecipeList();
+            showRecipeAlert('Recipe deleted.', 'warning');
         }
 
         function selectRecipeForEdit(index) {
@@ -1602,6 +1731,8 @@
             document.getElementById('btnSaveRecipe').disabled = false;
             document.getElementById('btnDownloadRecipe').disabled = false;
             document.getElementById('btnRevertRecipe').disabled = false;
+            document.getElementById('btnDeleteRecipe').disabled = false;
+            updateTabVisibility();
         }
 
         function loadRecipeIntoEditor(r) {
@@ -1611,7 +1742,29 @@
             document.getElementById('edit_enableStuds').checked = r.enableStuds;
             document.getElementById('edit_enableWindowsDoors').checked = r.enableWindowsDoors;
             document.getElementById('edit_enableElectrical').checked = r.enableElectrical;
-            document.getElementById('edit_isActive').checked = r.isActive;
+        }
+
+        // Show/hide editor tabs based on feature flags
+        function updateTabVisibility() {
+            const enableStuds = document.getElementById('edit_enableStuds').checked;
+            const enableWindows = document.getElementById('edit_enableWindowsDoors').checked;
+            const enableElectrical = document.getElementById('edit_enableElectrical').checked;
+
+            // Get tab buttons
+            const studsTab = document.querySelector('.editor-tab[onclick="switchEditorTab(\'studs\')"]');
+            const windowsTab = document.querySelector('.editor-tab[onclick="switchEditorTab(\'windows\')"]');
+            const electricalTab = document.querySelector('.editor-tab[onclick="switchEditorTab(\'electrical\')"]');
+
+            // Show/hide tabs
+            studsTab.style.display = enableStuds ? '' : 'none';
+            windowsTab.style.display = enableWindows ? '' : 'none';
+            electricalTab.style.display = enableElectrical ? '' : 'none';
+
+            // If current tab is hidden, switch to general
+            const currentTab = document.querySelector('.editor-tab.active');
+            if (currentTab && currentTab.style.display === 'none') {
+                switchEditorTab('general');
+            }
         }
 
         function switchEditorTab(tabName) {
@@ -1629,7 +1782,6 @@
             r.enableStuds = document.getElementById('edit_enableStuds').checked;
             r.enableWindowsDoors = document.getElementById('edit_enableWindowsDoors').checked;
             r.enableElectrical = document.getElementById('edit_enableElectrical').checked;
-            r.isActive = document.getElementById('edit_isActive').checked;
             originalRecipe = JSON.parse(JSON.stringify(r));
             showRecipeAlert('Recipe saved successfully!', 'success');
             renderRecipeList();
@@ -1675,8 +1827,17 @@
 
                 updatePilotLight('ledRunning', running, 'green');
                 updatePilotLight('ledFaulted', faulted, 'red');
-                updatePilotLight('ledHomed', homed, 'green');
                 updatePilotLight('ledDrives', drivesState, 'green');
+
+                // Update manual page status LEDs
+                updatePilotLight('manualHomedLed', homed, 'green');
+                updatePilotLight('manualDrivesLed', drivesState, 'green');
+
+                // Update homing page status
+                if (document.getElementById('homingStatusLed')) {
+                    updatePilotLight('homingStatusLed', homed, 'green');
+                    document.getElementById('homingStatusText').textContent = homed ? 'All Axes Homed' : 'Not Homed';
+                }
 
                 drivesOn = drivesState;
                 updateDrivesButton();
@@ -1710,6 +1871,25 @@
                     document.getElementById('stepDescription').textContent = stepDesc || 'Waiting...';
 
                     updateActiveAxes(activeAxesMask);
+                } catch (e) {}
+
+                // Update manual jog position display
+                try {
+                    if (selectedAxis && currentPage === 'manual') {
+                        const position = await readPLCVariable(plcVars.jogPosition);
+                        document.getElementById('currentPosition').textContent = (position || 0).toFixed(3);
+                    }
+                } catch (e) {}
+
+                // Update loaded recipe ID for recipe page
+                try {
+                    const loadedId = await readPLCVariable(plcVars.loadedRecipeId);
+                    if (loadedId !== loadedRecipeId) {
+                        loadedRecipeId = loadedId || 1;
+                        if (currentPage === 'recipes') {
+                            renderRecipeList();
+                        }
+                    }
                 } catch (e) {}
 
                 updateConnectionStatus(true);
@@ -1775,6 +1955,10 @@
             let body;
             if (plcType === 'UINT') {
                 body = JSON.stringify({ type: "uint16", value: Number(value) });
+            } else if (plcType === 'LREAL') {
+                body = JSON.stringify({ type: "float64", value: Number(value) });
+            } else if (plcType === 'REAL') {
+                body = JSON.stringify({ type: "float32", value: Number(value) });
             } else if (typeof value === 'boolean') {
                 body = JSON.stringify({ type: "bool8", value: Boolean(value) });
             } else {
@@ -1855,7 +2039,9 @@
 
         function updatePilotLight(id, isOn, color) {
             const el = document.getElementById(id);
-            el.className = 'pilot-light ' + color + (isOn ? ' on' : '');
+            if (el) {
+                el.className = 'pilot-light ' + color + (isOn ? ' on' : '');
+            }
         }
 
         function updateOperationCheck(id, enabled) {

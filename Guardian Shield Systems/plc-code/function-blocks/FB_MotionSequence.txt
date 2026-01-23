@@ -20,9 +20,21 @@ VAR_OUTPUT
     ActiveAxesMask : LWORD;             // Bitmask of currently moving axes (64-bit for 36 axes)
     StepDescription : STRING[80];       // Human-readable description
 
-    // Error outputs
-    HasError : BOOL;                    // Motion error occurred
-    ErrorAxisID : UINT;                 // Which axis caused error
+    // Individual step error outputs (for FB_ErrorHandler in state machine)
+    LoadBlockError : BOOL;
+    LoadBlockErrorAxisID : UINT;
+    StudsError : BOOL;
+    StudsErrorAxisID : UINT;
+    WindowsDoorsError : BOOL;
+    WindowsDoorsErrorAxisID : UINT;
+    ElectricalError : BOOL;
+    ElectricalErrorAxisID : UINT;
+    UnloadError : BOOL;
+    UnloadErrorAxisID : UINT;
+
+    // Aggregate error flag (for quick check)
+    HasError : BOOL;                    // Any motion error occurred
+    ErrorAxisID : UINT;                 // Which axis caused first error
 END_VAR
 
 VAR
@@ -48,9 +60,6 @@ VAR
     stepWindowsDoors : FB_MotionStep_WindowsDoors;
     stepElectrical : FB_MotionStep_Electrical;
     stepUnload : FB_MotionStep_Unload;
-
-    // Error handler
-    errorHandler : FB_ErrorHandler;
 
     // State tracking
     stepStarted : BOOL := FALSE;
@@ -99,11 +108,20 @@ IF NOT Enable THEN
     stepWindowsDoors(Enable := FALSE);
     stepElectrical(Enable := FALSE);
     stepUnload(Enable := FALSE);
-    errorHandler(Reset := TRUE);
 
     // Clear error state when disabled (errors are handled by state machine)
     HasError := FALSE;
     ErrorAxisID := 0;
+    LoadBlockError := FALSE;
+    LoadBlockErrorAxisID := 0;
+    StudsError := FALSE;
+    StudsErrorAxisID := 0;
+    WindowsDoorsError := FALSE;
+    WindowsDoorsErrorAxisID := 0;
+    ElectricalError := FALSE;
+    ElectricalErrorAxisID := 0;
+    UnloadError := FALSE;
+    UnloadErrorAxisID := 0;
 
     ActiveAxesMask := 0;
     stepStarted := FALSE;
@@ -266,31 +284,34 @@ END_CASE
 CurrentStep := motionStep;
 
 // ============================================================================
-// ERROR HANDLER
+// EXPOSE INDIVIDUAL STEP ERRORS (for FB_ErrorHandler in state machine)
 // ============================================================================
 
-errorHandler(
-    Reset := FALSE,  // Error handler still uses Reset for clearing error state
-    LoadBlockError := stepLoadBlock.Error,
-    LoadBlockErrorAxisID := stepLoadBlock.ErrorAxisID,
-    StudsError := stepStuds.Error,
-    StudsErrorAxisID := stepStuds.ErrorAxisID,
-    WindowsDoorsError := stepWindowsDoors.Error,
-    WindowsDoorsErrorAxisID := stepWindowsDoors.ErrorAxisID,
-    ElectricalError := stepElectrical.Error,
-    ElectricalErrorAxisID := stepElectrical.ErrorAxisID,
-    UnloadError := stepUnload.Error,
-    UnloadErrorAxisID := stepUnload.ErrorAxisID,
-    GearingError := FALSE,  // Would come from FB_AxisGearing
-    GearingErrorAxisID := 0,
-    PowerError := FALSE,    // Would come from FB_AxisPower
-    PowerErrorAxisID := 0,
-    CurrentStep := motionStep,
-    CurrentSubStep := CurrentSubStep
-);
+LoadBlockError := stepLoadBlock.Error;
+LoadBlockErrorAxisID := stepLoadBlock.ErrorAxisID;
+StudsError := stepStuds.Error;
+StudsErrorAxisID := stepStuds.ErrorAxisID;
+WindowsDoorsError := stepWindowsDoors.Error;
+WindowsDoorsErrorAxisID := stepWindowsDoors.ErrorAxisID;
+ElectricalError := stepElectrical.Error;
+ElectricalErrorAxisID := stepElectrical.ErrorAxisID;
+UnloadError := stepUnload.Error;
+UnloadErrorAxisID := stepUnload.ErrorAxisID;
 
-// Propagate error handler output
-IF errorHandler.HasError THEN
-    HasError := TRUE;
-    ErrorAxisID := errorHandler.ErrorInfo.errorAxisID;
+// Compute aggregate error flag for quick checking
+HasError := LoadBlockError OR StudsError OR WindowsDoorsError OR ElectricalError OR UnloadError;
+
+// Report first error axis
+IF LoadBlockError THEN
+    ErrorAxisID := LoadBlockErrorAxisID;
+ELSIF StudsError THEN
+    ErrorAxisID := StudsErrorAxisID;
+ELSIF WindowsDoorsError THEN
+    ErrorAxisID := WindowsDoorsErrorAxisID;
+ELSIF ElectricalError THEN
+    ErrorAxisID := ElectricalErrorAxisID;
+ELSIF UnloadError THEN
+    ErrorAxisID := UnloadErrorAxisID;
+ELSE
+    ErrorAxisID := 0;
 END_IF

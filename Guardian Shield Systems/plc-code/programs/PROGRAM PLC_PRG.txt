@@ -4,8 +4,11 @@ VAR
     buttonManager : FB_ButtonManager;
     axisPower : FB_AxisPower;
     stateMachine : FB_MachineStateMachine;
-    // Note: motionSequence is embedded inside stateMachine, not needed here
-    
+
+    // HMI Data Exchange - Called directly from PLC_PRG (not buried in FBs)
+    axisData : FB_AxisData;             // Reads position/velocity for selected axis
+    axisManual : FB_AxisManual;         // Jog control for manual mode
+
     // Raw button inputs (you toggle these for testing)
     btn_Start : BOOL := FALSE;
     btn_Stop : BOOL := FALSE;
@@ -43,6 +46,22 @@ VAR
     HMI_HasError : BOOL := FALSE;           // TRUE if motion error occurred
     HMI_ErrorAxisID : UINT := 0;            // Which axis caused the error (0 = none)
     HMI_DrivesReady : BOOL := FALSE;        // TRUE when all drives are powered
+
+    // HMI Manual Jog Control Variables (written by web HMI)
+    HMI_JogAxis : UINT := 1;                // Selected axis for jogging (1-36, master axes only)
+    HMI_JogDirection : BOOL := FALSE;       // TRUE = positive, FALSE = negative
+    HMI_JogSpeed : LREAL := 10.0;           // Jog velocity in mm/s
+    HMI_JogEnable : BOOL := FALSE;          // TRUE while jog button held down
+
+    // HMI Manual Jog Feedback Variables (read by web HMI)
+    HMI_JogPosition : LREAL := 0.0;         // Current position of selected axis
+    HMI_JogVelocity : LREAL := 0.0;         // Current velocity of selected axis
+    HMI_JogActive : BOOL := FALSE;          // TRUE when jog is actively moving
+    HMI_JogError : BOOL := FALSE;           // TRUE if jog error occurred
+    HMI_JogInvalidAxis : BOOL := FALSE;     // TRUE if selected axis is not a master axis
+
+    // HMI Loaded Recipe Tracking
+    HMI_LoadedRecipeId : UINT := 1;         // Recipe currently loaded in PLC memory
 END_VAR
 
 
@@ -74,7 +93,7 @@ axisPower(
 );
 
 // ============================================================================
-// STATE MACHINE - Uses processed button outputs
+// STATE MACHINE - Handles machine state logic only (no HMI data pass-through)
 // ============================================================================
 stateMachine(
     startButton := buttonManager.btn_Start_Out,
@@ -83,14 +102,45 @@ stateMachine(
     manualMode := buttonManager.btn_Manual_Out,
     eStopActive := buttonManager.btn_EStop_Out,
     resetButton := buttonManager.btn_Reset_Out,
-    selectedRecipe := HMI_RecipeSelect
+    selectedRecipe := HMI_RecipeSelect,
+    // Power error inputs (for centralized error handler)
+    powerError := (axisPower.ErrorAxisID <> 0),
+    powerErrorAxisID := axisPower.ErrorAxisID
 );
-
 
 MACHINE_STATE := stateMachine.currentStateOut;
 
 // ============================================================================
-// UPDATE HMI VARIABLES
+// HMI AXIS DATA - Always reads position/velocity for selected axis
+// Called directly from PLC_PRG, independent of machine state
+// ============================================================================
+axisData(
+    AxisSelect := HMI_JogAxis
+);
+
+// Update HMI with real-time axis data (always available)
+HMI_JogPosition := axisData.Position;
+HMI_JogVelocity := axisData.Velocity;
+
+// ============================================================================
+// HMI MANUAL JOG CONTROL - Only active when machine is in MANUAL state
+// Called directly from PLC_PRG for explicit control
+// ============================================================================
+axisManual(
+    Enable := stateMachine.inManualMode,
+    AxisSelect := HMI_JogAxis,
+    JogPositive := HMI_JogEnable AND HMI_JogDirection,      // Enable + positive direction
+    JogNegative := HMI_JogEnable AND NOT HMI_JogDirection,  // Enable + negative direction
+    JogVelocity := HMI_JogSpeed
+);
+
+// Update HMI with jog feedback
+HMI_JogActive := axisManual.Active;
+HMI_JogError := axisManual.Error;
+HMI_JogInvalidAxis := axisManual.InvalidAxis;
+
+// ============================================================================
+// UPDATE HMI STATUS VARIABLES
 // ============================================================================
 // Expose state machine status to web HMI
 isRunning := stateMachine.isRunning;
@@ -129,6 +179,9 @@ HMI_StepDescription := stateMachine.stepDescription;
 // ============================================================================
 // UPDATE ERROR HMI VARIABLES
 // ============================================================================
-HMI_HasError := stateMachine.hasMotionError;
-HMI_ErrorAxisID := stateMachine.errorAxisID;
+HMI_HasError := stateMachine.hasError;
+HMI_ErrorAxisID := stateMachine.errorInfo.errorAxisID;
 HMI_DrivesReady := axisPower.DrivesReady;
+
+// Track loaded recipe (for now, same as active - could be different if editing)
+HMI_LoadedRecipeId := HMI_ActiveRecipe;

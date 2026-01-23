@@ -1,3 +1,4 @@
+{attribute 'no_assign'}
 FUNCTION_BLOCK FB_AxisPower
 // Centralized power management for all 36 axes
 // Handles MC_Power enable and MC_Reset for fault clearing

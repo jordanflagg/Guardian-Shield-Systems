@@ -1,3 +1,4 @@
+{attribute 'no_assign'}
 FUNCTION_BLOCK FB_AxisGearing
 // Manages all permanent gearing relationships between master and slave axes.
 // Due to VAR_IN_OUT requirements of MB_GearInPos, each pair requires explicit calls.

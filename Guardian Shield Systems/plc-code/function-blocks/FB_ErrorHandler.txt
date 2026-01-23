@@ -1,6 +1,10 @@
 FUNCTION_BLOCK FB_ErrorHandler
-// Centralized error handling for motion sequence
-// Collects errors from all motion step FBs and provides unified error reporting
+// Centralized error handling for the entire machine
+// Located in FB_MachineStateMachine to collect errors from all subsystems:
+//   - FB_AxisPower (power errors)
+//   - FB_AxisGearing (gearing errors)
+//   - FB_MotionSequence (motion step errors)
+// Provides unified error reporting with error codes, descriptions, and context
 
 VAR_INPUT
     Reset : BOOL;                       // Reset all errors

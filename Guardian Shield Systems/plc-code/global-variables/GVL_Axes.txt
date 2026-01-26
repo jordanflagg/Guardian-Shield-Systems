@@ -1,0 +1,49 @@
+{attribute 'qualified_only'}
+VAR_GLOBAL CONSTANT
+    // ============================================================================
+    // MASTER AXIS CONFIGURATION
+    // Single source of truth for all master axis definitions
+    // ============================================================================
+    // Master axes are the primary motion controllers - slaves follow via gearing
+    // Total: 18 master axes controlling 36 physical axes
+    //
+    // Axis Groups:
+    //   1      - Shift left (independent)
+    //   2      - Load table lift (master for 3,4,5)
+    //   6      - Shift center (master for 7)
+    //   8      - Pusher (master for 9)
+    //   10     - Unload table lift (master for 11,12,13)
+    //   14,15  - Stud carving pair 1 (masters for 16,17)
+    //   18,19  - Stud carving pair 2 (masters for 20,21)
+    //   22,23  - Stud carving pair 3 (masters for 24,25)
+    //   26,27  - Stud carving pair 4 (masters for 28,29)
+    //   30,31  - Window/door (masters for 32,33)
+    //   34     - Reserved
+    //   35,36  - Electrical cutting (independent)
+    // ============================================================================
+
+    MASTER_AXES : ARRAY[1..18] OF UINT := [
+        1,      // Shift left
+        2,      // Load table lift
+        6,      // Shift center
+        8,      // Pusher
+        10,     // Unload table lift
+        14,     // Stud vertical pair 1
+        15,     // Stud horizontal pair 1
+        18,     // Stud vertical pair 2
+        19,     // Stud horizontal pair 2
+        22,     // Stud vertical pair 3
+        23,     // Stud horizontal pair 3
+        26,     // Stud vertical pair 4
+        27,     // Stud horizontal pair 4
+        30,     // Window/door horizontal
+        31,     // Window/door vertical
+        34,     // Reserved
+        35,     // Electrical cutting 1
+        36      // Electrical cutting 2
+    ];
+
+    MASTER_AXIS_COUNT : UINT := 18;
+    TOTAL_AXIS_COUNT : UINT := 36;
+
+END_VAR

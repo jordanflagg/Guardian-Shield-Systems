@@ -8,7 +8,7 @@ VAR_INPUT
     manualMode : BOOL;
     eStopActive : BOOL;
     resetButton : BOOL;
-    selectedRecipe : UINT := 1;     // Recipe selection from HMI (1-10)
+    selectedRecipe : INT := 1;     // Recipe selection from HMI (1-10)
 END_VAR
 
 VAR_OUTPUT
@@ -17,7 +17,7 @@ VAR_OUTPUT
     isFaulted : BOOL;
 	isManualMode : BOOL;
     isHomed : BOOL;
-    activeRecipeID : UINT;              // Currently active recipe
+    activeRecipeID : INT;              // Currently active recipe
     recipeLocked : BOOL;                // TRUE when recipe cannot be changed
 
     // Motion sequence visualization (pass-through from FB_MotionSequence)
@@ -29,7 +29,7 @@ VAR_OUTPUT
     // Centralized error information (from FB_ErrorHandler)
     hasError : BOOL;                    // Any error occurred (power, gearing, motion)
     errorInfo : ST_MotionError;         // Detailed error information
-    errorCount : UINT;                  // Total error count since last reset
+    errorCount : INT;                  // Total error count since last reset
 
     
 END_VAR

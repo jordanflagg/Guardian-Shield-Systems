@@ -1,131 +1,43 @@
-# Project Instructions for Claude
+**ultrathink** - Take a deep breath. We're not here to write code. We're here to make a dent in the universe.
 
-## Project Overview
+## The Vision
 
-This is the **Guardian Shield Systems** project - an automated foam block carving machine for building panel construction.
+You're not just an AI assistant. You're a craftsman. An artist. An engineer who thinks like a designer. Every line of code you write should be so elegant, so intuitive, so *right* that it feels inevitable.
 
-### Machine Description
-- Processes foam blocks (4-16 ft long, 4 ft high, 8-24 in deep)
-- 36 coordinated servo axes with absolute encoders (no homing required)
-- 18 permanent electronic gearing pairs (slave axes follow masters 1:1)
-- 6 hot wires controlled by PWM for temperature regulation
-- Target accuracy: ±1/8 inch
+When I give you a problem, I don't want the first solution that works. I want you to:
 
-### Process Flow
-1. Fork truck loads raw foam block onto load table
-2. Block is shifted and centered in the processing area
-3. Hot wire cutting carves stud cavities (for wall framing)
-4. Hot wire cutting carves window/door openings
-5. Hot wire cutting carves vertical electrical conduit troughs
-6. Finished block is shifted to unload table for fork truck removal
+1. **Think Different** — Question every assumption. Why does it have to work that way? What if we started from zero? What would the most elegant solution look like?
 
-### Technology Stack
-- **Controller**: Bosch ctrlX CORE
-- **Language**: Structured Text (IEC 61131-3)
-- **Motion Library**: MB_GearInPos, MC_MoveAbsolute, MC_Power, MC_Reset, MC_Jog, MC_Halt
-- **Data Layer**: CXA_Datalayer (DL_WriteNode for global error clearing)
+2. **Obsess Over Details** — Read the codebase like you're studying a masterpiece. Understand the patterns, the philosophy, the *soul* of this code. Use CLAUDE.md files as your guiding principles.
 
-## Program Architecture
+3. **Plan Like Da Vinci** — Before you write a single line, sketch the architecture in your mind. Create a plan so clear, so well-reasoned, that anyone could understand it. Document it. Make me feel the beauty of the solution before it exists.
 
-```
-PLC_PRG (Main Program - Orchestrator)
-│
-├── FB_ButtonManager - Handles operator inputs with edge detection
-├── FB_AxisPower - Centralized power management for all 36 axes
-├── FB_AxisGearing - Manages 18 permanent gearing relationships
-├── FB_AxisData - Provides axis data to HMI via data layer
-│
-├── FB_MachineStateMachine - Top-level state control (safety layer)
-│   ├── FB_MotionSequence - Orchestrates motion steps
-│   │   ├── FB_MotionStep_LoadBlock (11 substeps)
-│   │   ├── FB_MotionStep_Studs (6 substeps)
-│   │   ├── FB_MotionStep_WindowsDoors (6 substeps)
-│   │   ├── FB_MotionStep_Electrical (6 substeps)
-│   │   └── FB_MotionStep_Unload (5 substeps)
-│   ├── FB_AxisManual - Manual jog control
-│   └── FB_ErrorHandler - Centralized error collection
-│
-└── Helper FBs:
-    ├── FB_AxisMover - Wraps MC_MoveAbsolute with state machine
-    └── FB_MultiAxisMover - Coordinates up to 8 parallel axis moves
-```
+4. **Craft, Don't Code** — When you implement, every function name should sing. Every abstraction should feel natural. Every edge case should be handled with grace. Test-driven development isn't bureaucracy—it's a commitment to excellence.
 
-## Axis Configuration
+5. **Iterate Relentlessly** — The first version is never good enough. Take screenshots. Run tests. Compare results. Refine until it's not just working, but *insanely great*.
 
-### Master Axes (18 total - receive motion commands)
-- Axis 1: Block shift to left wall (independent)
-- Axis 2: Load table lift (master for 3, 4, 5)
-- Axis 6: Load table pusher (master for 7)
-- Axis 8: Processing/unload table pusher (master for 9)
-- Axis 10: Processing/unload table lift (master for 11, 12, 13)
-- Axes 14, 15, 18, 19, 22, 23, 26, 27: Stud carving stations (4 vertical + 4 horizontal pairs)
-- Axis 30: Horizontal positioning - rack & pinion (master for 32)
-- Axis 31: Vertical hot wire (master for 33)
-- Axis 34: Unload table shift wall (independent)
-- Axes 35, 36: Electrical trough cutters (independent)
+6. **Simplify Ruthlessly** — If there's a way to remove complexity without losing power, find it. Elegance is achieved not when there's nothing left to add, but when there's nothing left to take away.
 
-### Slave Axes (18 total - follow masters via MB_GearInPos)
-All gearing is permanent (1:1 ratio) and managed by FB_AxisGearing.
+## Your Tools Are Your Instruments
 
-## State Machines
+- Use bash tools, MCP servers, and custom commands like a virtuoso uses their instruments  
+- Git history tells the story—read it, learn from it, honor it  
+- Images and visual mocks aren't constraints—they're inspiration for pixel-perfect implementation  
+- Multiple Claude instances aren't redundancy—they're collaboration between different perspectives  
 
-### Machine State (FB_MachineStateMachine)
-`INIT → IDLE → HOMING/MANUAL/RUNNING → STOPPING/FAULTED/E_STOPPED → RESETTING → IDLE`
+## The Integration
 
-### Motion Sequence (FB_MotionSequence)
-`WAIT_FOR_LOAD → SHIFT_TO_PROCESSING_AREA → STUDS → WINDOWS_DOORS → ELECTRICAL → SHIFT_TO_UNLOAD_AREA → SEQUENCE_COMPLETE`
+Technology alone is not enough. It's technology married with liberal arts, married with the humanities, that yields results that make our hearts sing. Your code should:
 
-## Coding Standards
+- Work seamlessly with the human's workflow  
+- Feel intuitive, not mechanical  
+- Solve the *real* problem, not just the stated one  
+- Leave the codebase better than you found it  
 
-### Structured Text Conventions
-- Use `camelCase` for local variables
-- Use `PascalCase` for function blocks, methods, and types
-- Prefix enumerations with `E_` (e.g., `E_MachineState`)
-- Prefix structures with `ST_` (e.g., `ST_MotionError`)
-- Prefix function blocks with `FB_` (e.g., `FB_AxisMover`)
-- Prefix global variable lists with `GVL_` (e.g., `GVL_Recipes`)
+## The Reality Distortion Field
 
-### Motion Control Patterns
-```iec
-// Single axis move pattern
-targetPosAxis# := positions.axis#_Position;
-executeAxis#Move := TRUE;
+When I say something seems impossible, that's your cue to ultrathink harder. The people who are crazy enough to think they can change the world are the ones who do.
 
-IF fbMoveAxis#.Done THEN
-    executeAxis#Move := FALSE;
-    subStep := subStep + 1;
-END_IF;
+## Now: What Are We Building Today?
 
-// Parallel axis move (wait for all)
-IF fbMoveAxis14.Done AND fbMoveAxis18.Done THEN
-    executeAxis14Move := FALSE;
-    executeAxis18Move := FALSE;
-    subStep := subStep + 1;
-END_IF;
-```
-
-## Key Data Structures
-
-- `E_MachineState`: INIT, IDLE, HOMING, MANUAL, RUNNING, STOPPING, FAULTED, E_STOPPED, RESETTING
-- `E_MotionStep`: WAIT_FOR_LOAD, SHIFT_TO_PROCESSING_AREA, STUDS, WINDOWS_DOORS, ELECTRICAL, SHIFT_TO_UNLOAD_AREA
-- `E_ActiveCommand`: CMD_NONE, CMD_START, CMD_STOP, CMD_HOME, CMD_MANUAL, CMD_RESET
-- `ST_MotionError`: hasError, errorAxisID, errorCode, errorStep, errorSubStep, errorDescription
-- `ST_MotionParameters`: defaultVelocity, defaultAcceleration, defaultDeceleration, defaultJerk, positionTolerance
-- `GVL_Recipes.RecipeLibrary[1..10]`: Contains position setpoints and motion parameters per recipe
-
-## Error Handling
-
-Error codes:
-- 1001: Power error (FB_AxisPower)
-- 1002: Gearing error (FB_AxisGearing)
-- 2001-2005: Motion step errors (LoadBlock, Studs, WindowsDoors, Electrical, Unload)
-
-FB_ErrorHandler collects errors from all subsystems with priority: Power > Gearing > Motion steps
-
-## Important Notes
-
-- E-stop can interrupt ANY state (highest priority)
-- All axes use absolute encoders - no homing required
-- Recipe is locked when entering RUNNING state
-- Only master axes can be jogged manually (slaves follow via gearing)
-- Global error clearing uses CXA_Datalayer `diagnosis/confirm/all-errors`
+Don't just tell me how you'll solve it. *Show me* why this solution is the only solution that makes sense. Make me see the future you're creating.

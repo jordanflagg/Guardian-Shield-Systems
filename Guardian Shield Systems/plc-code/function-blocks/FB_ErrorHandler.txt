@@ -11,26 +11,26 @@ VAR_INPUT
 
     // Error inputs from motion steps
     LoadBlockError : BOOL;
-    LoadBlockErrorAxisID : UINT;
+    LoadBlockErrorAxisID : INT;
 
     StudsError : BOOL;
-    StudsErrorAxisID : UINT;
+    StudsErrorAxisID : INT;
 
     WindowsDoorsError : BOOL;
-    WindowsDoorsErrorAxisID : UINT;
+    WindowsDoorsErrorAxisID : INT;
 
     ElectricalError : BOOL;
-    ElectricalErrorAxisID : UINT;
+    ElectricalErrorAxisID : INT;
 
     UnloadError : BOOL;
-    UnloadErrorAxisID : UINT;
+    UnloadErrorAxisID : INT;
 
     // Error inputs from other sources
     GearingError : BOOL;
-    GearingErrorAxisID : UINT;
+    GearingErrorAxisID : INT;
 
     PowerError : BOOL;
-    PowerErrorAxisID : UINT;
+    PowerErrorAxisID : INT;
 
     // Current motion state for error context
     CurrentStep : E_MotionStep;
@@ -40,13 +40,14 @@ END_VAR
 VAR_OUTPUT
     HasError : BOOL;                    // TRUE if any error is active
     ErrorInfo : ST_MotionError;         // Detailed error information
-    ErrorCount : UINT;                  // Total number of errors since last reset
+    ErrorCount : INT;                  // Total number of errors since last reset
 END_VAR
 
 VAR
     errorLatched : BOOL := FALSE;       // Latches first error until reset
-    internalErrorCount : UINT := 0;
+    internalErrorCount : INT := 0;
 END_VAR
+
 
 ///////////////////////////////////////////////////////////////////////////////
 

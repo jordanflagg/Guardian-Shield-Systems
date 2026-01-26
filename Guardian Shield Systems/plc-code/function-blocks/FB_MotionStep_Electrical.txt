@@ -1,7 +1,13 @@
+{attribute 'no_assign'}
 FUNCTION_BLOCK FB_MotionStep_Electrical
+// ============================================================================
 // Handles ELECTRICAL motion sequence
 // Controls electrical trough cutting axes (35, 36 independent, 30 for positioning)
-// 6 substeps total
+// Uses FB_MotionStepBase for enable/disable handling
+//
+// Axes: 30 (positioning), 35, 36 (electrical cutting - independent, no gearing)
+// 6 substeps: position -> extend -> cut -> retract -> home -> complete
+// ============================================================================
 
 VAR_INPUT
     Enable : BOOL;                      // TRUE to run this step
@@ -13,224 +19,197 @@ VAR_OUTPUT
     Done : BOOL;                        // Step completed
     Busy : BOOL;                        // Step in progress
     Error : BOOL;                       // Step failed
-    ErrorAxisID : UINT;                 // Which axis caused error
+    ErrorAxisID : INT;                 // Which axis caused error
     CurrentSubStep : INT;               // Current substep (0-5)
-    ActiveAxesMask : LWORD;             // Bitmask of moving axes (64-bit for 36 axes)
+    ActiveAxesMask : LWORD;             // Bitmask of moving axes
     StepDescription : STRING[80];       // Human-readable description
 END_VAR
 
 VAR
-    subStep : INT := 0;
+    // Base handler for enable/disable logic
+    base : FB_MotionStepBase;
 
     // Electrical trough axes
     moverAxis30 : FB_AxisMover;         // Horizontal positioning
     moverAxis35 : FB_AxisMover;         // Electrical cutting (independent)
     moverAxis36 : FB_AxisMover;         // Electrical cutting (independent)
 
-    // State tracking
-    stepStarted : BOOL := FALSE;
+    // Status for parallel moves
+    status30 : ST_MoverStatus;
+    status35 : ST_MoverStatus;
+    status36 : ST_MoverStatus;
+    tempErrorAxis : UINT;
+
+    // Local substep tracking
+    subStep : INT;
+
+    // Empty placeholder for unused mover slots
+    emptyStatus : ST_MoverStatus := (Done := FALSE, Error := FALSE, AxisID := 0);
 END_VAR
 
 ///////////////////////////////////////////////////////////////////////////////
 
-// Not enabled - reset state for next cycle
-IF NOT Enable THEN
-    Busy := FALSE;
-    Done := FALSE;
+// Run base enable/disable handler
+base(Enable := Enable);
+
+// Reset substep on new enable
+IF base.ResetSubStep THEN
+    subStep := 0;
+END_IF
+
+// Handle disabled state
+IF NOT base.ShouldRun THEN
+    Done := base.Done;
+    Busy := base.Busy;
     Error := FALSE;
     ErrorAxisID := 0;
     ActiveAxesMask := 0;
-    stepStarted := FALSE;
-    subStep := 0;
+    CurrentSubStep := 0;
+    StepDescription := '';
     RETURN;
 END_IF
 
-// Start on enable
-IF Enable AND NOT stepStarted THEN
-    stepStarted := TRUE;
-    Busy := TRUE;
-    subStep := 0;
-END_IF
-
-// Update output
+// Update outputs
 CurrentSubStep := subStep;
+
+// Build status for utility functions
+status30.Done := moverAxis30.Done;
+status30.Error := moverAxis30.Error;
+status30.AxisID := 30;
+
+status35.Done := moverAxis35.Done;
+status35.Error := moverAxis35.Error;
+status35.AxisID := 35;
+
+status36.Done := moverAxis36.Done;
+status36.Error := moverAxis36.Error;
+status36.AxisID := 36;
 
 // Substep state machine
 CASE subStep OF
 
-    // ----------------------------------------------------------------
-    0: // Axes 30,32 move to starting position for trough
+    // =========================================================================
+    0: // Axis 30 moves to starting position for trough
+    // =========================================================================
         StepDescription := 'Electrical - positioning for trough';
+        ActiveAxesMask := FC_BuildAxisMask(30, 0, 0, 0, 0, 0, 0, 0);
 
-        moverAxis30(
-            Execute := TRUE,
-            AxisRef := Axis_30,
-            Position := Positions.axis30_TargetPosition_3,
-            Velocity := MotionParams.defaultVelocity,
-            Acceleration := MotionParams.defaultAcceleration,
-            Deceleration := MotionParams.defaultDeceleration,
-            Jerk := MotionParams.defaultJerk
-        );
+        moverAxis30(Execute := TRUE, AxisRef := Axis_30, Position := Positions.axis30_TargetPosition_3,
+            Velocity := MotionParams.defaultVelocity, Acceleration := MotionParams.defaultAcceleration,
+            Deceleration := MotionParams.defaultDeceleration, Jerk := MotionParams.defaultJerk);
 
-        ActiveAxesMask := SHL(LWORD#1, 29);  // Axis 30
-
-        IF moverAxis30.Done THEN
-            moverAxis30(Execute := FALSE);
-            subStep := 1;
-        ELSIF moverAxis30.Error THEN
+        IF moverAxis30.Error THEN
             Error := TRUE;
             ErrorAxisID := 30;
+        ELSIF moverAxis30.Done THEN
+            moverAxis30(Execute := FALSE);
+            subStep :=1;
         END_IF
 
-    // ----------------------------------------------------------------
-    1: // Axes 35,36 extend into foam to depth
+    // =========================================================================
+    1: // Axes 35,36 extend into foam to depth (parallel move)
+    // =========================================================================
         StepDescription := 'Electrical - extending into foam';
+        ActiveAxesMask := FC_BuildAxisMask(35, 36, 0, 0, 0, 0, 0, 0);
 
-        moverAxis35(
-            Execute := TRUE,
-            AxisRef := Axis_35,
-            Position := Positions.axis35_TargetPosition_1,
-            Velocity := MotionParams.defaultVelocity,
-            Acceleration := MotionParams.defaultAcceleration,
-            Deceleration := MotionParams.defaultDeceleration,
-            Jerk := MotionParams.defaultJerk
-        );
+        moverAxis35(Execute := TRUE, AxisRef := Axis_35, Position := Positions.axis35_TargetPosition_1,
+            Velocity := MotionParams.defaultVelocity, Acceleration := MotionParams.defaultAcceleration,
+            Deceleration := MotionParams.defaultDeceleration, Jerk := MotionParams.defaultJerk);
 
-        moverAxis36(
-            Execute := TRUE,
-            AxisRef := Axis_36,
-            Position := Positions.axis36_TargetPosition_1,
-            Velocity := MotionParams.defaultVelocity,
-            Acceleration := MotionParams.defaultAcceleration,
-            Deceleration := MotionParams.defaultDeceleration,
-            Jerk := MotionParams.defaultJerk
-        );
+        moverAxis36(Execute := TRUE, AxisRef := Axis_36, Position := Positions.axis36_TargetPosition_1,
+            Velocity := MotionParams.defaultVelocity, Acceleration := MotionParams.defaultAcceleration,
+            Deceleration := MotionParams.defaultDeceleration, Jerk := MotionParams.defaultJerk);
 
-        ActiveAxesMask := SHL(LWORD#1, 34) OR SHL(LWORD#1, 35);  // Axes 35, 36
+        tempErrorAxis := FC_FindFirstErrorAxis(status35, status36,
+            emptyStatus, emptyStatus, emptyStatus, emptyStatus, emptyStatus, emptyStatus);
 
-        IF moverAxis35.Done AND moverAxis36.Done THEN
+        IF tempErrorAxis > 0 THEN
+            Error := TRUE;
+            ErrorAxisID := tempErrorAxis;
+        ELSIF moverAxis35.Done AND moverAxis36.Done THEN
             moverAxis35(Execute := FALSE);
             moverAxis36(Execute := FALSE);
-            subStep := 2;
-        ELSIF moverAxis35.Error OR moverAxis36.Error THEN
-            Error := TRUE;
-            IF moverAxis35.Error THEN ErrorAxisID := 35;
-            ELSE ErrorAxisID := 36;
-            END_IF
+            subStep :=2;
         END_IF
 
-    // ----------------------------------------------------------------
-    2: // Axes 30,32 move to cut trough
+    // =========================================================================
+    2: // Axis 30 moves to cut trough
+    // =========================================================================
         StepDescription := 'Electrical - cutting trough';
+        ActiveAxesMask := FC_BuildAxisMask(30, 0, 0, 0, 0, 0, 0, 0);
 
-        moverAxis30(
-            Execute := TRUE,
-            AxisRef := Axis_30,
-            Position := Positions.axis30_TargetPosition_4,
-            Velocity := MotionParams.defaultVelocity,
-            Acceleration := MotionParams.defaultAcceleration,
-            Deceleration := MotionParams.defaultDeceleration,
-            Jerk := MotionParams.defaultJerk
-        );
+        moverAxis30(Execute := TRUE, AxisRef := Axis_30, Position := Positions.axis30_TargetPosition_4,
+            Velocity := MotionParams.defaultVelocity, Acceleration := MotionParams.defaultAcceleration,
+            Deceleration := MotionParams.defaultDeceleration, Jerk := MotionParams.defaultJerk);
 
-        ActiveAxesMask := SHL(LWORD#1, 29);  // Axis 30
-
-        IF moverAxis30.Done THEN
-            moverAxis30(Execute := FALSE);
-            subStep := 3;
-        ELSIF moverAxis30.Error THEN
+        IF moverAxis30.Error THEN
             Error := TRUE;
             ErrorAxisID := 30;
+        ELSIF moverAxis30.Done THEN
+            moverAxis30(Execute := FALSE);
+            subStep :=3;
         END_IF
 
-    // ----------------------------------------------------------------
-    3: // Axes 35,36 retract from foam
+    // =========================================================================
+    3: // Axes 35,36 retract from foam (parallel move)
+    // =========================================================================
         StepDescription := 'Electrical - retracting';
+        ActiveAxesMask := FC_BuildAxisMask(35, 36, 0, 0, 0, 0, 0, 0);
 
-        moverAxis35(
-            Execute := TRUE,
-            AxisRef := Axis_35,
-            Position := Positions.axis35_TargetPosition_2,
-            Velocity := MotionParams.defaultVelocity,
-            Acceleration := MotionParams.defaultAcceleration,
-            Deceleration := MotionParams.defaultDeceleration,
-            Jerk := MotionParams.defaultJerk
-        );
+        moverAxis35(Execute := TRUE, AxisRef := Axis_35, Position := Positions.axis35_TargetPosition_2,
+            Velocity := MotionParams.defaultVelocity, Acceleration := MotionParams.defaultAcceleration,
+            Deceleration := MotionParams.defaultDeceleration, Jerk := MotionParams.defaultJerk);
 
-        moverAxis36(
-            Execute := TRUE,
-            AxisRef := Axis_36,
-            Position := Positions.axis36_TargetPosition_2,
-            Velocity := MotionParams.defaultVelocity,
-            Acceleration := MotionParams.defaultAcceleration,
-            Deceleration := MotionParams.defaultDeceleration,
-            Jerk := MotionParams.defaultJerk
-        );
+        moverAxis36(Execute := TRUE, AxisRef := Axis_36, Position := Positions.axis36_TargetPosition_2,
+            Velocity := MotionParams.defaultVelocity, Acceleration := MotionParams.defaultAcceleration,
+            Deceleration := MotionParams.defaultDeceleration, Jerk := MotionParams.defaultJerk);
 
-        ActiveAxesMask := SHL(LWORD#1, 34) OR SHL(LWORD#1, 35);  // Axes 35, 36
+        tempErrorAxis := FC_FindFirstErrorAxis(status35, status36,
+            emptyStatus, emptyStatus, emptyStatus, emptyStatus, emptyStatus, emptyStatus);
 
-        IF moverAxis35.Done AND moverAxis36.Done THEN
+        IF tempErrorAxis > 0 THEN
+            Error := TRUE;
+            ErrorAxisID := tempErrorAxis;
+        ELSIF moverAxis35.Done AND moverAxis36.Done THEN
             moverAxis35(Execute := FALSE);
             moverAxis36(Execute := FALSE);
-            subStep := 4;
-        ELSIF moverAxis35.Error OR moverAxis36.Error THEN
-            Error := TRUE;
-            IF moverAxis35.Error THEN ErrorAxisID := 35;
-            ELSE ErrorAxisID := 36;
-            END_IF
+            subStep :=4;
         END_IF
 
-    // ----------------------------------------------------------------
-    4: // All axes 30,35,36 return home
+    // =========================================================================
+    4: // All axes 30,35,36 return home (parallel move)
+    // =========================================================================
         StepDescription := 'Electrical - returning home';
+        ActiveAxesMask := FC_BuildAxisMask(30, 35, 36, 0, 0, 0, 0, 0);
 
-        moverAxis30(
-            Execute := TRUE,
-            AxisRef := Axis_30,
-            Position := Positions.axis30_HomePosition,
-            Velocity := MotionParams.defaultVelocity,
-            Acceleration := MotionParams.defaultAcceleration,
-            Deceleration := MotionParams.defaultDeceleration,
-            Jerk := MotionParams.defaultJerk
-        );
+        moverAxis30(Execute := TRUE, AxisRef := Axis_30, Position := Positions.axis30_HomePosition,
+            Velocity := MotionParams.defaultVelocity, Acceleration := MotionParams.defaultAcceleration,
+            Deceleration := MotionParams.defaultDeceleration, Jerk := MotionParams.defaultJerk);
 
-        moverAxis35(
-            Execute := TRUE,
-            AxisRef := Axis_35,
-            Position := Positions.axis35_HomePosition,
-            Velocity := MotionParams.defaultVelocity,
-            Acceleration := MotionParams.defaultAcceleration,
-            Deceleration := MotionParams.defaultDeceleration,
-            Jerk := MotionParams.defaultJerk
-        );
+        moverAxis35(Execute := TRUE, AxisRef := Axis_35, Position := Positions.axis35_HomePosition,
+            Velocity := MotionParams.defaultVelocity, Acceleration := MotionParams.defaultAcceleration,
+            Deceleration := MotionParams.defaultDeceleration, Jerk := MotionParams.defaultJerk);
 
-        moverAxis36(
-            Execute := TRUE,
-            AxisRef := Axis_36,
-            Position := Positions.axis36_HomePosition,
-            Velocity := MotionParams.defaultVelocity,
-            Acceleration := MotionParams.defaultAcceleration,
-            Deceleration := MotionParams.defaultDeceleration,
-            Jerk := MotionParams.defaultJerk
-        );
+        moverAxis36(Execute := TRUE, AxisRef := Axis_36, Position := Positions.axis36_HomePosition,
+            Velocity := MotionParams.defaultVelocity, Acceleration := MotionParams.defaultAcceleration,
+            Deceleration := MotionParams.defaultDeceleration, Jerk := MotionParams.defaultJerk);
 
-        ActiveAxesMask := SHL(LWORD#1, 29) OR SHL(LWORD#1, 34) OR SHL(LWORD#1, 35);  // Axes 30, 35, 36
+        tempErrorAxis := FC_FindFirstErrorAxis(status30, status35, status36,
+            emptyStatus, emptyStatus, emptyStatus, emptyStatus, emptyStatus);
 
-        IF moverAxis30.Done AND moverAxis35.Done AND moverAxis36.Done THEN
+        IF tempErrorAxis > 0 THEN
+            Error := TRUE;
+            ErrorAxisID := tempErrorAxis;
+        ELSIF moverAxis30.Done AND moverAxis35.Done AND moverAxis36.Done THEN
             moverAxis30(Execute := FALSE);
             moverAxis35(Execute := FALSE);
             moverAxis36(Execute := FALSE);
-            subStep := 5;
-        ELSIF moverAxis30.Error OR moverAxis35.Error OR moverAxis36.Error THEN
-            Error := TRUE;
-            IF moverAxis30.Error THEN ErrorAxisID := 30;
-            ELSIF moverAxis35.Error THEN ErrorAxisID := 35;
-            ELSE ErrorAxisID := 36;
-            END_IF
+            subStep :=5;
         END_IF
 
-    // ----------------------------------------------------------------
+    // =========================================================================
     5: // Complete - electrical trough done
+    // =========================================================================
         StepDescription := 'Electrical trough complete';
         ActiveAxesMask := 0;
         Done := TRUE;
@@ -238,7 +217,7 @@ CASE subStep OF
 
 END_CASE
 
-// Handle errors
+// Handle errors - stop motion and clear busy
 IF Error THEN
     Busy := FALSE;
     ActiveAxesMask := 0;

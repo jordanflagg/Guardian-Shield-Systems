@@ -1,7 +1,12 @@
 FUNCTION_BLOCK FB_MotionStep_WindowsDoors
+// ============================================================================
 // Handles WINDOWS_DOORS motion sequence
 // Controls window/door cutting axes (30,31 masters, 32,33 slaves via gearing)
-// 6 substeps total
+// Uses FB_MotionStepBase for enable/disable handling
+//
+// Axes: 30 (horizontal), 31 (vertical) with slaves 32, 33
+// 6 substeps: position -> down -> cut -> up -> home -> complete
+// ============================================================================
 
 VAR_INPUT
     Enable : BOOL;                      // TRUE to run this step
@@ -15,183 +20,169 @@ VAR_OUTPUT
     Error : BOOL;                       // Step failed
     ErrorAxisID : UINT;                 // Which axis caused error
     CurrentSubStep : INT;               // Current substep (0-5)
-    ActiveAxesMask : LWORD;             // Bitmask of moving axes (64-bit for 36 axes)
+    ActiveAxesMask : LWORD;             // Bitmask of moving axes
     StepDescription : STRING[80];       // Human-readable description
 END_VAR
 
 VAR
-    subStep : INT := 0;
+    // Base handler for enable/disable logic
+    base : FB_MotionStepBase;
 
     // Window/door axes
     moverAxis30 : FB_AxisMover;         // Horizontal master (slave: 32)
     moverAxis31 : FB_AxisMover;         // Vertical master (slave: 33)
 
-    // State tracking
-    stepStarted : BOOL := FALSE;
+    // Status for parallel move in substep 4
+    status30 : ST_MoverStatus;
+    status31 : ST_MoverStatus;
+    tempErrorAxis : UINT;
+
+    // Local substep tracking
+    subStep : INT;
+
+    // Empty placeholder for unused mover slots
+    emptyStatus : ST_MoverStatus := (Done := FALSE, Error := FALSE, AxisID := 0);
 END_VAR
 
 ///////////////////////////////////////////////////////////////////////////////
 
-// Not enabled - reset state for next cycle
-IF NOT Enable THEN
-    Busy := FALSE;
-    Done := FALSE;
+// Run base enable/disable handler
+base(Enable := Enable);
+
+// Reset substep on new enable
+IF base.ResetSubStep THEN
+    subStep := 0;
+END_IF
+
+// Handle disabled state
+IF NOT base.ShouldRun THEN
+    Done := base.Done;
+    Busy := base.Busy;
     Error := FALSE;
     ErrorAxisID := 0;
     ActiveAxesMask := 0;
-    stepStarted := FALSE;
-    subStep := 0;
+    CurrentSubStep := 0;
+    StepDescription := '';
     RETURN;
 END_IF
 
-// Start on enable
-IF Enable AND NOT stepStarted THEN
-    stepStarted := TRUE;
-    Busy := TRUE;
-    subStep := 0;
-END_IF
-
-// Update output
+// Update outputs
 CurrentSubStep := subStep;
+
+// Build status for utility functions
+status30.Done := moverAxis30.Done;
+status30.Error := moverAxis30.Error;
+status30.AxisID := 30;
+
+status31.Done := moverAxis31.Done;
+status31.Error := moverAxis31.Error;
+status31.AxisID := 31;
 
 // Substep state machine
 CASE subStep OF
 
-    // ----------------------------------------------------------------
-    0: // Axes 30,32 (horizontal) move to position 1
+    // =========================================================================
+    0: // Axis 30 (horizontal) moves to position 1 - slave 32 follows
+    // =========================================================================
         StepDescription := 'Window/door - horizontal position';
+        ActiveAxesMask := FC_BuildAxisMask(30, 0, 0, 0, 0, 0, 0, 0);
 
-        moverAxis30(
-            Execute := TRUE,
-            AxisRef := Axis_30,
-            Position := Positions.axis30_TargetPosition_1,
-            Velocity := MotionParams.defaultVelocity,
-            Acceleration := MotionParams.defaultAcceleration,
-            Deceleration := MotionParams.defaultDeceleration,
-            Jerk := MotionParams.defaultJerk
-        );
+        moverAxis30(Execute := TRUE, AxisRef := Axis_30, Position := Positions.axis30_TargetPosition_1,
+            Velocity := MotionParams.defaultVelocity, Acceleration := MotionParams.defaultAcceleration,
+            Deceleration := MotionParams.defaultDeceleration, Jerk := MotionParams.defaultJerk);
 
-        ActiveAxesMask := SHL(LWORD#1, 29);  // Axis 30 (slave 32 follows)
-
-        IF moverAxis30.Done THEN
-            moverAxis30(Execute := FALSE);
-            subStep := 1;
-        ELSIF moverAxis30.Error THEN
+        IF moverAxis30.Error THEN
             Error := TRUE;
             ErrorAxisID := 30;
+        ELSIF moverAxis30.Done THEN
+            moverAxis30(Execute := FALSE);
+            subStep :=1;
         END_IF
 
-    // ----------------------------------------------------------------
-    1: // Axes 31,33 (vertical) move down to position 1
+    // =========================================================================
+    1: // Axis 31 (vertical) moves down to position 1 - slave 33 follows
+    // =========================================================================
         StepDescription := 'Window/door - vertical down';
+        ActiveAxesMask := FC_BuildAxisMask(31, 0, 0, 0, 0, 0, 0, 0);
 
-        moverAxis31(
-            Execute := TRUE,
-            AxisRef := Axis_31,
-            Position := Positions.axis31_TargetPosition_1,
-            Velocity := MotionParams.defaultVelocity,
-            Acceleration := MotionParams.defaultAcceleration,
-            Deceleration := MotionParams.defaultDeceleration,
-            Jerk := MotionParams.defaultJerk
-        );
+        moverAxis31(Execute := TRUE, AxisRef := Axis_31, Position := Positions.axis31_TargetPosition_1,
+            Velocity := MotionParams.defaultVelocity, Acceleration := MotionParams.defaultAcceleration,
+            Deceleration := MotionParams.defaultDeceleration, Jerk := MotionParams.defaultJerk);
 
-        ActiveAxesMask := SHL(LWORD#1, 30);  // Axis 31 (slave 33 follows)
-
-        IF moverAxis31.Done THEN
-            moverAxis31(Execute := FALSE);
-            subStep := 2;
-        ELSIF moverAxis31.Error THEN
+        IF moverAxis31.Error THEN
             Error := TRUE;
             ErrorAxisID := 31;
+        ELSIF moverAxis31.Done THEN
+            moverAxis31(Execute := FALSE);
+            subStep :=2;
         END_IF
 
-    // ----------------------------------------------------------------
-    2: // Axes 30,32 move to position 2 (cutting)
+    // =========================================================================
+    2: // Axis 30 moves to position 2 (cutting)
+    // =========================================================================
         StepDescription := 'Window/door - cutting horizontal';
+        ActiveAxesMask := FC_BuildAxisMask(30, 0, 0, 0, 0, 0, 0, 0);
 
-        moverAxis30(
-            Execute := TRUE,
-            AxisRef := Axis_30,
-            Position := Positions.axis30_TargetPosition_2,
-            Velocity := MotionParams.defaultVelocity,
-            Acceleration := MotionParams.defaultAcceleration,
-            Deceleration := MotionParams.defaultDeceleration,
-            Jerk := MotionParams.defaultJerk
-        );
+        moverAxis30(Execute := TRUE, AxisRef := Axis_30, Position := Positions.axis30_TargetPosition_2,
+            Velocity := MotionParams.defaultVelocity, Acceleration := MotionParams.defaultAcceleration,
+            Deceleration := MotionParams.defaultDeceleration, Jerk := MotionParams.defaultJerk);
 
-        ActiveAxesMask := SHL(LWORD#1, 29);  // Axis 30
-
-        IF moverAxis30.Done THEN
-            moverAxis30(Execute := FALSE);
-            subStep := 3;
-        ELSIF moverAxis30.Error THEN
+        IF moverAxis30.Error THEN
             Error := TRUE;
             ErrorAxisID := 30;
+        ELSIF moverAxis30.Done THEN
+            moverAxis30(Execute := FALSE);
+            subStep :=3;
         END_IF
 
-    // ----------------------------------------------------------------
-    3: // Axes 31,33 move up to position 2
+    // =========================================================================
+    3: // Axis 31 moves up to position 2
+    // =========================================================================
         StepDescription := 'Window/door - vertical up';
+        ActiveAxesMask := FC_BuildAxisMask(31, 0, 0, 0, 0, 0, 0, 0);
 
-        moverAxis31(
-            Execute := TRUE,
-            AxisRef := Axis_31,
-            Position := Positions.axis31_TargetPosition_2,
-            Velocity := MotionParams.defaultVelocity,
-            Acceleration := MotionParams.defaultAcceleration,
-            Deceleration := MotionParams.defaultDeceleration,
-            Jerk := MotionParams.defaultJerk
-        );
+        moverAxis31(Execute := TRUE, AxisRef := Axis_31, Position := Positions.axis31_TargetPosition_2,
+            Velocity := MotionParams.defaultVelocity, Acceleration := MotionParams.defaultAcceleration,
+            Deceleration := MotionParams.defaultDeceleration, Jerk := MotionParams.defaultJerk);
 
-        ActiveAxesMask := SHL(LWORD#1, 30);  // Axis 31
-
-        IF moverAxis31.Done THEN
-            moverAxis31(Execute := FALSE);
-            subStep := 4;
-        ELSIF moverAxis31.Error THEN
+        IF moverAxis31.Error THEN
             Error := TRUE;
             ErrorAxisID := 31;
+        ELSIF moverAxis31.Done THEN
+            moverAxis31(Execute := FALSE);
+            subStep :=4;
         END_IF
 
-    // ----------------------------------------------------------------
-    4: // All axes 30-33 return home
+    // =========================================================================
+    4: // Both axes 30,31 return home (parallel move)
+    // =========================================================================
         StepDescription := 'Window/door - returning home';
+        ActiveAxesMask := FC_BuildAxisMask(30, 31, 0, 0, 0, 0, 0, 0);
 
-        moverAxis30(
-            Execute := TRUE,
-            AxisRef := Axis_30,
-            Position := Positions.axis30_HomePosition,
-            Velocity := MotionParams.defaultVelocity,
-            Acceleration := MotionParams.defaultAcceleration,
-            Deceleration := MotionParams.defaultDeceleration,
-            Jerk := MotionParams.defaultJerk
-        );
+        moverAxis30(Execute := TRUE, AxisRef := Axis_30, Position := Positions.axis30_HomePosition,
+            Velocity := MotionParams.defaultVelocity, Acceleration := MotionParams.defaultAcceleration,
+            Deceleration := MotionParams.defaultDeceleration, Jerk := MotionParams.defaultJerk);
 
-        moverAxis31(
-            Execute := TRUE,
-            AxisRef := Axis_31,
-            Position := Positions.axis31_HomePosition,
-            Velocity := MotionParams.defaultVelocity,
-            Acceleration := MotionParams.defaultAcceleration,
-            Deceleration := MotionParams.defaultDeceleration,
-            Jerk := MotionParams.defaultJerk
-        );
+        moverAxis31(Execute := TRUE, AxisRef := Axis_31, Position := Positions.axis31_HomePosition,
+            Velocity := MotionParams.defaultVelocity, Acceleration := MotionParams.defaultAcceleration,
+            Deceleration := MotionParams.defaultDeceleration, Jerk := MotionParams.defaultJerk);
 
-        ActiveAxesMask := SHL(LWORD#1, 29) OR SHL(LWORD#1, 30);  // Axes 30, 31
+        // Check for errors using utility function
+        tempErrorAxis := FC_FindFirstErrorAxis(status30, status31,
+            emptyStatus, emptyStatus, emptyStatus, emptyStatus, emptyStatus, emptyStatus);
 
-        IF moverAxis30.Done AND moverAxis31.Done THEN
+        IF tempErrorAxis > 0 THEN
+            Error := TRUE;
+            ErrorAxisID := tempErrorAxis;
+        ELSIF moverAxis30.Done AND moverAxis31.Done THEN
             moverAxis30(Execute := FALSE);
             moverAxis31(Execute := FALSE);
-            subStep := 5;
-        ELSIF moverAxis30.Error OR moverAxis31.Error THEN
-            Error := TRUE;
-            IF moverAxis30.Error THEN ErrorAxisID := 30;
-            ELSE ErrorAxisID := 31;
-            END_IF
+            subStep :=5;
         END_IF
 
-    // ----------------------------------------------------------------
+    // =========================================================================
     5: // Complete - window/door carving done
+    // =========================================================================
         StepDescription := 'Window/door carving complete';
         ActiveAxesMask := 0;
         Done := TRUE;
@@ -199,7 +190,7 @@ CASE subStep OF
 
 END_CASE
 
-// Handle errors
+// Handle errors - stop motion and clear busy
 IF Error THEN
     Busy := FALSE;
     ActiveAxesMask := 0;

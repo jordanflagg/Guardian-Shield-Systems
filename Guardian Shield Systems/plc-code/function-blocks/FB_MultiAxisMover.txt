@@ -27,7 +27,7 @@ VAR_OUTPUT
     Busy : BOOL;                // At least one move in progress
     Error : BOOL;               // At least one move failed
     ErrorAxisNum : UINT;        // Which axis (1-8) had first error
-    ErrorID : DWORD;            // Error code from failed axis
+    ErrorID : ERROR_CODE;            // Error code from failed axis
     ActiveAxesMask : BYTE;      // Bitmask of currently moving axes
 END_VAR
 

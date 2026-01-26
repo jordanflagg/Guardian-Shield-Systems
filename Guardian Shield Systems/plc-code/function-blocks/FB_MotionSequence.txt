@@ -1,3 +1,4 @@
+{attribute 'no_assign'}
 FUNCTION_BLOCK FB_MotionSequence
 // Refactored motion sequence controller
 // Orchestrates modular motion step FBs for cleaner, more maintainable code
@@ -5,13 +6,13 @@ FUNCTION_BLOCK FB_MotionSequence
 
 VAR_INPUT
     Enable : BOOL;                      // TRUE when machine in RUNNING state
-    RecipeID : UINT := 1;               // Recipe number to load (1-10)
+    RecipeID : INT := 1;               // Recipe number to load (1-10)
 END_VAR
 
 VAR_OUTPUT
     SequenceComplete : BOOL;            // Full cycle completed
     CurrentStep : E_MotionStep;         // Current motion phase
-    ActiveRecipeID : UINT;              // Currently loaded recipe ID
+    ActiveRecipeID : INT;              // Currently loaded recipe ID
     RecipeLoadComplete : BOOL;          // Recipe loaded successfully
     RecipeLoadError : BOOL;             // Recipe load failed
 
@@ -22,19 +23,19 @@ VAR_OUTPUT
 
     // Individual step error outputs (for FB_ErrorHandler in state machine)
     LoadBlockError : BOOL;
-    LoadBlockErrorAxisID : UINT;
+    LoadBlockErrorAxisID : INT;
     StudsError : BOOL;
-    StudsErrorAxisID : UINT;
+    StudsErrorAxisID : INT;
     WindowsDoorsError : BOOL;
-    WindowsDoorsErrorAxisID : UINT;
+    WindowsDoorsErrorAxisID : INT;
     ElectricalError : BOOL;
-    ElectricalErrorAxisID : UINT;
+    ElectricalErrorAxisID : INT;
     UnloadError : BOOL;
-    UnloadErrorAxisID : UINT;
+    UnloadErrorAxisID : INT;
 
     // Aggregate error flag (for quick check)
     HasError : BOOL;                    // Any motion error occurred
-    ErrorAxisID : UINT;                 // Which axis caused first error
+    ErrorAxisID : INT;                 // Which axis caused first error
 END_VAR
 
 VAR
@@ -44,7 +45,7 @@ VAR
     // Recipe data
     positions : ST_PositionSetpoints;
     motionParams : ST_MotionParameters;
-    lastRecipeID : UINT := 0;
+    lastRecipeID : INT := 0;
 
     // Operation enable flags (from recipe)
     enableStuds : BOOL := TRUE;

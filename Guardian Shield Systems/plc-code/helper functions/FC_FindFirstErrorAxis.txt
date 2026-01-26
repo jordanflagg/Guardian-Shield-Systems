@@ -1,0 +1,43 @@
+FUNCTION FC_FindFirstErrorAxis : UINT
+// ============================================================================
+// Finds the first mover with an error and returns its axis ID
+// Returns 0 if no errors found
+//
+// Usage:
+//   errorAxis := FC_FindFirstErrorAxis(
+//       (Done := mover1.Done, Error := mover1.Error, AxisID := 14),
+//       (Done := mover2.Done, Error := mover2.Error, AxisID := 18),
+//       ...
+//   );
+//   IF errorAxis > 0 THEN
+//       ErrorAxisID := errorAxis;
+//       Error := TRUE;
+//   END_IF
+//
+// Replaces verbose IF-ELSIF chains for error identification
+// ============================================================================
+
+VAR_INPUT
+    Mover1 : ST_MoverStatus;
+    Mover2 : ST_MoverStatus;
+    Mover3 : ST_MoverStatus;
+    Mover4 : ST_MoverStatus;
+    Mover5 : ST_MoverStatus;
+    Mover6 : ST_MoverStatus;
+    Mover7 : ST_MoverStatus;
+    Mover8 : ST_MoverStatus;
+END_VAR
+
+///////////////////////////////////////////////////////////////////////////////
+
+FC_FindFirstErrorAxis := 0;
+
+// Return first axis with error (priority order)
+IF Mover1.Error AND Mover1.AxisID > 0 THEN FC_FindFirstErrorAxis := Mover1.AxisID; RETURN; END_IF
+IF Mover2.Error AND Mover2.AxisID > 0 THEN FC_FindFirstErrorAxis := Mover2.AxisID; RETURN; END_IF
+IF Mover3.Error AND Mover3.AxisID > 0 THEN FC_FindFirstErrorAxis := Mover3.AxisID; RETURN; END_IF
+IF Mover4.Error AND Mover4.AxisID > 0 THEN FC_FindFirstErrorAxis := Mover4.AxisID; RETURN; END_IF
+IF Mover5.Error AND Mover5.AxisID > 0 THEN FC_FindFirstErrorAxis := Mover5.AxisID; RETURN; END_IF
+IF Mover6.Error AND Mover6.AxisID > 0 THEN FC_FindFirstErrorAxis := Mover6.AxisID; RETURN; END_IF
+IF Mover7.Error AND Mover7.AxisID > 0 THEN FC_FindFirstErrorAxis := Mover7.AxisID; RETURN; END_IF
+IF Mover8.Error AND Mover8.AxisID > 0 THEN FC_FindFirstErrorAxis := Mover8.AxisID; RETURN; END_IF

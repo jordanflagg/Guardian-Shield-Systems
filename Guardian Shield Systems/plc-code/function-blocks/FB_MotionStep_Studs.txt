@@ -1,7 +1,13 @@
+{attribute 'no_assign'}
 FUNCTION_BLOCK FB_MotionStep_Studs
-// Handles STUDS motion sequence
-// Controls 8 stud carving pairs (16 axes total via gearing)
-// 6 substeps total
+// ============================================================================
+// Handles STUDS motion sequence - Carves studs using 8 pairs (16 axes total)
+// Uses FB_MotionStepBase for enable/disable handling
+// Uses utility functions for cleaner status aggregation
+//
+// Axes: 14,15,18,19,22,23,26,27 (masters) with 16,17,20,21,24,25,28,29 (slaves)
+// 6 substeps: position -> extend -> cut -> retract -> home -> complete
+// ============================================================================
 
 VAR_INPUT
     Enable : BOOL;                      // TRUE to run this step
@@ -13,67 +19,111 @@ VAR_OUTPUT
     Done : BOOL;                        // Step completed
     Busy : BOOL;                        // Step in progress
     Error : BOOL;                       // Step failed
-    ErrorAxisID : UINT;                 // Which axis caused error
+    ErrorAxisID : INT;                 // Which axis caused error
     CurrentSubStep : INT;               // Current substep (0-5)
-    ActiveAxesMask : LWORD;             // Bitmask of moving axes (64-bit for 36 axes)
+    ActiveAxesMask : LWORD;             // Bitmask of moving axes
     StepDescription : STRING[80];       // Human-readable description
 END_VAR
 
 VAR
-    subStep : INT := 0;
+    // Base handler for enable/disable logic
+    base : FB_MotionStepBase;
 
-    // Vertical stud axes (even masters: 14, 18, 22, 26)
+    // Vertical stud axes (masters: 14, 18, 22, 26)
     moverAxis14 : FB_AxisMover;
     moverAxis18 : FB_AxisMover;
     moverAxis22 : FB_AxisMover;
     moverAxis26 : FB_AxisMover;
 
-    // Horizontal stud axes (odd masters: 15, 19, 23, 27)
+    // Horizontal stud axes (masters: 15, 19, 23, 27)
     moverAxis15 : FB_AxisMover;
     moverAxis19 : FB_AxisMover;
     moverAxis23 : FB_AxisMover;
     moverAxis27 : FB_AxisMover;
 
-    // State tracking
-    stepStarted : BOOL := FALSE;
+    // Status structures for utility functions
+    verticalStatus : ARRAY[1..4] OF ST_MoverStatus;
+    horizontalStatus : ARRAY[1..4] OF ST_MoverStatus;
+    allStatus : ARRAY[1..8] OF ST_MoverStatus;
 
-    // Completion flags for parallel moves
+    // Completion tracking
     allVerticalDone : BOOL;
     allHorizontalDone : BOOL;
-    anyError : BOOL;
-    firstErrorAxis : UINT;
+    tempErrorAxis : UINT;
+
+    // Local substep tracking
+    subStep : INT;
+
+    // Empty placeholder for unused mover slots
+    emptyStatus : ST_MoverStatus := (Done := FALSE, Error := FALSE, AxisID := 0);
 END_VAR
 
 ///////////////////////////////////////////////////////////////////////////////
 
-// Not enabled - reset state for next cycle
-IF NOT Enable THEN
-    Busy := FALSE;
-    Done := FALSE;
+// Run base enable/disable handler
+base(Enable := Enable);
+
+// Reset substep on new enable
+IF base.ResetSubStep THEN
+    subStep := 0;
+END_IF
+
+// Handle disabled state
+IF NOT base.ShouldRun THEN
+    Done := base.Done;
+    Busy := base.Busy;
     Error := FALSE;
     ErrorAxisID := 0;
     ActiveAxesMask := 0;
-    stepStarted := FALSE;
-    subStep := 0;
+    CurrentSubStep := 0;
+    StepDescription := '';
     RETURN;
 END_IF
 
-// Start on enable
-IF Enable AND NOT stepStarted THEN
-    stepStarted := TRUE;
-    Busy := TRUE;
-    subStep := 0;
-END_IF
-
-// Update output
+// Update outputs
 CurrentSubStep := subStep;
+
+// Build status arrays for utility functions
+verticalStatus[1].Done := moverAxis14.Done;
+verticalStatus[1].Error := moverAxis14.Error;
+verticalStatus[1].AxisID := 14;
+
+verticalStatus[2].Done := moverAxis18.Done;
+verticalStatus[2].Error := moverAxis18.Error;
+verticalStatus[2].AxisID := 18;
+
+verticalStatus[3].Done := moverAxis22.Done;
+verticalStatus[3].Error := moverAxis22.Error;
+verticalStatus[3].AxisID := 22;
+
+verticalStatus[4].Done := moverAxis26.Done;
+verticalStatus[4].Error := moverAxis26.Error;
+verticalStatus[4].AxisID := 26;
+
+horizontalStatus[1].Done := moverAxis15.Done;
+horizontalStatus[1].Error := moverAxis15.Error;
+horizontalStatus[1].AxisID := 15;
+
+horizontalStatus[2].Done := moverAxis19.Done;
+horizontalStatus[2].Error := moverAxis19.Error;
+horizontalStatus[2].AxisID := 19;
+
+horizontalStatus[3].Done := moverAxis23.Done;
+horizontalStatus[3].Error := moverAxis23.Error;
+horizontalStatus[3].AxisID := 23;
+
+horizontalStatus[4].Done := moverAxis27.Done;
+horizontalStatus[4].Error := moverAxis27.Error;
+horizontalStatus[4].AxisID := 27;
 
 // Substep state machine
 CASE subStep OF
 
-    // ----------------------------------------------------------------
-    0: // Vertical axes move to position 1 (14,16)(18,20)(22,24)(26,28)
-        StepDescription := 'Stud axes - moving to position 1';
+    // =========================================================================
+    0: // Vertical axes move to position 1 (14,18,22,26 with slaves 16,20,24,28)
+    // =========================================================================
+        StepDescription := 'Stud axes - vertical to position 1';
+        ActiveAxesMask := FC_BuildAxisMask(14, 18, 22, 26, 0, 0, 0, 0);
 
         moverAxis14(Execute := TRUE, AxisRef := Axis_14, Position := Positions.axis14_TargetPosition_1,
             Velocity := MotionParams.defaultVelocity, Acceleration := MotionParams.defaultAcceleration,
@@ -88,31 +138,26 @@ CASE subStep OF
             Velocity := MotionParams.defaultVelocity, Acceleration := MotionParams.defaultAcceleration,
             Deceleration := MotionParams.defaultDeceleration, Jerk := MotionParams.defaultJerk);
 
-        // Axes 14, 18, 22, 26 (bits 13, 17, 21, 25)
-        ActiveAxesMask := SHL(LWORD#1, 13) OR SHL(LWORD#1, 17) OR SHL(LWORD#1, 21) OR SHL(LWORD#1, 25);
+        // Check for errors using utility function
+        tempErrorAxis := FC_FindFirstErrorAxis(verticalStatus[1], verticalStatus[2], verticalStatus[3], verticalStatus[4],
+            emptyStatus, emptyStatus, emptyStatus, emptyStatus);
 
-        // Check completion
-        allVerticalDone := moverAxis14.Done AND moverAxis18.Done AND moverAxis22.Done AND moverAxis26.Done;
-        anyError := moverAxis14.Error OR moverAxis18.Error OR moverAxis22.Error OR moverAxis26.Error;
-
-        IF anyError THEN
+        IF tempErrorAxis > 0 THEN
             Error := TRUE;
-            IF moverAxis14.Error THEN ErrorAxisID := 14;
-            ELSIF moverAxis18.Error THEN ErrorAxisID := 18;
-            ELSIF moverAxis22.Error THEN ErrorAxisID := 22;
-            ELSIF moverAxis26.Error THEN ErrorAxisID := 26;
-            END_IF
-        ELSIF allVerticalDone THEN
-            moverAxis14(Execute := FALSE);
-            moverAxis18(Execute := FALSE);
-            moverAxis22(Execute := FALSE);
-            moverAxis26(Execute := FALSE);
-            subStep := 1;
+            ErrorAxisID := tempErrorAxis;
+        ELSIF FC_CheckMoversComplete(verticalStatus[1], verticalStatus[2], verticalStatus[3], verticalStatus[4],
+            emptyStatus, emptyStatus, emptyStatus, emptyStatus) THEN
+            // Clear movers and advance
+            moverAxis14(Execute := FALSE); moverAxis18(Execute := FALSE);
+            moverAxis22(Execute := FALSE); moverAxis26(Execute := FALSE);
+            subStep :=1;
         END_IF
 
-    // ----------------------------------------------------------------
-    1: // Horizontal axes move to position 1 (15,17)(19,21)(23,25)(27,29)
+    // =========================================================================
+    1: // Horizontal axes extend to position 1 (15,19,23,27 with slaves 17,21,25,29)
+    // =========================================================================
         StepDescription := 'Stud axes - horizontal extend';
+        ActiveAxesMask := FC_BuildAxisMask(15, 19, 23, 27, 0, 0, 0, 0);
 
         moverAxis15(Execute := TRUE, AxisRef := Axis_15, Position := Positions.axis15_TargetPosition_1,
             Velocity := MotionParams.defaultVelocity, Acceleration := MotionParams.defaultAcceleration,
@@ -127,30 +172,24 @@ CASE subStep OF
             Velocity := MotionParams.defaultVelocity, Acceleration := MotionParams.defaultAcceleration,
             Deceleration := MotionParams.defaultDeceleration, Jerk := MotionParams.defaultJerk);
 
-        // Axes 15, 19, 23, 27 (bits 14, 18, 22, 26)
-        ActiveAxesMask := SHL(LWORD#1, 14) OR SHL(LWORD#1, 18) OR SHL(LWORD#1, 22) OR SHL(LWORD#1, 26);
+        tempErrorAxis := FC_FindFirstErrorAxis(horizontalStatus[1], horizontalStatus[2], horizontalStatus[3], horizontalStatus[4],
+            emptyStatus, emptyStatus, emptyStatus, emptyStatus);
 
-        allHorizontalDone := moverAxis15.Done AND moverAxis19.Done AND moverAxis23.Done AND moverAxis27.Done;
-        anyError := moverAxis15.Error OR moverAxis19.Error OR moverAxis23.Error OR moverAxis27.Error;
-
-        IF anyError THEN
+        IF tempErrorAxis > 0 THEN
             Error := TRUE;
-            IF moverAxis15.Error THEN ErrorAxisID := 15;
-            ELSIF moverAxis19.Error THEN ErrorAxisID := 19;
-            ELSIF moverAxis23.Error THEN ErrorAxisID := 23;
-            ELSIF moverAxis27.Error THEN ErrorAxisID := 27;
-            END_IF
-        ELSIF allHorizontalDone THEN
-            moverAxis15(Execute := FALSE);
-            moverAxis19(Execute := FALSE);
-            moverAxis23(Execute := FALSE);
-            moverAxis27(Execute := FALSE);
-            subStep := 2;
+            ErrorAxisID := tempErrorAxis;
+        ELSIF FC_CheckMoversComplete(horizontalStatus[1], horizontalStatus[2], horizontalStatus[3], horizontalStatus[4],
+            emptyStatus, emptyStatus, emptyStatus, emptyStatus) THEN
+            moverAxis15(Execute := FALSE); moverAxis19(Execute := FALSE);
+            moverAxis23(Execute := FALSE); moverAxis27(Execute := FALSE);
+            subStep :=2;
         END_IF
 
-    // ----------------------------------------------------------------
-    2: // Vertical axes move to position 2 (cutting)
+    // =========================================================================
+    2: // Vertical axes cut to position 2
+    // =========================================================================
         StepDescription := 'Stud axes - cutting (vertical)';
+        ActiveAxesMask := FC_BuildAxisMask(14, 18, 22, 26, 0, 0, 0, 0);
 
         moverAxis14(Execute := TRUE, AxisRef := Axis_14, Position := Positions.axis14_TargetPosition_2,
             Velocity := MotionParams.defaultVelocity, Acceleration := MotionParams.defaultAcceleration,
@@ -165,29 +204,24 @@ CASE subStep OF
             Velocity := MotionParams.defaultVelocity, Acceleration := MotionParams.defaultAcceleration,
             Deceleration := MotionParams.defaultDeceleration, Jerk := MotionParams.defaultJerk);
 
-        ActiveAxesMask := SHL(LWORD#1, 13) OR SHL(LWORD#1, 17) OR SHL(LWORD#1, 21) OR SHL(LWORD#1, 25);
+        tempErrorAxis := FC_FindFirstErrorAxis(verticalStatus[1], verticalStatus[2], verticalStatus[3], verticalStatus[4],
+            emptyStatus, emptyStatus, emptyStatus, emptyStatus);
 
-        allVerticalDone := moverAxis14.Done AND moverAxis18.Done AND moverAxis22.Done AND moverAxis26.Done;
-        anyError := moverAxis14.Error OR moverAxis18.Error OR moverAxis22.Error OR moverAxis26.Error;
-
-        IF anyError THEN
+        IF tempErrorAxis > 0 THEN
             Error := TRUE;
-            IF moverAxis14.Error THEN ErrorAxisID := 14;
-            ELSIF moverAxis18.Error THEN ErrorAxisID := 18;
-            ELSIF moverAxis22.Error THEN ErrorAxisID := 22;
-            ELSIF moverAxis26.Error THEN ErrorAxisID := 26;
-            END_IF
-        ELSIF allVerticalDone THEN
-            moverAxis14(Execute := FALSE);
-            moverAxis18(Execute := FALSE);
-            moverAxis22(Execute := FALSE);
-            moverAxis26(Execute := FALSE);
-            subStep := 3;
+            ErrorAxisID := tempErrorAxis;
+        ELSIF FC_CheckMoversComplete(verticalStatus[1], verticalStatus[2], verticalStatus[3], verticalStatus[4],
+            emptyStatus, emptyStatus, emptyStatus, emptyStatus) THEN
+            moverAxis14(Execute := FALSE); moverAxis18(Execute := FALSE);
+            moverAxis22(Execute := FALSE); moverAxis26(Execute := FALSE);
+            subStep :=3;
         END_IF
 
-    // ----------------------------------------------------------------
-    3: // Horizontal axes move to position 2 (retracting)
+    // =========================================================================
+    3: // Horizontal axes retract to position 2
+    // =========================================================================
         StepDescription := 'Stud axes - retracting';
+        ActiveAxesMask := FC_BuildAxisMask(15, 19, 23, 27, 0, 0, 0, 0);
 
         moverAxis15(Execute := TRUE, AxisRef := Axis_15, Position := Positions.axis15_TargetPosition_2,
             Velocity := MotionParams.defaultVelocity, Acceleration := MotionParams.defaultAcceleration,
@@ -202,29 +236,24 @@ CASE subStep OF
             Velocity := MotionParams.defaultVelocity, Acceleration := MotionParams.defaultAcceleration,
             Deceleration := MotionParams.defaultDeceleration, Jerk := MotionParams.defaultJerk);
 
-        ActiveAxesMask := SHL(LWORD#1, 14) OR SHL(LWORD#1, 18) OR SHL(LWORD#1, 22) OR SHL(LWORD#1, 26);
+        tempErrorAxis := FC_FindFirstErrorAxis(horizontalStatus[1], horizontalStatus[2], horizontalStatus[3], horizontalStatus[4],
+            emptyStatus, emptyStatus, emptyStatus, emptyStatus);
 
-        allHorizontalDone := moverAxis15.Done AND moverAxis19.Done AND moverAxis23.Done AND moverAxis27.Done;
-        anyError := moverAxis15.Error OR moverAxis19.Error OR moverAxis23.Error OR moverAxis27.Error;
-
-        IF anyError THEN
+        IF tempErrorAxis > 0 THEN
             Error := TRUE;
-            IF moverAxis15.Error THEN ErrorAxisID := 15;
-            ELSIF moverAxis19.Error THEN ErrorAxisID := 19;
-            ELSIF moverAxis23.Error THEN ErrorAxisID := 23;
-            ELSIF moverAxis27.Error THEN ErrorAxisID := 27;
-            END_IF
-        ELSIF allHorizontalDone THEN
-            moverAxis15(Execute := FALSE);
-            moverAxis19(Execute := FALSE);
-            moverAxis23(Execute := FALSE);
-            moverAxis27(Execute := FALSE);
-            subStep := 4;
+            ErrorAxisID := tempErrorAxis;
+        ELSIF FC_CheckMoversComplete(horizontalStatus[1], horizontalStatus[2], horizontalStatus[3], horizontalStatus[4],
+            emptyStatus, emptyStatus, emptyStatus, emptyStatus) THEN
+            moverAxis15(Execute := FALSE); moverAxis19(Execute := FALSE);
+            moverAxis23(Execute := FALSE); moverAxis27(Execute := FALSE);
+            subStep :=4;
         END_IF
 
-    // ----------------------------------------------------------------
-    4: // All stud axes return home (14-29)
+    // =========================================================================
+    4: // All stud axes return home (8 axes in parallel)
+    // =========================================================================
         StepDescription := 'Stud axes - returning home';
+        ActiveAxesMask := FC_BuildAxisMask(14, 15, 18, 19, 22, 23, 26, 27);
 
         // Vertical axes home
         moverAxis14(Execute := TRUE, AxisRef := Axis_14, Position := Positions.axis14_HomePosition,
@@ -254,42 +283,31 @@ CASE subStep OF
             Velocity := MotionParams.defaultVelocity, Acceleration := MotionParams.defaultAcceleration,
             Deceleration := MotionParams.defaultDeceleration, Jerk := MotionParams.defaultJerk);
 
-        // All stud axes active
-        ActiveAxesMask := SHL(LWORD#1, 13) OR SHL(LWORD#1, 14) OR SHL(LWORD#1, 17) OR SHL(LWORD#1, 18) OR
-                          SHL(LWORD#1, 21) OR SHL(LWORD#1, 22) OR SHL(LWORD#1, 25) OR SHL(LWORD#1, 26);
+        // Build combined status for all 8 movers
+        allStatus[1] := verticalStatus[1];   allStatus[2] := horizontalStatus[1];
+        allStatus[3] := verticalStatus[2];   allStatus[4] := horizontalStatus[2];
+        allStatus[5] := verticalStatus[3];   allStatus[6] := horizontalStatus[3];
+        allStatus[7] := verticalStatus[4];   allStatus[8] := horizontalStatus[4];
 
-        allVerticalDone := moverAxis14.Done AND moverAxis18.Done AND moverAxis22.Done AND moverAxis26.Done;
-        allHorizontalDone := moverAxis15.Done AND moverAxis19.Done AND moverAxis23.Done AND moverAxis27.Done;
+        tempErrorAxis := FC_FindFirstErrorAxis(allStatus[1], allStatus[2], allStatus[3], allStatus[4],
+            allStatus[5], allStatus[6], allStatus[7], allStatus[8]);
 
-        anyError := moverAxis14.Error OR moverAxis15.Error OR moverAxis18.Error OR moverAxis19.Error OR
-                    moverAxis22.Error OR moverAxis23.Error OR moverAxis26.Error OR moverAxis27.Error;
-
-        IF anyError THEN
+        IF tempErrorAxis > 0 THEN
             Error := TRUE;
-            // Find first error
-            IF moverAxis14.Error THEN ErrorAxisID := 14;
-            ELSIF moverAxis15.Error THEN ErrorAxisID := 15;
-            ELSIF moverAxis18.Error THEN ErrorAxisID := 18;
-            ELSIF moverAxis19.Error THEN ErrorAxisID := 19;
-            ELSIF moverAxis22.Error THEN ErrorAxisID := 22;
-            ELSIF moverAxis23.Error THEN ErrorAxisID := 23;
-            ELSIF moverAxis26.Error THEN ErrorAxisID := 26;
-            ELSIF moverAxis27.Error THEN ErrorAxisID := 27;
-            END_IF
-        ELSIF allVerticalDone AND allHorizontalDone THEN
-            moverAxis14(Execute := FALSE);
-            moverAxis15(Execute := FALSE);
-            moverAxis18(Execute := FALSE);
-            moverAxis19(Execute := FALSE);
-            moverAxis22(Execute := FALSE);
-            moverAxis23(Execute := FALSE);
-            moverAxis26(Execute := FALSE);
-            moverAxis27(Execute := FALSE);
-            subStep := 5;
+            ErrorAxisID := tempErrorAxis;
+        ELSIF FC_CheckMoversComplete(allStatus[1], allStatus[2], allStatus[3], allStatus[4],
+            allStatus[5], allStatus[6], allStatus[7], allStatus[8]) THEN
+            // Clear all movers
+            moverAxis14(Execute := FALSE); moverAxis15(Execute := FALSE);
+            moverAxis18(Execute := FALSE); moverAxis19(Execute := FALSE);
+            moverAxis22(Execute := FALSE); moverAxis23(Execute := FALSE);
+            moverAxis26(Execute := FALSE); moverAxis27(Execute := FALSE);
+            subStep :=5;
         END_IF
 
-    // ----------------------------------------------------------------
+    // =========================================================================
     5: // Complete - stud carving done
+    // =========================================================================
         StepDescription := 'Stud carving complete';
         ActiveAxesMask := 0;
         Done := TRUE;
@@ -297,7 +315,7 @@ CASE subStep OF
 
 END_CASE
 
-// Handle errors
+// Handle errors - stop motion and clear busy
 IF Error THEN
     Busy := FALSE;
     ActiveAxesMask := 0;

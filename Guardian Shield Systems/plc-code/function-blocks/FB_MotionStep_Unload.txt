@@ -1,7 +1,13 @@
+{attribute 'no_assign'}
 FUNCTION_BLOCK FB_MotionStep_Unload
+// ============================================================================
 // Handles SHIFT_TO_UNLOAD_AREA motion sequence
 // Moves completed block from processing center to unload table
-// 5 substeps total
+// Uses FB_MotionStepBase for enable/disable handling
+//
+// Axes: 8 (pusher), 10 (table lift) with slaves 9, 11, 12, 13
+// 5 substeps: raise -> shift -> lower -> return -> complete
+// ============================================================================
 
 VAR_INPUT
     Enable : BOOL;                      // TRUE to run this step
@@ -13,151 +19,130 @@ VAR_OUTPUT
     Done : BOOL;                        // Step completed
     Busy : BOOL;                        // Step in progress
     Error : BOOL;                       // Step failed
-    ErrorAxisID : UINT;                 // Which axis caused error
+    ErrorAxisID : INT;                 // Which axis caused error
     CurrentSubStep : INT;               // Current substep (0-4)
-    ActiveAxesMask : LWORD;             // Bitmask of moving axes (64-bit for 36 axes)
+    ActiveAxesMask : LWORD;             // Bitmask of moving axes
     StepDescription : STRING[80];       // Human-readable description
 END_VAR
 
 VAR
-    subStep : INT := 0;
+    // Base handler for enable/disable logic
+    base : FB_MotionStepBase;
 
     // Unload axes
     moverAxis8 : FB_AxisMover;          // Pusher master (slave: 9)
     moverAxis10 : FB_AxisMover;         // Table lift master (slaves: 11, 12, 13)
 
-    // State tracking
-    stepStarted : BOOL := FALSE;
+    // Local substep tracking
+    subStep : INT;
 END_VAR
 
 ///////////////////////////////////////////////////////////////////////////////
 
-// Not enabled - reset state for next cycle
-IF NOT Enable THEN
-    Busy := FALSE;
-    Done := FALSE;
+// Run base enable/disable handler
+base(Enable := Enable);
+
+// Reset substep on new enable
+IF base.ResetSubStep THEN
+    subStep := 0;
+END_IF
+
+// Handle disabled state
+IF NOT base.ShouldRun THEN
+    Done := base.Done;
+    Busy := base.Busy;
     Error := FALSE;
     ErrorAxisID := 0;
     ActiveAxesMask := 0;
-    stepStarted := FALSE;
-    subStep := 0;
+    CurrentSubStep := 0;
+    StepDescription := '';
     RETURN;
 END_IF
 
-// Start on enable
-IF Enable AND NOT stepStarted THEN
-    stepStarted := TRUE;
-    Busy := TRUE;
-    subStep := 0;
-END_IF
-
-// Update output
+// Update outputs
 CurrentSubStep := subStep;
 
 // Substep state machine
 CASE subStep OF
 
-    // ----------------------------------------------------------------
-    0: // Axes 10,11,12,13 raise to pick up block
+    // =========================================================================
+    0: // Axis 10 raises to pick up block - slaves 11,12,13 follow
+    // =========================================================================
         StepDescription := 'Unload - raising table';
+        ActiveAxesMask := FC_BuildAxisMask(10, 0, 0, 0, 0, 0, 0, 0);
 
         // TODO: Disable suction cups first when I/O is available
         // suctionCupsEnable := FALSE;
 
-        moverAxis10(
-            Execute := TRUE,
-            AxisRef := Axis_10,
-            Position := Positions.axis10_RaisePosition,
-            Velocity := MotionParams.defaultVelocity,
-            Acceleration := MotionParams.defaultAcceleration,
-            Deceleration := MotionParams.defaultDeceleration,
-            Jerk := MotionParams.defaultJerk
-        );
+        moverAxis10(Execute := TRUE, AxisRef := Axis_10, Position := Positions.axis10_RaisePosition,
+            Velocity := MotionParams.defaultVelocity, Acceleration := MotionParams.defaultAcceleration,
+            Deceleration := MotionParams.defaultDeceleration, Jerk := MotionParams.defaultJerk);
 
-        ActiveAxesMask := SHL(LWORD#1, 9);  // Axis 10 (slaves 11,12,13 follow)
-
-        IF moverAxis10.Done THEN
-            moverAxis10(Execute := FALSE);
-            subStep := 1;
-        ELSIF moverAxis10.Error THEN
+        IF moverAxis10.Error THEN
             Error := TRUE;
             ErrorAxisID := 10;
+        ELSIF moverAxis10.Done THEN
+            moverAxis10(Execute := FALSE);
+            subStep :=1;
         END_IF
 
-    // ----------------------------------------------------------------
-    1: // Axes 8,9 shift block to unload table
+    // =========================================================================
+    1: // Axis 8 shifts block to unload table - slave 9 follows
+    // =========================================================================
         StepDescription := 'Unload - shifting block';
+        ActiveAxesMask := FC_BuildAxisMask(8, 0, 0, 0, 0, 0, 0, 0);
 
-        moverAxis8(
-            Execute := TRUE,
-            AxisRef := Axis_8,
-            Position := Positions.axis8_UnloadPosition,
-            Velocity := MotionParams.defaultVelocity,
-            Acceleration := MotionParams.defaultAcceleration,
-            Deceleration := MotionParams.defaultDeceleration,
-            Jerk := MotionParams.defaultJerk
-        );
+        moverAxis8(Execute := TRUE, AxisRef := Axis_8, Position := Positions.axis8_UnloadPosition,
+            Velocity := MotionParams.defaultVelocity, Acceleration := MotionParams.defaultAcceleration,
+            Deceleration := MotionParams.defaultDeceleration, Jerk := MotionParams.defaultJerk);
 
-        ActiveAxesMask := SHL(LWORD#1, 7);  // Axis 8 (slave 9 follows)
-
-        IF moverAxis8.Done THEN
-            moverAxis8(Execute := FALSE);
-            subStep := 2;
-        ELSIF moverAxis8.Error THEN
+        IF moverAxis8.Error THEN
             Error := TRUE;
             ErrorAxisID := 8;
+        ELSIF moverAxis8.Done THEN
+            moverAxis8(Execute := FALSE);
+            subStep :=2;
         END_IF
 
-    // ----------------------------------------------------------------
-    2: // Axes 10,11,12,13 lower (place block on unload table)
+    // =========================================================================
+    2: // Axis 10 lowers (place block on unload table)
+    // =========================================================================
         StepDescription := 'Unload - lowering table';
+        ActiveAxesMask := FC_BuildAxisMask(10, 0, 0, 0, 0, 0, 0, 0);
 
-        moverAxis10(
-            Execute := TRUE,
-            AxisRef := Axis_10,
-            Position := Positions.axis10_LowerPosition,
-            Velocity := MotionParams.defaultVelocity,
-            Acceleration := MotionParams.defaultAcceleration,
-            Deceleration := MotionParams.defaultDeceleration,
-            Jerk := MotionParams.defaultJerk
-        );
+        moverAxis10(Execute := TRUE, AxisRef := Axis_10, Position := Positions.axis10_LowerPosition,
+            Velocity := MotionParams.defaultVelocity, Acceleration := MotionParams.defaultAcceleration,
+            Deceleration := MotionParams.defaultDeceleration, Jerk := MotionParams.defaultJerk);
 
-        ActiveAxesMask := SHL(LWORD#1, 9);  // Axis 10
-
-        IF moverAxis10.Done THEN
-            moverAxis10(Execute := FALSE);
-            subStep := 3;
-        ELSIF moverAxis10.Error THEN
+        IF moverAxis10.Error THEN
             Error := TRUE;
             ErrorAxisID := 10;
+        ELSIF moverAxis10.Done THEN
+            moverAxis10(Execute := FALSE);
+            subStep :=3;
         END_IF
 
-    // ----------------------------------------------------------------
-    3: // Axes 8,9 return home
+    // =========================================================================
+    3: // Axis 8 returns home
+    // =========================================================================
         StepDescription := 'Unload - returning pusher';
+        ActiveAxesMask := FC_BuildAxisMask(8, 0, 0, 0, 0, 0, 0, 0);
 
-        moverAxis8(
-            Execute := TRUE,
-            AxisRef := Axis_8,
-            Position := Positions.axis8_HomePosition,
-            Velocity := MotionParams.defaultVelocity,
-            Acceleration := MotionParams.defaultAcceleration,
-            Deceleration := MotionParams.defaultDeceleration,
-            Jerk := MotionParams.defaultJerk
-        );
+        moverAxis8(Execute := TRUE, AxisRef := Axis_8, Position := Positions.axis8_HomePosition,
+            Velocity := MotionParams.defaultVelocity, Acceleration := MotionParams.defaultAcceleration,
+            Deceleration := MotionParams.defaultDeceleration, Jerk := MotionParams.defaultJerk);
 
-        ActiveAxesMask := SHL(LWORD#1, 7);  // Axis 8
-
-        IF moverAxis8.Done THEN
-            moverAxis8(Execute := FALSE);
-            subStep := 4;
-        ELSIF moverAxis8.Error THEN
+        IF moverAxis8.Error THEN
             Error := TRUE;
             ErrorAxisID := 8;
+        ELSIF moverAxis8.Done THEN
+            moverAxis8(Execute := FALSE);
+            subStep :=4;
         END_IF
 
-    // ----------------------------------------------------------------
+    // =========================================================================
     4: // Complete - block on unload table, ready for fork truck
+    // =========================================================================
         StepDescription := 'Cycle complete - ready for removal';
         ActiveAxesMask := 0;
         Done := TRUE;
@@ -165,7 +150,7 @@ CASE subStep OF
 
 END_CASE
 
-// Handle errors
+// Handle errors - stop motion and clear busy
 IF Error THEN
     Busy := FALSE;
     ActiveAxesMask := 0;

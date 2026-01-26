@@ -1,0 +1,60 @@
+FUNCTION FC_BuildAxisMask : LWORD
+// ============================================================================
+// Builds a 64-bit bitmask from axis numbers for HMI visualization
+// Each axis number sets its corresponding bit (axis 1 = bit 0, axis 14 = bit 13)
+//
+// Usage:
+//   ActiveAxesMask := FC_BuildAxisMask(14, 18, 22, 26, 0, 0, 0, 0);
+//   // Instead of: SHL(LWORD#1, 13) OR SHL(LWORD#1, 17) OR ...
+//
+// Parameters use axis numbers directly (1-36), not bit positions
+// Pass 0 for unused axis slots
+// ============================================================================
+
+VAR_INPUT
+    Axis1 : UINT;   // Axis number (1-36) or 0 if unused
+    Axis2 : UINT;   // Axis number (1-36) or 0 if unused
+    Axis3 : UINT;   // Axis number (1-36) or 0 if unused
+    Axis4 : UINT;   // Axis number (1-36) or 0 if unused
+    Axis5 : UINT;   // Axis number (1-36) or 0 if unused
+    Axis6 : UINT;   // Axis number (1-36) or 0 if unused
+    Axis7 : UINT;   // Axis number (1-36) or 0 if unused
+    Axis8 : UINT;   // Axis number (1-36) or 0 if unused
+END_VAR
+
+///////////////////////////////////////////////////////////////////////////////
+
+FC_BuildAxisMask := 0;
+
+// Set bit for each non-zero axis (axis N sets bit N-1)
+IF Axis1 > 0 AND Axis1 <= 36 THEN
+    FC_BuildAxisMask := FC_BuildAxisMask OR SHL(LWORD#1, Axis1 - 1);
+END_IF
+
+IF Axis2 > 0 AND Axis2 <= 36 THEN
+    FC_BuildAxisMask := FC_BuildAxisMask OR SHL(LWORD#1, Axis2 - 1);
+END_IF
+
+IF Axis3 > 0 AND Axis3 <= 36 THEN
+    FC_BuildAxisMask := FC_BuildAxisMask OR SHL(LWORD#1, Axis3 - 1);
+END_IF
+
+IF Axis4 > 0 AND Axis4 <= 36 THEN
+    FC_BuildAxisMask := FC_BuildAxisMask OR SHL(LWORD#1, Axis4 - 1);
+END_IF
+
+IF Axis5 > 0 AND Axis5 <= 36 THEN
+    FC_BuildAxisMask := FC_BuildAxisMask OR SHL(LWORD#1, Axis5 - 1);
+END_IF
+
+IF Axis6 > 0 AND Axis6 <= 36 THEN
+    FC_BuildAxisMask := FC_BuildAxisMask OR SHL(LWORD#1, Axis6 - 1);
+END_IF
+
+IF Axis7 > 0 AND Axis7 <= 36 THEN
+    FC_BuildAxisMask := FC_BuildAxisMask OR SHL(LWORD#1, Axis7 - 1);
+END_IF
+
+IF Axis8 > 0 AND Axis8 <= 36 THEN
+    FC_BuildAxisMask := FC_BuildAxisMask OR SHL(LWORD#1, Axis8 - 1);
+END_IF

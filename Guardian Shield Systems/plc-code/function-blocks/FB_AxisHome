@@ -45,8 +45,7 @@ VAR
     selectedAxis : UINT;
     homeAllPhase : INT := 0;  // 0=idle, 1=group1, 2=group2, 3=group3, 4=done
 
-    // Master axis validation
-    masterAxes : ARRAY[1..18] OF UINT := [1, 2, 6, 8, 10, 14, 15, 18, 19, 22, 23, 26, 27, 30, 31, 34, 35, 36];
+    // Master axis validation (uses GVL_Axes.MASTER_AXES as single source of truth)
     isMaster : BOOL;
     i : INT;
 
@@ -63,10 +62,10 @@ homeSinglePrev := HomeSingle;
 homeAllRising := HomeAll AND NOT homeAllPrev;
 homeAllPrev := HomeAll;
 
-// Check if selected axis is a master axis
+// Check if selected axis is a master axis (using global constant)
 isMaster := FALSE;
-FOR i := 1 TO 18 DO
-    IF HomeAxis = masterAxes[i] THEN
+FOR i := 1 TO GVL_Axes.MASTER_AXIS_COUNT DO
+    IF HomeAxis = GVL_Axes.MASTER_AXES[i] THEN
         isMaster := TRUE;
         EXIT;
     END_IF
@@ -93,8 +92,8 @@ END_FOR
 
 // Check if all master axes are homed
 AllAxesHomed := TRUE;
-FOR i := 1 TO 18 DO
-    IF NOT AxisIsHomed[masterAxes[i]] THEN
+FOR i := 1 TO GVL_Axes.MASTER_AXIS_COUNT DO
+    IF NOT AxisIsHomed[GVL_Axes.MASTER_AXES[i]] THEN
         AllAxesHomed := FALSE;
         EXIT;
     END_IF

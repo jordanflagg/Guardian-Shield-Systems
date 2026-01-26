@@ -1,0 +1,39 @@
+FUNCTION FC_CheckMoversComplete : BOOL
+// ============================================================================
+// Checks if all provided movers have completed (all Done = TRUE)
+// Returns TRUE only when ALL non-empty movers are done
+//
+// Usage:
+//   allDone := FC_CheckMoversComplete(
+//       (Done := mover1.Done, Error := FALSE, AxisID := 14),
+//       (Done := mover2.Done, Error := FALSE, AxisID := 18),
+//       ...
+//   );
+//
+// Empty slots (AxisID = 0) are ignored
+// ============================================================================
+
+VAR_INPUT
+    Mover1 : ST_MoverStatus;
+    Mover2 : ST_MoverStatus;
+    Mover3 : ST_MoverStatus;
+    Mover4 : ST_MoverStatus;
+    Mover5 : ST_MoverStatus;
+    Mover6 : ST_MoverStatus;
+    Mover7 : ST_MoverStatus;
+    Mover8 : ST_MoverStatus;
+END_VAR
+
+///////////////////////////////////////////////////////////////////////////////
+
+FC_CheckMoversComplete := TRUE;
+
+// Check each mover - if AxisID > 0, it's active and must be Done
+IF Mover1.AxisID > 0 AND NOT Mover1.Done THEN FC_CheckMoversComplete := FALSE; RETURN; END_IF
+IF Mover2.AxisID > 0 AND NOT Mover2.Done THEN FC_CheckMoversComplete := FALSE; RETURN; END_IF
+IF Mover3.AxisID > 0 AND NOT Mover3.Done THEN FC_CheckMoversComplete := FALSE; RETURN; END_IF
+IF Mover4.AxisID > 0 AND NOT Mover4.Done THEN FC_CheckMoversComplete := FALSE; RETURN; END_IF
+IF Mover5.AxisID > 0 AND NOT Mover5.Done THEN FC_CheckMoversComplete := FALSE; RETURN; END_IF
+IF Mover6.AxisID > 0 AND NOT Mover6.Done THEN FC_CheckMoversComplete := FALSE; RETURN; END_IF
+IF Mover7.AxisID > 0 AND NOT Mover7.Done THEN FC_CheckMoversComplete := FALSE; RETURN; END_IF
+IF Mover8.AxisID > 0 AND NOT Mover8.Done THEN FC_CheckMoversComplete := FALSE; RETURN; END_IF

@@ -1,0 +1,79 @@
+{attribute 'no_assign'}
+FUNCTION_BLOCK FB_MotionStepBase
+// ============================================================================
+// Base handler for motion step enable/disable and state management
+// Eliminates duplicate boilerplate across all FB_MotionStep_* blocks
+//
+// Usage in motion step FBs:
+//   VAR
+//       base : FB_MotionStepBase;
+//       subStep : INT;    // Each FB manages its own substep
+//   END_VAR
+//
+//   base(Enable := Enable);
+//   IF base.ResetSubStep THEN
+//       subStep := 0;
+//   END_IF
+//   IF NOT base.ShouldRun THEN
+//       Done := base.Done;
+//       Busy := base.Busy;
+//       RETURN;
+//   END_IF
+//
+//   CASE subStep OF
+//       0: ...
+//          subStep := 1;
+//       1: ...
+//   END_CASE
+// ============================================================================
+
+VAR_INPUT
+    Enable : BOOL;              // Enable this motion step
+END_VAR
+
+VAR_OUTPUT
+    ShouldRun : BOOL;           // TRUE when substep logic should execute
+    Done : BOOL;                // Step completed successfully
+    Busy : BOOL;                // Step in progress
+    ResetSubStep : BOOL;        // TRUE on first scan after enable - caller should reset substep to 0
+END_VAR
+
+VAR
+    stepStarted : BOOL := FALSE;
+    stepComplete : BOOL := FALSE;
+    stepError : BOOL := FALSE;
+END_VAR
+
+///////////////////////////////////////////////////////////////////////////////
+
+ResetSubStep := FALSE;
+
+// Reset when disabled
+IF NOT Enable THEN
+    ShouldRun := FALSE;
+    Done := FALSE;
+    Busy := FALSE;
+    stepStarted := FALSE;
+    stepComplete := FALSE;
+    stepError := FALSE;
+    RETURN;
+END_IF
+
+// Start on enable transition
+IF Enable AND NOT stepStarted THEN
+    stepStarted := TRUE;
+    stepComplete := FALSE;
+    stepError := FALSE;
+    Busy := TRUE;
+    Done := FALSE;
+    ResetSubStep := TRUE;  // Signal caller to reset their substep
+END_IF
+
+// If already complete or in error, don't run logic
+IF stepComplete OR stepError THEN
+    ShouldRun := FALSE;
+    RETURN;
+END_IF
+
+// Normal operation - run substep logic
+ShouldRun := TRUE;

@@ -36,7 +36,7 @@ VAR
     enables : ARRAY[1..8] OF BOOL;
     i : UINT;
 
-    state : INT := 0;
+    state : UNIT := 0;
     executePrev : BOOL;
     executeRising : BOOL;
 

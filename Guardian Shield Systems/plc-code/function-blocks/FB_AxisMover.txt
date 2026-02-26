@@ -23,7 +23,7 @@ END_VAR
 
 VAR
     fbMove : MC_MoveAbsolute;
-    state : INT := 0;           // 0=Idle, 1=Moving, 2=Done, 3=Error
+    state : UINT := 0;           // 0=Idle, 1=Moving, 2=Done, 3=Error
 END_VAR
 
 ///////////////////////////////////////////////////////////////////////////////

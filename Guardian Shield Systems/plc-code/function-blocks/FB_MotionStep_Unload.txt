@@ -19,8 +19,8 @@ VAR_OUTPUT
     Done : BOOL;                        // Step completed
     Busy : BOOL;                        // Step in progress
     Error : BOOL;                       // Step failed
-    ErrorAxisID : INT;                 // Which axis caused error
-    CurrentSubStep : INT;               // Current substep (0-4)
+    ErrorAxisID : UINT;                 // Which axis caused error
+    CurrentSubStep : UINT;               // Current substep (0-4)
     ActiveAxesMask : LWORD;             // Bitmask of moving axes
     StepDescription : STRING[80];       // Human-readable description
 END_VAR
@@ -34,7 +34,7 @@ VAR
     moverAxis10 : FB_AxisMover;         // Table lift master (slaves: 11, 12, 13)
 
     // Local substep tracking
-    subStep : INT;
+    subStep : UINT;
 END_VAR
 
 ///////////////////////////////////////////////////////////////////////////////

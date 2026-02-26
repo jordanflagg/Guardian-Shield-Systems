@@ -937,6 +937,255 @@
             border: 1px solid #ef9a9a;
         }
 
+        /* ================================================
+           MESSAGE CENTER PANEL
+           ================================================ */
+        .message-center {
+            background: #fff;
+            border: 2px solid #1976d2;
+            border-radius: 3px;
+            margin-bottom: 12px;
+            overflow: hidden;
+        }
+
+        .message-center-header {
+            background: linear-gradient(180deg, #1976d2 0%, #1565c0 100%);
+            color: white;
+            padding: 6px 12px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .message-center-header .pulse-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #4caf50;
+            animation: pulse-glow 2s infinite;
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 4px #4caf50; }
+            50% { box-shadow: 0 0 12px #4caf50, 0 0 20px #4caf50; }
+        }
+
+        .message-center-body {
+            padding: 10px;
+        }
+
+        .guidance-message {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 10px;
+            border-radius: 3px;
+            font-size: 13px;
+            line-height: 1.4;
+        }
+
+        .guidance-message.info {
+            background: #e3f2fd;
+            border: 1px solid #90caf9;
+            color: #1565c0;
+        }
+
+        .guidance-message.warning {
+            background: #fff3e0;
+            border: 1px solid #ffcc80;
+            color: #e65100;
+        }
+
+        .guidance-message.error {
+            background: #ffebee;
+            border: 1px solid #ef9a9a;
+            color: #c62828;
+        }
+
+        .guidance-message.success {
+            background: #e8f5e9;
+            border: 1px solid #a5d6a7;
+            color: #2e7d32;
+        }
+
+        .guidance-icon {
+            font-size: 16px;
+            font-weight: bold;
+            flex-shrink: 0;
+            width: 20px;
+            text-align: center;
+        }
+
+        .guidance-text {
+            flex: 1;
+        }
+
+        .guidance-title {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .guidance-action {
+            font-size: 12px;
+            opacity: 0.9;
+        }
+
+        /* ================================================
+           MODAL POPUP SYSTEM
+           ================================================ */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal-overlay.show {
+            display: flex;
+        }
+
+        .modal-dialog {
+            background: #f5f5f5;
+            border: 2px solid #333;
+            border-radius: 4px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            max-width: 450px;
+            width: 90%;
+            animation: modal-slide-in 0.2s ease-out;
+        }
+
+        @keyframes modal-slide-in {
+            from { transform: translateY(-20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .modal-header {
+            background: linear-gradient(180deg, #666 0%, #555 100%);
+            color: white;
+            padding: 12px 16px;
+            font-size: 14px;
+            font-weight: 600;
+            text-transform: uppercase;
+            border-bottom: 3px solid #f7941d;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .modal-header.warning {
+            border-bottom-color: #ff9800;
+        }
+
+        .modal-header.error {
+            border-bottom-color: #f44336;
+        }
+
+        .modal-header-icon {
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .modal-body {
+            padding: 20px;
+            font-size: 14px;
+            line-height: 1.5;
+            color: #333;
+        }
+
+        .modal-body p {
+            margin: 0 0 10px 0;
+        }
+
+        .modal-body p:last-child {
+            margin-bottom: 0;
+        }
+
+        .modal-footer {
+            padding: 12px 16px;
+            background: #e8e8e8;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            border-top: 1px solid #ccc;
+        }
+
+        .modal-footer .btn {
+            min-width: 100px;
+        }
+
+        /* ================================================
+           MODE CONTROL BAR (for Homing/Manual pages)
+           ================================================ */
+        .mode-control-bar {
+            background: linear-gradient(180deg, #f0f0f0 0%, #e0e0e0 100%);
+            border: 1px solid #ccc;
+            border-top: none;
+            padding: 10px 15px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 15px;
+        }
+
+        .mode-control-bar .current-mode {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .mode-control-bar .mode-label {
+            font-size: 11px;
+            color: #666;
+            text-transform: uppercase;
+        }
+
+        .mode-control-bar .mode-value {
+            font-size: 12px;
+            font-weight: 600;
+            padding: 4px 10px;
+            border-radius: 3px;
+            background: #333;
+            color: white;
+        }
+
+        .mode-control-bar .mode-value.HOMING {
+            background: #7b1fa2;
+        }
+
+        .mode-control-bar .mode-value.MANUAL {
+            background: #f57c00;
+        }
+
+        .mode-control-bar .mode-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .mode-control-bar .btn {
+            padding: 8px 14px;
+            font-size: 11px;
+        }
+
+        /* Button priority highlight for drives */
+        .btn-drives.highlight {
+            animation: drives-highlight 1.5s infinite;
+        }
+
+        @keyframes drives-highlight {
+            0%, 100% { box-shadow: 0 2px 0 rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.3); }
+            50% { box-shadow: 0 2px 0 rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.3), 0 0 15px rgba(247, 148, 29, 0.7); }
+        }
+
         /* Responsive */
         @media (max-width: 1100px) {
             .main-content {
@@ -989,11 +1238,29 @@
                 <div class="panel">
                     <div class="panel-title">Machine Controls</div>
                     <div class="panel-body">
+                        <!-- Message Center -->
+                        <div class="message-center">
+                            <div class="message-center-header">
+                                <div class="pulse-indicator"></div>
+                                System Guidance
+                            </div>
+                            <div id="messageCenterBody" class="message-center-body">
+                                <div id="guidanceMessage" class="guidance-message info">
+                                    <span class="guidance-icon">...</span>
+                                    <div class="guidance-text">
+                                        <div class="guidance-title" id="guidanceTitle">Initializing</div>
+                                        <div class="guidance-action" id="guidanceAction">Please wait for system startup.</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Control Buttons - DRIVES FIRST for visibility -->
                         <div class="button-grid">
-                            <button class="btn btn-start" onclick="sendCommand('btn_Start', true)">Start Cycle</button>
+                            <button id="btnDrives" class="btn btn-drives" onclick="validateAndToggleDrives()">Drives Off</button>
+                            <button class="btn btn-start" onclick="validateStartCycle()">Start Cycle</button>
                             <button class="btn btn-stop" onclick="sendCommand('btn_Stop', true)">Stop</button>
                             <button class="btn btn-reset" onclick="sendCommand('btn_Reset', true)">Reset Fault</button>
-                            <button id="btnDrives" class="btn btn-drives" onclick="toggleDrives()">Drives Off</button>
                             <button class="btn btn-estop" onclick="sendCommand('btn_EStop', true)">EMERGENCY STOP</button>
                         </div>
                     </div>
@@ -1141,6 +1408,17 @@
             <div class="main-content" style="grid-template-columns: 1fr;">
                 <div class="panel">
                     <div class="panel-title">Axis Homing</div>
+                    <!-- Mode Control Bar -->
+                    <div class="mode-control-bar">
+                        <div class="current-mode">
+                            <span class="mode-label">Current Mode:</span>
+                            <span id="homingPageModeValue" class="mode-value">IDLE</span>
+                        </div>
+                        <div class="mode-buttons">
+                            <button class="btn btn-secondary" onclick="validateExitToIdle()">Exit to IDLE</button>
+                            <button class="btn btn-manual" onclick="validateEnterManual()">Enter Manual</button>
+                        </div>
+                    </div>
                     <div class="panel-body">
                         <div style="display: grid; grid-template-columns: 300px 1fr; gap: 20px;">
                             <!-- Axis Selection List -->
@@ -1150,7 +1428,7 @@
                                     <!-- Will be populated by JavaScript -->
                                 </div>
                                 <div style="margin-top: 15px; display: flex; flex-direction: column; gap: 10px;">
-                                    <button class="btn btn-home" onclick="sendCommand('btn_Home', true)" style="width: 100%;" id="btnToggleHoming">Enter Homing Mode</button>
+                                    <button class="btn btn-home" onclick="validateToggleHoming()" style="width: 100%;" id="btnToggleHoming">Enter Homing Mode</button>
                                     <button class="btn btn-secondary" onclick="homeSingleAxis()" style="width: 100%;" id="btnHomeSingle" disabled>Home Selected Axis</button>
                                     <button class="btn btn-home" onclick="homeAllAxes()" style="width: 100%;" id="btnHomeAll" disabled>Home All Axes</button>
                                 </div>
@@ -1209,6 +1487,17 @@
             <div class="main-content" style="grid-template-columns: 1fr;">
                 <div class="panel">
                     <div class="panel-title">Manual Control</div>
+                    <!-- Mode Control Bar -->
+                    <div class="mode-control-bar">
+                        <div class="current-mode">
+                            <span class="mode-label">Current Mode:</span>
+                            <span id="manualPageModeValue" class="mode-value">IDLE</span>
+                        </div>
+                        <div class="mode-buttons">
+                            <button class="btn btn-secondary" onclick="validateExitToIdle()">Exit to IDLE</button>
+                            <button class="btn btn-home" onclick="validateEnterHoming()">Enter Homing</button>
+                        </div>
+                    </div>
                     <div class="panel-body">
                         <div style="display: grid; grid-template-columns: 300px 1fr; gap: 20px;">
                             <!-- Axis Selection -->
@@ -1218,7 +1507,7 @@
                                     <!-- Will be populated by JavaScript -->
                                 </div>
                                 <div style="margin-top: 15px;">
-                                    <button class="btn btn-manual" onclick="sendCommand('btn_Manual', true)" style="width: 100%;">Enter Manual Mode</button>
+                                    <button class="btn btn-manual" onclick="validateToggleManual()" style="width: 100%;">Enter Manual Mode</button>
                                 </div>
                             </div>
                             <!-- Jog Controls -->
@@ -2080,6 +2369,9 @@
                 const homed = await readPLCVariable(plcVars.isHomed);
                 const drivesState = await readPLCVariable(plcVars.btnDriveOn);
 
+                // Store homed state for validation system
+                isHomedState = homed;
+
                 updatePilotLight('ledRunning', running, 'green');
                 updatePilotLight('ledFaulted', faulted, 'red');
                 updatePilotLight('ledDrives', drivesState, 'green');
@@ -2129,6 +2421,9 @@
 
                 drivesOn = drivesState;
                 updateDrivesButton();
+
+                // Update guidance message (depends on drivesOn and isHomedState)
+                updateGuidanceMessage();
 
                 try {
                     const recipeLocked = await readPLCVariable(plcVars.recipeLocked);
@@ -2327,6 +2622,9 @@
             let stateText = typeof stateValue === 'number' ? machineStates[stateValue] : stateValue;
             if (!stateText) stateText = 'UNKNOWN';
 
+            // Store for validation system
+            machineStateValue = stateText;
+
             const stateEl = document.getElementById('machineState');
             const descEl = document.getElementById('stateDescription');
             const headerModeEl = document.getElementById('headerMachineMode');
@@ -2343,6 +2641,12 @@
 
             // Update homing button states based on machine mode
             updateHomingButtonStates(stateText);
+
+            // Update mode displays on Homing/Manual pages
+            updatePageModeDisplays(stateText);
+
+            // Update guidance message
+            updateGuidanceMessage();
         }
 
         function updatePilotLight(id, isOn, color) {
@@ -2429,6 +2733,329 @@
         function hideError() {
             document.getElementById('errorBanner').classList.remove('show');
         }
+
+        // ================================================================
+        // SMART VALIDATION SYSTEM
+        // ================================================================
+
+        // Global state for guidance
+        let lastGuidanceState = '';
+        let machineStateValue = 'INIT';
+        let isHomedState = false;
+
+        // Validated action wrappers
+        async function validateStartCycle() {
+            if (!drivesOn) {
+                showWarningModal('Cannot Start Cycle', 'Drives are not enabled.', 'Press the DRIVES button to enable drives first.');
+                return;
+            }
+            if (machineStateValue !== 'IDLE') {
+                showWarningModal('Cannot Start Cycle', 'Machine must be in IDLE state.', 'Wait for the current operation to complete or press Reset.');
+                return;
+            }
+            if (!isHomedState) {
+                showWarningModal('Cannot Start Cycle', 'Axes are not homed.', 'Go to the Homing page and home all axes before starting a cycle.');
+                return;
+            }
+            sendCommand('btn_Start', true);
+        }
+
+        async function validateAndToggleDrives() {
+            // Warn if trying to disable drives while running
+            if (drivesOn && machineStateValue === 'RUNNING') {
+                showConfirmModal(
+                    'Disable Drives?',
+                    'Disabling drives while the machine is RUNNING will halt all motion immediately.',
+                    'Are you sure you want to disable drives?',
+                    () => toggleDrives()
+                );
+                return;
+            }
+            toggleDrives();
+        }
+
+        async function validateEnterHoming() {
+            if (!drivesOn) {
+                showWarningModal('Cannot Enter Homing Mode', 'Drives are not enabled.', 'Press the DRIVES button to enable drives first.');
+                return;
+            }
+            if (machineStateValue !== 'IDLE') {
+                showWarningModal('Cannot Enter Homing Mode', 'Machine must be in IDLE state.', 'Wait for the current operation to complete.');
+                return;
+            }
+            sendCommand('btn_Home', true);
+        }
+
+        async function validateEnterManual() {
+            if (!drivesOn) {
+                showWarningModal('Cannot Enter Manual Mode', 'Drives are not enabled.', 'Press the DRIVES button to enable drives first.');
+                return;
+            }
+            if (machineStateValue !== 'IDLE') {
+                showWarningModal('Cannot Enter Manual Mode', 'Machine must be in IDLE state.', 'Wait for the current operation to complete.');
+                return;
+            }
+            sendCommand('btn_Manual', true);
+        }
+
+        async function validateToggleHoming() {
+            // If already in homing mode, just toggle out (no validation needed)
+            if (machineStateValue === 'HOMING') {
+                sendCommand('btn_Home', true);
+                return;
+            }
+            // Otherwise validate entering homing mode
+            validateEnterHoming();
+        }
+
+        async function validateToggleManual() {
+            // If already in manual mode, just toggle out (no validation needed)
+            if (machineStateValue === 'MANUAL') {
+                sendCommand('btn_Manual', true);
+                return;
+            }
+            // Otherwise validate entering manual mode
+            validateEnterManual();
+        }
+
+        async function validateExitToIdle() {
+            if (machineStateValue === 'RUNNING') {
+                showWarningModal('Cannot Exit Mode', 'Machine is currently running a cycle.', 'Press STOP to halt the cycle first.');
+                return;
+            }
+            // Send the appropriate toggle command based on current mode
+            if (machineStateValue === 'HOMING') {
+                sendCommand('btn_Home', true); // Toggle out of homing
+            } else if (machineStateValue === 'MANUAL') {
+                sendCommand('btn_Manual', true); // Toggle out of manual
+            }
+        }
+
+        // ================================================================
+        // MODAL SYSTEM
+        // ================================================================
+
+        function showModal(title, body, footerButtons, headerClass = '') {
+            const overlay = document.getElementById('modalOverlay');
+            const header = document.getElementById('modalHeader');
+            const titleEl = document.getElementById('modalTitle');
+            const bodyEl = document.getElementById('modalBody');
+            const footerEl = document.getElementById('modalFooter');
+            const iconEl = document.getElementById('modalIcon');
+
+            // Set header style
+            header.className = 'modal-header ' + headerClass;
+
+            // Set icon based on type
+            if (headerClass === 'warning') {
+                iconEl.textContent = '!';
+            } else if (headerClass === 'error') {
+                iconEl.textContent = 'X';
+            } else {
+                iconEl.textContent = 'i';
+            }
+
+            titleEl.textContent = title;
+            bodyEl.innerHTML = body;
+            footerEl.innerHTML = footerButtons;
+
+            overlay.classList.add('show');
+        }
+
+        function showWarningModal(title, message, action) {
+            const body = `
+                <p><strong>${message}</strong></p>
+                ${action ? `<p style="color: #666; font-size: 13px;"><strong>Action required:</strong> ${action}</p>` : ''}
+            `;
+            const buttons = '<button class="btn btn-primary" onclick="closeModal()">Understood</button>';
+            showModal(title, body, buttons, 'warning');
+        }
+
+        function showConfirmModal(title, message, question, onConfirm) {
+            // Store the callback globally since we can't easily pass it through onclick
+            window._modalConfirmCallback = onConfirm;
+            const body = `
+                <p>${message}</p>
+                <p><strong>${question}</strong></p>
+            `;
+            const buttons = `
+                <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                <button class="btn btn-stop" onclick="closeModal(); if(window._modalConfirmCallback) window._modalConfirmCallback();">Confirm</button>
+            `;
+            showModal(title, body, buttons, 'warning');
+        }
+
+        function showErrorModal(title, message) {
+            const body = `<p><strong>${message}</strong></p>`;
+            const buttons = '<button class="btn btn-primary" onclick="closeModal()">OK</button>';
+            showModal(title, body, buttons, 'error');
+        }
+
+        function closeModal() {
+            document.getElementById('modalOverlay').classList.remove('show');
+            window._modalConfirmCallback = null;
+        }
+
+        function closeModalOnOverlay(event) {
+            if (event.target.id === 'modalOverlay') {
+                closeModal();
+            }
+        }
+
+        // ================================================================
+        // GUIDANCE MESSAGE SYSTEM
+        // ================================================================
+
+        const guidanceMessages = {
+            'INIT': {
+                type: 'info',
+                icon: '...',
+                title: 'Initializing',
+                action: 'Please wait for system startup.'
+            },
+            'IDLE_DRIVES_OFF': {
+                type: 'warning',
+                icon: '!',
+                title: 'Drives Disabled',
+                action: 'Press DRIVES to enable drives and begin operation.'
+            },
+            'IDLE_NOT_HOMED': {
+                type: 'warning',
+                icon: '!',
+                title: 'Axes Not Homed',
+                action: 'Go to Homing page and home all axes before starting cycle.'
+            },
+            'IDLE_READY': {
+                type: 'success',
+                icon: '>',
+                title: 'System Ready',
+                action: 'Press START CYCLE to begin operation.'
+            },
+            'HOMING': {
+                type: 'info',
+                icon: 'H',
+                title: 'Homing Mode Active',
+                action: 'Select axes and press HOME buttons to home.'
+            },
+            'MANUAL': {
+                type: 'info',
+                icon: 'M',
+                title: 'Manual Mode Active',
+                action: 'Use jog controls to move axes.'
+            },
+            'RUNNING': {
+                type: 'success',
+                icon: '>',
+                title: 'Cycle In Progress',
+                action: 'Machine is running. Press STOP to halt.'
+            },
+            'STOPPING': {
+                type: 'warning',
+                icon: '||',
+                title: 'Stopping Motion',
+                action: 'Please wait for motion to stop.'
+            },
+            'FAULTED': {
+                type: 'error',
+                icon: 'X',
+                title: 'FAULT DETECTED',
+                action: 'Press RESET to clear fault and investigate cause.'
+            },
+            'E_STOPPED': {
+                type: 'error',
+                icon: '!!',
+                title: 'EMERGENCY STOP ACTIVE',
+                action: 'Release E-Stop and press RESET to resume.'
+            },
+            'RESETTING': {
+                type: 'info',
+                icon: '...',
+                title: 'Resetting System',
+                action: 'Please wait for reset to complete.'
+            }
+        };
+
+        function updateGuidanceMessage() {
+            // Determine guidance state
+            let guidanceKey = machineStateValue;
+
+            // Refine IDLE state guidance
+            if (machineStateValue === 'IDLE') {
+                if (!drivesOn) {
+                    guidanceKey = 'IDLE_DRIVES_OFF';
+                } else if (!isHomedState) {
+                    guidanceKey = 'IDLE_NOT_HOMED';
+                } else {
+                    guidanceKey = 'IDLE_READY';
+                }
+            }
+
+            // Only update if changed
+            if (guidanceKey === lastGuidanceState) return;
+            lastGuidanceState = guidanceKey;
+
+            const guidance = guidanceMessages[guidanceKey] || guidanceMessages['INIT'];
+
+            const messageEl = document.getElementById('guidanceMessage');
+            const titleEl = document.getElementById('guidanceTitle');
+            const actionEl = document.getElementById('guidanceAction');
+            const iconEl = messageEl ? messageEl.querySelector('.guidance-icon') : null;
+
+            if (!messageEl) return;
+
+            // Update message type/styling
+            messageEl.className = 'guidance-message ' + guidance.type;
+
+            // Update icon
+            if (iconEl) iconEl.textContent = guidance.icon;
+
+            // Update text
+            if (titleEl) titleEl.textContent = guidance.title;
+            if (actionEl) actionEl.textContent = guidance.action;
+
+            // Highlight drives button when drives are off in IDLE
+            const drivesBtn = document.getElementById('btnDrives');
+            if (drivesBtn) {
+                if (guidanceKey === 'IDLE_DRIVES_OFF') {
+                    drivesBtn.classList.add('highlight');
+                } else {
+                    drivesBtn.classList.remove('highlight');
+                }
+            }
+        }
+
+        // Update mode values on Homing and Manual pages
+        function updatePageModeDisplays(stateText) {
+            const homingModeEl = document.getElementById('homingPageModeValue');
+            const manualModeEl = document.getElementById('manualPageModeValue');
+
+            if (homingModeEl) {
+                homingModeEl.textContent = stateText;
+                homingModeEl.className = 'mode-value ' + stateText;
+            }
+            if (manualModeEl) {
+                manualModeEl.textContent = stateText;
+                manualModeEl.className = 'mode-value ' + stateText;
+            }
+        }
     </script>
+
+    <!-- ================================================================== -->
+    <!-- MODAL OVERLAY -->
+    <!-- ================================================================== -->
+    <div id="modalOverlay" class="modal-overlay" onclick="closeModalOnOverlay(event)">
+        <div class="modal-dialog" onclick="event.stopPropagation()">
+            <div id="modalHeader" class="modal-header">
+                <span id="modalIcon" class="modal-header-icon">!</span>
+                <span id="modalTitle">Alert</span>
+            </div>
+            <div id="modalBody" class="modal-body">
+                <p>Message content here</p>
+            </div>
+            <div id="modalFooter" class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal()">OK</button>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

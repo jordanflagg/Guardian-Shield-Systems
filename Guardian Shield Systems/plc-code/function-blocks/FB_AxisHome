@@ -35,7 +35,7 @@ VAR
     fbMoveGroup3 : FB_MultiAxisMover;  // Axes 35, 36
 
     // State machine
-    state : INT := 0;
+    state : UINT := 0;
     homeSinglePrev : BOOL;
     homeAllPrev : BOOL;
     homeSingleRising : BOOL;
@@ -43,11 +43,11 @@ VAR
 
     // Tracking
     selectedAxis : UINT;
-    homeAllPhase : INT := 0;  // 0=idle, 1=group1, 2=group2, 3=group3, 4=done
+    homeAllPhase : UINT := 0;  // 0=idle, 1=group1, 2=group2, 3=group3, 4=done
 
     // Master axis validation (uses GVL_Axes.MASTER_AXES as single source of truth)
     isMaster : BOOL;
-    i : INT;
+    i : UINT;
 
     // Position reading for homed status
     fbReadPos : ARRAY[1..36] OF MC_ReadActualPosition;

@@ -23,12 +23,12 @@ VAR_OUTPUT
     Done : BOOL;                // All gearing successfully engaged
     Busy : BOOL;                // Gearing in progress
     Error : BOOL;               // One or more gearing operations failed
-    ErrorAxisID : INT;         // Which slave axis had the error (0 = none)
-    ActivePairCount : INT;     // Number of gearing pairs currently active
+    ErrorAxisID : UINT;         // Which slave axis had the error (0 = none)
+    ActivePairCount : UINT;     // Number of gearing pairs currently active
 END_VAR
 
 VAR CONSTANT
-    NUM_GEARING_PAIRS : INT := 18;
+    NUM_GEARING_PAIRS : UINT := 18;
 END_VAR
 
 VAR
@@ -71,7 +71,7 @@ VAR
     // Status Aggregation Arrays
     // Maps pair index to slave axis ID for error reporting
     // =========================================================================
-    SLAVE_AXIS_MAP : ARRAY[1..18] OF INT := [
+    SLAVE_AXIS_MAP : ARRAY[1..18] OF UINT := [
         3,   // Pair 1:  2->3
         4,   // Pair 2:  2->4
         5,   // Pair 3:  2->5
@@ -104,7 +104,7 @@ VAR
     gearingActive : BOOL := FALSE;
 
     // Loop counter
-    i : INT;
+    i : UINT;
 END_VAR
 
 ///////////////////////////////////////////////////////////////////////////////

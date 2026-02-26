@@ -6,36 +6,36 @@ FUNCTION_BLOCK FB_MotionSequence
 
 VAR_INPUT
     Enable : BOOL;                      // TRUE when machine in RUNNING state
-    RecipeID : INT := 1;               // Recipe number to load (1-10)
+    RecipeID : UNIT := 1;               // Recipe number to load (1-10)
 END_VAR
 
 VAR_OUTPUT
     SequenceComplete : BOOL;            // Full cycle completed
     CurrentStep : E_MotionStep;         // Current motion phase
-    ActiveRecipeID : INT;              // Currently loaded recipe ID
+    ActiveRecipeID : UNIT;              // Currently loaded recipe ID
     RecipeLoadComplete : BOOL;          // Recipe loaded successfully
     RecipeLoadError : BOOL;             // Recipe load failed
 
     // HMI visualization outputs
-    CurrentSubStep : INT;               // Current substep within motion step
+    CurrentSubStep : UNIT;               // Current substep within motion step
     ActiveAxesMask : LWORD;             // Bitmask of currently moving axes (64-bit for 36 axes)
     StepDescription : STRING[80];       // Human-readable description
 
     // Individual step error outputs (for FB_ErrorHandler in state machine)
     LoadBlockError : BOOL;
-    LoadBlockErrorAxisID : INT;
+    LoadBlockErrorAxisID : UNIT;
     StudsError : BOOL;
-    StudsErrorAxisID : INT;
+    StudsErrorAxisID : UNIT;
     WindowsDoorsError : BOOL;
-    WindowsDoorsErrorAxisID : INT;
+    WindowsDoorsErrorAxisID : UNIT;
     ElectricalError : BOOL;
-    ElectricalErrorAxisID : INT;
+    ElectricalErrorAxisID : UNIT;
     UnloadError : BOOL;
-    UnloadErrorAxisID : INT;
+    UnloadErrorAxisID : UNIT;
 
     // Aggregate error flag (for quick check)
     HasError : BOOL;                    // Any motion error occurred
-    ErrorAxisID : INT;                 // Which axis caused first error
+    ErrorAxisID : UNIT;                 // Which axis caused first error
 END_VAR
 
 VAR
@@ -45,7 +45,7 @@ VAR
     // Recipe data
     positions : ST_PositionSetpoints;
     motionParams : ST_MotionParameters;
-    lastRecipeID : INT := 0;
+    lastRecipeID : UNIT := 0;
 
     // Operation enable flags (from recipe)
     enableStuds : BOOL := TRUE;

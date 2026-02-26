@@ -7,7 +7,7 @@ FUNCTION_BLOCK FB_MotionStepBase
 // Usage in motion step FBs:
 //   VAR
 //       base : FB_MotionStepBase;
-//       subStep : INT;    // Each FB manages its own substep
+//       subStep : UNIT;    // Each FB manages its own substep
 //   END_VAR
 //
 //   base(Enable := Enable);

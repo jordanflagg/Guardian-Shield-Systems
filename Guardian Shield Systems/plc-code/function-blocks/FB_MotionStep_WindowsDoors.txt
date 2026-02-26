@@ -19,7 +19,7 @@ VAR_OUTPUT
     Busy : BOOL;                        // Step in progress
     Error : BOOL;                       // Step failed
     ErrorAxisID : UINT;                 // Which axis caused error
-    CurrentSubStep : INT;               // Current substep (0-5)
+    CurrentSubStep : UNIT;               // Current substep (0-5)
     ActiveAxesMask : LWORD;             // Bitmask of moving axes
     StepDescription : STRING[80];       // Human-readable description
 END_VAR
@@ -38,7 +38,7 @@ VAR
     tempErrorAxis : UINT;
 
     // Local substep tracking
-    subStep : INT;
+    subStep : UNIT;
 
     // Empty placeholder for unused mover slots
     emptyStatus : ST_MoverStatus := (Done := FALSE, Error := FALSE, AxisID := 0);

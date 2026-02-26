@@ -36,7 +36,7 @@ VAR
     // Master axis validation (uses GVL_Axes.MASTER_AXES as single source of truth)
     // Slaves follow automatically via electronic gearing
     isValidAxis     : BOOL;
-    i               : INT;
+    i               : UINT;
 END_VAR
 
 // ============================================================================

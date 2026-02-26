@@ -2,6 +2,15 @@
 
 ## High Priority (Immediate)
 
+
+Machine is running, stop, home, resume running it goes back to where it was. Need logic for resetting cycle and some way to keep track if anything is homed maybe we need to do a full reset. 
+
+If runnning homing command and hit stop button the home continues. After doing this homing does not work... fb_single execute is stuck at TRUE. need abort homing option or soemthing to reset it. The FB axis mover instance is stuck on true and never reset 
+
+after e stop (ie any time drive off is toggled) it forces you to home all axis. (maybe option to resume where left off or home in a pop up?)
+
+
+
 ### I/O Integration
 - [ ] Add suction cup I/O control (enable output, active confirmation input)
 - [ ] Add hot wire PWM control for temperature regulation (6 hot wires)

@@ -19,8 +19,8 @@ VAR_OUTPUT
     Done : BOOL;                        // Step completed
     Busy : BOOL;                        // Step in progress
     Error : BOOL;                       // Step failed
-    ErrorAxisID : INT;                 // Which axis caused error
-    CurrentSubStep : INT;               // Current substep (0-10)
+    ErrorAxisID : UNIT;                 // Which axis caused error
+    CurrentSubStep : UNIT;               // Current substep (0-10)
     ActiveAxesMask : LWORD;             // Bitmask of moving axes
     StepDescription : STRING[80];       // Human-readable description
 END_VAR
@@ -37,7 +37,7 @@ VAR
     moverAxis10 : FB_AxisMover;
 
     // Local substep tracking
-    subStep : INT;
+    subStep : UNIT;
 END_VAR
 
 ///////////////////////////////////////////////////////////////////////////////

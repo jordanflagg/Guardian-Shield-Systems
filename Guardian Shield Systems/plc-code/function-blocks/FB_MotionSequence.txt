@@ -1,131 +1,81 @@
 {attribute 'no_assign'}
 FUNCTION_BLOCK FB_MotionSequence
-// Refactored motion sequence controller
-// Orchestrates modular motion step FBs for cleaner, more maintainable code
-// Each motion phase is now handled by a dedicated function block
+(*
+==============================================================================
+  FB_MotionSequence
+  Motion sequence controller — G-Code driven cutting
+
+  Orchestrates the production cycle:
+    WAIT_FOR_LOAD → SHIFT_TO_PROCESSING → CUTTING → SHIFT_TO_UNLOAD
+
+  Position setpoints and motion parameters come from GVL_Machine.
+  Cutting path comes from GVL_GCode (written by Python pipeline).
+==============================================================================
+*)
 
 VAR_INPUT
     Enable : BOOL;                      // TRUE when machine in RUNNING state
-    RecipeID : UNIT := 1;               // Recipe number to load (1-10)
 END_VAR
 
 VAR_OUTPUT
     SequenceComplete : BOOL;            // Full cycle completed
     CurrentStep : E_MotionStep;         // Current motion phase
-    ActiveRecipeID : UNIT;              // Currently loaded recipe ID
-    RecipeLoadComplete : BOOL;          // Recipe loaded successfully
-    RecipeLoadError : BOOL;             // Recipe load failed
 
     // HMI visualization outputs
-    CurrentSubStep : UNIT;               // Current substep within motion step
-    ActiveAxesMask : LWORD;             // Bitmask of currently moving axes (64-bit for 36 axes)
+    CurrentSubStep : UINT;              // Current substep within motion step
+    ActiveAxesMask : LWORD;             // Bitmask of currently moving axes
     StepDescription : STRING[80];       // Human-readable description
 
-    // Individual step error outputs (for FB_ErrorHandler in state machine)
+    // Step error outputs (for FB_ErrorHandler in state machine)
     LoadBlockError : BOOL;
-    LoadBlockErrorAxisID : UNIT;
-    StudsError : BOOL;
-    StudsErrorAxisID : UNIT;
-    WindowsDoorsError : BOOL;
-    WindowsDoorsErrorAxisID : UNIT;
-    ElectricalError : BOOL;
-    ElectricalErrorAxisID : UNIT;
+    LoadBlockErrorAxisID : UINT;
+    CuttingError : BOOL;
+    CuttingErrorAxisID : UINT;
     UnloadError : BOOL;
-    UnloadErrorAxisID : UNIT;
+    UnloadErrorAxisID : UINT;
 
-    // Aggregate error flag (for quick check)
-    HasError : BOOL;                    // Any motion error occurred
-    ErrorAxisID : UNIT;                 // Which axis caused first error
+    // G-Code cutting progress
+    CuttingMoveIndex : INT;
+    CuttingTotalMoves : INT;
+
+    // Aggregate error flag
+    HasError : BOOL;
+    ErrorAxisID : UINT;
 END_VAR
 
 VAR
-    // Motion step (main state machine)
+    // Motion step state machine
     motionStep : E_MotionStep := E_MotionStep.WAIT_FOR_LOAD;
 
-    // Recipe data
-    positions : ST_PositionSetpoints;
-    motionParams : ST_MotionParameters;
-    lastRecipeID : UNIT := 0;
-
-    // Operation enable flags (from recipe)
-    enableStuds : BOOL := TRUE;
-    enableWindowsDoors : BOOL := TRUE;
-    enableElectrical : BOOL := TRUE;
-
-    // Block loaded flag (would come from sensor in production)
+    // Block loaded flag (set by sensor / HMI trigger)
     blockLoaded : BOOL := TRUE;
 
-    // Modular motion step function blocks
+    // Motion step function blocks
     stepLoadBlock : FB_MotionStep_LoadBlock;
-    stepStuds : FB_MotionStep_Studs;
-    stepWindowsDoors : FB_MotionStep_WindowsDoors;
-    stepElectrical : FB_MotionStep_Electrical;
-    stepUnload : FB_MotionStep_Unload;
-
-    // State tracking
-    stepStarted : BOOL := FALSE;
+    stepCutting   : FB_MotionStep_Cutting;
+    stepUnload    : FB_MotionStep_Unload;
 END_VAR
 
 ///////////////////////////////////////////////////////////////////////////////
 
 // ============================================================================
-// RECIPE LOADING - Load when RecipeID changes
-// ============================================================================
-
-IF RecipeID <> lastRecipeID THEN
-    IF RecipeID >= 1 AND RecipeID <= 10 THEN
-        IF GVL_Recipes.RecipeLibrary[RecipeID].isActive THEN
-            // Load recipe data
-            positions := GVL_Recipes.RecipeLibrary[RecipeID].positions;
-            motionParams := GVL_Recipes.RecipeLibrary[RecipeID].motionParams;
-            enableStuds := GVL_Recipes.RecipeLibrary[RecipeID].enableStuds;
-            enableWindowsDoors := GVL_Recipes.RecipeLibrary[RecipeID].enableWindowsDoors;
-            enableElectrical := GVL_Recipes.RecipeLibrary[RecipeID].enableElectrical;
-
-            ActiveRecipeID := RecipeID;
-            RecipeLoadError := FALSE;
-            RecipeLoadComplete := TRUE;
-        ELSE
-            // Recipe is inactive
-            RecipeLoadError := TRUE;
-            RecipeLoadComplete := FALSE;
-        END_IF
-    ELSE
-        // Invalid recipe ID
-        RecipeLoadError := TRUE;
-        RecipeLoadComplete := FALSE;
-    END_IF
-
-    lastRecipeID := RecipeID;
-END_IF
-
-// ============================================================================
-// HANDLE DISABLE - Disable all step FBs
+// HANDLE DISABLE
 // ============================================================================
 
 IF NOT Enable THEN
     stepLoadBlock(Enable := FALSE);
-    stepStuds(Enable := FALSE);
-    stepWindowsDoors(Enable := FALSE);
-    stepElectrical(Enable := FALSE);
+    stepCutting(Enable := FALSE);
     stepUnload(Enable := FALSE);
 
-    // Clear error state when disabled (errors are handled by state machine)
     HasError := FALSE;
     ErrorAxisID := 0;
     LoadBlockError := FALSE;
     LoadBlockErrorAxisID := 0;
-    StudsError := FALSE;
-    StudsErrorAxisID := 0;
-    WindowsDoorsError := FALSE;
-    WindowsDoorsErrorAxisID := 0;
-    ElectricalError := FALSE;
-    ElectricalErrorAxisID := 0;
+    CuttingError := FALSE;
+    CuttingErrorAxisID := 0;
     UnloadError := FALSE;
     UnloadErrorAxisID := 0;
-
     ActiveAxesMask := 0;
-    stepStarted := FALSE;
     RETURN;
 END_IF
 
@@ -135,38 +85,34 @@ END_IF
 
 CASE motionStep OF
 
-    // ----------------------------------------------------------------
+    // ────────────────────────────────────────────────────────────────────────
     E_MotionStep.WAIT_FOR_LOAD:
         SequenceComplete := FALSE;
         CurrentSubStep := 0;
         StepDescription := 'Waiting for block to load';
         ActiveAxesMask := 0;
 
-        // Clear any previous error state for new cycle
         HasError := FALSE;
         ErrorAxisID := 0;
 
-        // Disable step FBs while waiting for new cycle
         stepLoadBlock(Enable := FALSE);
-        stepStuds(Enable := FALSE);
-        stepWindowsDoors(Enable := FALSE);
-        stepElectrical(Enable := FALSE);
+        stepCutting(Enable := FALSE);
         stepUnload(Enable := FALSE);
 
         IF blockLoaded THEN
             motionStep := E_MotionStep.SHIFT_TO_PROCESSING_AREA;
         END_IF
 
-    // ----------------------------------------------------------------
+    // ────────────────────────────────────────────────────────────────────────
     E_MotionStep.SHIFT_TO_PROCESSING_AREA:
         stepLoadBlock(
-            Enable := TRUE,
-            Positions := positions,
-            MotionParams := motionParams
+            Enable       := TRUE,
+            Positions    := GVL_Machine.Positions,
+            MotionParams := GVL_Machine.MotionParams
         );
 
-        CurrentSubStep := stepLoadBlock.CurrentSubStep;
-        ActiveAxesMask := stepLoadBlock.ActiveAxesMask;
+        CurrentSubStep  := stepLoadBlock.CurrentSubStep;
+        ActiveAxesMask  := stepLoadBlock.ActiveAxesMask;
         StepDescription := stepLoadBlock.StepDescription;
 
         IF stepLoadBlock.Error THEN
@@ -174,100 +120,39 @@ CASE motionStep OF
             ErrorAxisID := stepLoadBlock.ErrorAxisID;
         ELSIF stepLoadBlock.Done THEN
             stepLoadBlock(Enable := FALSE);
-            // Determine next operation based on recipe
-            IF enableStuds THEN
-                motionStep := E_MotionStep.STUDS;
-            ELSIF enableWindowsDoors THEN
-                motionStep := E_MotionStep.WINDOWS_DOORS;
-            ELSIF enableElectrical THEN
-                motionStep := E_MotionStep.ELECTRICAL;
-            ELSE
-                motionStep := E_MotionStep.SHIFT_TO_UNLOAD_AREA;
-            END_IF
+            motionStep := E_MotionStep.CUTTING;
         END_IF
 
-    // ----------------------------------------------------------------
-    E_MotionStep.STUDS:
-        stepStuds(
-            Enable := TRUE,
-            Positions := positions,
-            MotionParams := motionParams
+    // ────────────────────────────────────────────────────────────────────────
+    E_MotionStep.CUTTING:
+        stepCutting(
+            Enable := TRUE
         );
 
-        CurrentSubStep := stepStuds.CurrentSubStep;
-        ActiveAxesMask := stepStuds.ActiveAxesMask;
-        StepDescription := stepStuds.StepDescription;
+        CurrentSubStep    := stepCutting.CurrentSubStep;
+        ActiveAxesMask    := stepCutting.ActiveAxesMask;
+        StepDescription   := stepCutting.StepDescription;
+        CuttingMoveIndex  := stepCutting.CurrentMoveIndex;
+        CuttingTotalMoves := stepCutting.TotalMoves;
 
-        IF stepStuds.Error THEN
+        IF stepCutting.Error THEN
             HasError := TRUE;
-            ErrorAxisID := stepStuds.ErrorAxisID;
-        ELSIF stepStuds.Done THEN
-            stepStuds(Enable := FALSE);
-            // Determine next operation
-            IF enableWindowsDoors THEN
-                motionStep := E_MotionStep.WINDOWS_DOORS;
-            ELSIF enableElectrical THEN
-                motionStep := E_MotionStep.ELECTRICAL;
-            ELSE
-                motionStep := E_MotionStep.SHIFT_TO_UNLOAD_AREA;
-            END_IF
-        END_IF
-
-    // ----------------------------------------------------------------
-    E_MotionStep.WINDOWS_DOORS:
-        stepWindowsDoors(
-            Enable := TRUE,
-            Positions := positions,
-            MotionParams := motionParams
-        );
-
-        CurrentSubStep := stepWindowsDoors.CurrentSubStep;
-        ActiveAxesMask := stepWindowsDoors.ActiveAxesMask;
-        StepDescription := stepWindowsDoors.StepDescription;
-
-        IF stepWindowsDoors.Error THEN
-            HasError := TRUE;
-            ErrorAxisID := stepWindowsDoors.ErrorAxisID;
-        ELSIF stepWindowsDoors.Done THEN
-            stepWindowsDoors(Enable := FALSE);
-            // Determine next operation
-            IF enableElectrical THEN
-                motionStep := E_MotionStep.ELECTRICAL;
-            ELSE
-                motionStep := E_MotionStep.SHIFT_TO_UNLOAD_AREA;
-            END_IF
-        END_IF
-
-    // ----------------------------------------------------------------
-    E_MotionStep.ELECTRICAL:
-        stepElectrical(
-            Enable := TRUE,
-            Positions := positions,
-            MotionParams := motionParams
-        );
-
-        CurrentSubStep := stepElectrical.CurrentSubStep;
-        ActiveAxesMask := stepElectrical.ActiveAxesMask;
-        StepDescription := stepElectrical.StepDescription;
-
-        IF stepElectrical.Error THEN
-            HasError := TRUE;
-            ErrorAxisID := stepElectrical.ErrorAxisID;
-        ELSIF stepElectrical.Done THEN
-            stepElectrical(Enable := FALSE);
+            ErrorAxisID := stepCutting.ErrorAxisID;
+        ELSIF stepCutting.Done THEN
+            stepCutting(Enable := FALSE);
             motionStep := E_MotionStep.SHIFT_TO_UNLOAD_AREA;
         END_IF
 
-    // ----------------------------------------------------------------
+    // ────────────────────────────────────────────────────────────────────────
     E_MotionStep.SHIFT_TO_UNLOAD_AREA:
         stepUnload(
-            Enable := TRUE,
-            Positions := positions,
-            MotionParams := motionParams
+            Enable       := TRUE,
+            Positions    := GVL_Machine.Positions,
+            MotionParams := GVL_Machine.MotionParams
         );
 
-        CurrentSubStep := stepUnload.CurrentSubStep;
-        ActiveAxesMask := stepUnload.ActiveAxesMask;
+        CurrentSubStep  := stepUnload.CurrentSubStep;
+        ActiveAxesMask  := stepUnload.ActiveAxesMask;
         StepDescription := stepUnload.StepDescription;
 
         IF stepUnload.Error THEN
@@ -281,36 +166,25 @@ CASE motionStep OF
 
 END_CASE
 
-// Update current step output
 CurrentStep := motionStep;
 
 // ============================================================================
-// EXPOSE INDIVIDUAL STEP ERRORS (for FB_ErrorHandler in state machine)
+// EXPOSE STEP ERRORS
 // ============================================================================
 
-LoadBlockError := stepLoadBlock.Error;
+LoadBlockError       := stepLoadBlock.Error;
 LoadBlockErrorAxisID := stepLoadBlock.ErrorAxisID;
-StudsError := stepStuds.Error;
-StudsErrorAxisID := stepStuds.ErrorAxisID;
-WindowsDoorsError := stepWindowsDoors.Error;
-WindowsDoorsErrorAxisID := stepWindowsDoors.ErrorAxisID;
-ElectricalError := stepElectrical.Error;
-ElectricalErrorAxisID := stepElectrical.ErrorAxisID;
-UnloadError := stepUnload.Error;
-UnloadErrorAxisID := stepUnload.ErrorAxisID;
+CuttingError         := stepCutting.Error;
+CuttingErrorAxisID   := stepCutting.ErrorAxisID;
+UnloadError          := stepUnload.Error;
+UnloadErrorAxisID    := stepUnload.ErrorAxisID;
 
-// Compute aggregate error flag for quick checking
-HasError := LoadBlockError OR StudsError OR WindowsDoorsError OR ElectricalError OR UnloadError;
+HasError := LoadBlockError OR CuttingError OR UnloadError;
 
-// Report first error axis
 IF LoadBlockError THEN
     ErrorAxisID := LoadBlockErrorAxisID;
-ELSIF StudsError THEN
-    ErrorAxisID := StudsErrorAxisID;
-ELSIF WindowsDoorsError THEN
-    ErrorAxisID := WindowsDoorsErrorAxisID;
-ELSIF ElectricalError THEN
-    ErrorAxisID := ElectricalErrorAxisID;
+ELSIF CuttingError THEN
+    ErrorAxisID := CuttingErrorAxisID;
 ELSIF UnloadError THEN
     ErrorAxisID := UnloadErrorAxisID;
 ELSE

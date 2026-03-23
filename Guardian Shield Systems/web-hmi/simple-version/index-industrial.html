@@ -1196,6 +1196,196 @@
                 font-size: 36px;
             }
         }
+
+        /* ================================================================
+           PROGRAM TAB STYLES
+           ================================================================ */
+
+        .cam-drop-zone {
+            border: 2px dashed #555;
+            border-radius: 6px;
+            padding: 22px 12px;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.2s, background 0.2s;
+            background: #1e1e1e;
+            user-select: none;
+        }
+        .cam-drop-zone:hover, .cam-drop-zone.drag-over {
+            border-color: #f7941d;
+            background: #252010;
+        }
+        .cam-drop-icon {
+            font-size: 28px;
+            font-weight: 700;
+            color: #555;
+            font-family: 'Consolas', monospace;
+            letter-spacing: 2px;
+            margin-bottom: 8px;
+        }
+        .cam-drop-zone:hover .cam-drop-icon,
+        .cam-drop-zone.drag-over .cam-drop-icon {
+            color: #f7941d;
+        }
+        .cam-drop-label { font-size: 13px; color: #888; }
+        .cam-file-info {
+            margin-top: 8px;
+            padding: 8px 10px;
+            background: #1a2a12;
+            border: 1px solid #3a5a22;
+            border-radius: 4px;
+            font-size: 12px;
+            color: #8bc34a;
+            font-family: 'Consolas', monospace;
+            word-break: break-all;
+        }
+        .cam-param-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 12px;
+        }
+        .cam-param-row label { color: #888; }
+        .cam-input {
+            width: 110px;
+            padding: 4px 8px;
+            background: #2a2a2a;
+            border: 1px solid #444;
+            border-radius: 3px;
+            color: #e0e0e0;
+            font-size: 12px;
+            font-family: 'Consolas', monospace;
+        }
+        .cam-input:focus { outline: none; border-color: #f7941d; }
+        .cam-convert-btn {
+            width: 100%;
+            margin-top: 14px;
+            background: linear-gradient(180deg, #f7941d 0%, #e07800 100%);
+            color: white;
+            font-weight: 600;
+            font-size: 13px;
+            padding: 10px;
+            letter-spacing: 0.5px;
+        }
+        .cam-convert-btn:disabled {
+            background: #333;
+            color: #666;
+            cursor: not-allowed;
+        }
+        .cam-status-msg {
+            margin-top: 8px;
+            font-size: 12px;
+            color: #aaa;
+            min-height: 18px;
+            word-break: break-word;
+        }
+        .cam-status-msg.error { color: #ef5350; }
+        .cam-status-msg.success { color: #8bc34a; }
+
+        /* Preview panel */
+        .cam-preview-container {
+            background: #1a1a1a;
+            border-radius: 4px;
+            min-height: 420px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+        .cam-preview-placeholder {
+            text-align: center;
+            padding: 40px;
+        }
+        .cam-spinner {
+            text-align: center;
+            padding: 40px;
+        }
+        .cam-spinner-ring {
+            width: 48px;
+            height: 48px;
+            border: 4px solid #333;
+            border-top-color: #f7941d;
+            border-radius: 50%;
+            animation: cam-spin 0.8s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes cam-spin { to { transform: rotate(360deg); } }
+
+        /* View tabs (bottom block / top block / window) */
+        .cam-view-tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 8px;
+            flex-wrap: wrap;
+        }
+        .cam-view-tab {
+            padding: 5px 14px;
+            background: #2a2a2a;
+            color: #888;
+            border: 1px solid #444;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s;
+            letter-spacing: 0.3px;
+        }
+        .cam-view-tab:hover { background: #333; color: #ccc; }
+        .cam-view-tab.active {
+            background: #122030;
+            color: #64b5f6;
+            border-color: #2196F3;
+        }
+
+        /* Block info / feature chips */
+        .cam-info-grid {
+            font-family: 'Consolas', monospace;
+            font-size: 12px;
+            color: #ccc;
+            line-height: 1.9;
+        }
+        .cam-feature-chip {
+            padding: 4px 8px;
+            margin-bottom: 4px;
+            background: #1e1e1e;
+            border-left: 3px solid #444;
+            border-radius: 2px;
+            font-size: 12px;
+            color: #aaa;
+            font-family: 'Consolas', monospace;
+        }
+
+        /* G-code file list items */
+        .cam-gcode-item {
+            padding: 8px 10px;
+            border-left: 3px solid #444;
+            background: #1e1e1e;
+            margin-bottom: 4px;
+            border-radius: 2px;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .cam-gcode-item:hover { background: #252525; }
+        .cam-gcode-item.active { background: #122030; border-left-width: 4px; }
+
+        /* Legend */
+        .cam-legend {
+            display: flex;
+            gap: 14px;
+            flex-wrap: wrap;
+            font-size: 11px;
+            color: #666;
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid #2a2a2a;
+        }
+        .cam-legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
     </style>
 </head>
 <body>
@@ -1208,7 +1398,7 @@
                     <button class="nav-tab active" onclick="switchPage('dashboard')">Dashboard</button>
                     <button class="nav-tab" onclick="switchPage('homing')">Homing</button>
                     <button class="nav-tab" onclick="switchPage('manual')">Manual</button>
-                    <button class="nav-tab" onclick="switchPage('recipes')">Recipes</button>
+                    <button class="nav-tab" onclick="switchPage('program')">Program</button>
                 </div>
                 <div class="header-item">
                     <label>Mode:</label>
@@ -1359,44 +1549,6 @@
                     </div>
                 </div>
 
-                <!-- Recipe Selection -->
-                <div class="panel">
-                    <div class="panel-title">Recipe Selection</div>
-                    <div class="panel-body">
-                        <div class="recipe-section">
-                            <label class="recipe-label">Active Recipe</label>
-                            <select id="recipeSelect" class="recipe-select" onchange="selectRecipe()">
-                                <option value="1">Recipe 1 - Default</option>
-                                <option value="2">Recipe 2 - Custom</option>
-                                <option value="3">Recipe 3 - Test</option>
-                                <option value="4">Recipe 4 - Advanced</option>
-                                <option value="5">Recipe 5 - Quick</option>
-                            </select>
-                        </div>
-                        <div class="recipe-details">
-                            <div id="recipeName" class="recipe-name">Recipe 1</div>
-                            <div id="recipeDesc" class="recipe-desc">Standard cutting parameters for foam blocks.</div>
-                            <div id="recipeLocked" class="recipe-locked-badge" style="display: none;">LOCKED - RUNNING</div>
-                        </div>
-
-                        <!-- Operations -->
-                        <div class="operations-section">
-                            <div class="operations-title">Enabled Operations</div>
-                            <div class="operation-item">
-                                <div id="opStuds" class="operation-check enabled"></div>
-                                <span>Studs</span>
-                            </div>
-                            <div class="operation-item">
-                                <div id="opWindows" class="operation-check enabled"></div>
-                                <span>Windows/Doors</span>
-                            </div>
-                            <div class="operation-item">
-                                <div id="opElectrical" class="operation-check enabled"></div>
-                                <span>Electrical</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
             </div>
         </div>
         </div> <!-- End Dashboard Page -->
@@ -1559,174 +1711,169 @@
         </div>
 
         <!-- ================================================================== -->
-        <!-- RECIPES PAGE -->
+        <!-- PROGRAM PAGE -->
         <!-- ================================================================== -->
-        <div id="page-recipes" class="page-content">
-            <div class="main-content" style="grid-template-columns: 280px 1fr;">
-                <!-- Recipe List -->
+        <div id="page-program" class="page-content">
+            <div class="main-content" style="grid-template-columns: 290px 1fr 300px; gap: 12px;">
+
+                <!-- ── Left Panel: Upload & Machine Config ── -->
                 <div class="panel">
-                    <div class="panel-title">Recipes</div>
+                    <div class="panel-title">CAM — Upload &amp; Analyze</div>
                     <div class="panel-body">
-                        <div class="recipe-list" id="recipeList">
-                            <!-- Will be populated by JavaScript -->
+
+                        <!-- Drag-drop zone -->
+                        <div id="camDropZone" class="cam-drop-zone"
+                             ondragover="event.preventDefault(); this.classList.add('drag-over')"
+                             ondragleave="this.classList.remove('drag-over')"
+                             ondrop="camHandleDrop(event)"
+                             onclick="document.getElementById('camFileInput').click()">
+                            <div class="cam-drop-icon">STEP</div>
+                            <div class="cam-drop-label">Drop STEP file here<br><span style="color:#aaa;font-size:11px;">(.step / .stp) &nbsp;or click to browse</span></div>
+                            <input type="file" id="camFileInput" accept=".step,.stp" style="display:none"
+                                   onchange="camHandleFileSelect(event)">
                         </div>
+                        <div id="camFileName" class="cam-file-info" style="display:none"></div>
+
+                        <!-- Machine config parameters -->
+                        <div class="form-section" style="margin-top:14px;">
+                            <h3>Machine Config</h3>
+                            <div class="cam-param-row">
+                                <label>Pass Height (mm)</label>
+                                <input type="number" id="camMachineHeight" value="1219.2" min="100" max="3000" step="0.1" class="cam-input" title="Max machine Z travel per pass. 4ft = 1219.2mm">
+                            </div>
+                            <div class="cam-param-row">
+                                <label>Feed Rate (mm/min)</label>
+                                <input type="number" id="camFeedRate" value="500" min="10" max="3000" step="10" class="cam-input">
+                            </div>
+                            <div class="cam-param-row">
+                                <label>Safe Retract (mm)</label>
+                                <input type="number" id="camSafeRetract" value="10" min="1" max="100" step="1" class="cam-input" title="Wire clearance outside panel face before Z moves">
+                            </div>
+                        </div>
+
+                        <!-- Analyze button -->
+                        <button id="camAnalyzeBtn" class="btn cam-convert-btn" onclick="camAnalyzeStep()" disabled>
+                            Analyze &amp; Generate G-code
+                        </button>
+                        <div id="camConvertStatus" class="cam-status-msg"></div>
+
+                        <!-- Block info (shown after analysis) -->
+                        <div id="camBlockInfo" style="display:none">
+                            <div class="form-section" style="margin-top:16px;">
+                                <h3>Block Dimensions</h3>
+                                <div class="cam-info-grid">
+                                    <div>Thickness: <span id="camInfoThickness" style="color:#f7941d;">—</span> mm</div>
+                                    <div>Height: <span id="camInfoHeight" style="color:#f7941d;">—</span> mm</div>
+                                    <div>Length: <span id="camInfoLength" style="color:#f7941d;">—</span> mm</div>
+                                    <div>Pass height: <span id="camInfoPass" style="color:#f7941d;">—</span> mm</div>
+                                </div>
+                            </div>
+                            <div class="form-section">
+                                <h3>Detected Features</h3>
+                                <div id="camFeatureList"></div>
+                            </div>
+                            <button class="btn btn-secondary" style="width:100%;margin-top:8px;font-size:12px;" onclick="camClear()">
+                                Clear / New File
+                            </button>
+                        </div>
+
                     </div>
                 </div>
 
-                <!-- Recipe Editor -->
+                <!-- ── Center Panel: Cut Path Visualization ── -->
                 <div class="panel">
-                    <div class="panel-title">Edit Recipe: <span id="editingRecipeName">Select a recipe</span></div>
-                    <div class="panel-body">
-                        <!-- Alert Container -->
-                        <div id="recipeAlertContainer"></div>
+                    <div class="panel-title">Cut Path Visualization</div>
+                    <div class="panel-body" style="padding:10px;">
 
-                        <!-- Editor Tabs -->
-                        <div class="editor-tabs">
-                            <button class="editor-tab active" onclick="switchEditorTab('general')">General</button>
-                            <button class="editor-tab" onclick="switchEditorTab('loading')">Loading/Unloading</button>
-                            <button class="editor-tab" onclick="switchEditorTab('studs')">Stud Carving</button>
-                            <button class="editor-tab" onclick="switchEditorTab('windows')">Windows/Doors</button>
-                            <button class="editor-tab" onclick="switchEditorTab('electrical')">Electrical</button>
-                            <button class="editor-tab" onclick="switchEditorTab('motion')">Motion Params</button>
+                        <!-- View selector tabs -->
+                        <div id="camViewTabs" class="cam-view-tabs" style="display:none;">
+                            <button class="cam-view-tab active" data-view="bottom" onclick="camSwitchView('bottom')">Bottom Block</button>
+                            <button class="cam-view-tab" data-view="top" onclick="camSwitchView('top')">Top Block</button>
+                            <button class="cam-view-tab" data-view="window" id="camWindowTab" onclick="camSwitchView('window')" style="display:none;">Window Cut</button>
                         </div>
 
-                        <!-- General Tab -->
-                        <div id="editor-tab-general" class="editor-tab-content active">
-                            <div class="form-section">
-                                <h3>Recipe Information</h3>
-                                <div class="form-grid">
-                                    <div class="form-group">
-                                        <label>Recipe ID</label>
-                                        <input type="number" id="edit_recipeId" readonly>
-                                    </div>
-                                    <div class="form-group">
-                                        <label>Recipe Name</label>
-                                        <input type="text" id="edit_recipeName" maxlength="40">
-                                    </div>
-                                    <div class="form-group" style="grid-column: 1 / -1;">
-                                        <label>Description</label>
-                                        <textarea id="edit_recipeDescription" rows="2" maxlength="100"></textarea>
-                                    </div>
-                                </div>
+                        <!-- SVG visualization area -->
+                        <div id="camVisContainer" class="cam-preview-container" style="min-height:500px;overflow:auto;">
+                            <div id="camPreviewPlaceholder" class="cam-preview-placeholder">
+                                <div style="font-size:14px;color:#555;">No program loaded</div>
+                                <div style="font-size:12px;color:#444;margin-top:6px;">Upload a STEP file and click<br>Analyze &amp; Generate G-code</div>
                             </div>
-                            <div class="form-section">
-                                <h3>Feature Flags</h3>
-                                <p style="font-size: 11px; color: #888; margin-bottom: 10px;">Enable or disable processing sections. Disabled sections will be skipped during the cycle.</p>
-                                <div class="form-grid">
-                                    <div class="checkbox-group">
-                                        <input type="checkbox" id="edit_enableStuds" onchange="updateTabVisibility()">
-                                        <label for="edit_enableStuds">Enable Stud Carving</label>
-                                    </div>
-                                    <div class="checkbox-group">
-                                        <input type="checkbox" id="edit_enableWindowsDoors" onchange="updateTabVisibility()">
-                                        <label for="edit_enableWindowsDoors">Enable Windows/Doors</label>
-                                    </div>
-                                    <div class="checkbox-group">
-                                        <input type="checkbox" id="edit_enableElectrical" onchange="updateTabVisibility()">
-                                        <label for="edit_enableElectrical">Enable Electrical Trough</label>
-                                    </div>
-                                </div>
+                            <div id="camSpinner" class="cam-spinner" style="display:none;">
+                                <div class="cam-spinner-ring"></div>
+                                <div style="margin-top:12px;font-size:13px;color:#888;">Analyzing STEP file…</div>
                             </div>
+                            <div id="camViewBottom" style="display:none;width:100%;text-align:center;"></div>
+                            <div id="camViewTop"    style="display:none;width:100%;text-align:center;"></div>
+                            <div id="camViewWindow" style="display:none;width:100%;text-align:center;"></div>
                         </div>
 
-                        <!-- Loading/Unloading Tab -->
-                        <div id="editor-tab-loading" class="editor-tab-content">
-                            <div class="form-section">
-                                <h3>Loading/Unloading Positions (mm)</h3>
-                                <p style="font-size: 11px; color: #888; margin-bottom: 15px;">Configure position setpoints for block loading and unloading operations. Home position is always 0.</p>
-                                <div class="position-group">
-                                    <h4>Axis 1 - Block Shift</h4>
-                                    <div class="form-grid">
-                                        <div class="form-group"><label>Shift Position</label><input type="number" step="0.1" id="edit_axis1_ShiftPosition"></div>
-                                    </div>
-                                </div>
-                                <div class="position-group">
-                                    <h4>Axes 2-5 - Load Table Lift (+ slaves 3, 4, 5)</h4>
-                                    <div class="form-grid">
-                                        <div class="form-group"><label>Raise Position</label><input type="number" step="0.1" id="edit_axis2_RaisePosition"></div>
-                                        <div class="form-group"><label>Lower Position</label><input type="number" step="0.1" id="edit_axis2_LowerPosition"></div>
-                                    </div>
-                                </div>
-                                <div class="position-group">
-                                    <h4>Axes 6-7 - Shift to Center (+ slave 7)</h4>
-                                    <div class="form-grid">
-                                        <div class="form-group"><label>Shift Position</label><input type="number" step="0.1" id="edit_axis6_ShiftPosition"></div>
-                                    </div>
-                                </div>
-                                <div class="position-group">
-                                    <h4>Axes 8-9 - Unload Pusher (+ slave 9)</h4>
-                                    <div class="form-grid">
-                                        <div class="form-group"><label>Shift Position</label><input type="number" step="0.1" id="edit_axis8_ShiftPosition"></div>
-                                        <div class="form-group"><label>Unload Position</label><input type="number" step="0.1" id="edit_axis8_UnloadPosition"></div>
-                                    </div>
-                                </div>
-                                <div class="position-group">
-                                    <h4>Axes 10-13 - Unload Table Lift (+ slaves 11, 12, 13)</h4>
-                                    <div class="form-grid">
-                                        <div class="form-group"><label>Raise Position</label><input type="number" step="0.1" id="edit_axis10_RaisePosition"></div>
-                                        <div class="form-group"><label>Lower Position</label><input type="number" step="0.1" id="edit_axis10_LowerPosition"></div>
-                                    </div>
-                                </div>
-                                <div class="position-group">
-                                    <h4>Axis 34 - Unload Shift Wall</h4>
-                                    <div class="form-grid">
-                                        <div class="form-group"><label>Shift Position</label><input type="number" step="0.1" id="edit_axis34_ShiftPosition"></div>
-                                    </div>
-                                </div>
+                        <!-- Wire color legend -->
+                        <div id="camLegend" class="cam-legend" style="display:none;">
+                            <div class="cam-legend-item">
+                                <svg width="18" height="8"><line x1="0" y1="4" x2="18" y2="4" stroke="#F44336" stroke-width="2.5"/></svg>
+                                Wire 1 (Face B bottom)
+                            </div>
+                            <div class="cam-legend-item">
+                                <svg width="18" height="8"><line x1="0" y1="4" x2="18" y2="4" stroke="#FF8F00" stroke-width="2.5"/></svg>
+                                Wire 2 (Face B top)
+                            </div>
+                            <div class="cam-legend-item">
+                                <svg width="18" height="8"><line x1="0" y1="4" x2="18" y2="4" stroke="#2196F3" stroke-width="2.5"/></svg>
+                                Wire 3 (Face A bottom)
+                            </div>
+                            <div class="cam-legend-item">
+                                <svg width="18" height="8"><line x1="0" y1="4" x2="18" y2="4" stroke="#4CAF50" stroke-width="2.5"/></svg>
+                                Wire 4 (Face A top)
+                            </div>
+                            <div class="cam-legend-item" id="camWindowLegendItem" style="display:none;">
+                                <svg width="18" height="8"><line x1="0" y1="4" x2="18" y2="4" stroke="#9C27B0" stroke-width="2.5"/></svg>
+                                Wires 5/6 (Window)
+                            </div>
+                            <div class="cam-legend-item" style="color:#555;">
+                                <svg width="18" height="8"><line x1="0" y1="4" x2="18" y2="4" stroke="#555" stroke-width="1.5" stroke-dasharray="4,3"/></svg>
+                                Rapid approach/retract
                             </div>
                         </div>
 
-                        <!-- Studs Tab -->
-                        <div id="editor-tab-studs" class="editor-tab-content">
-                            <div class="form-section">
-                                <h3>Stud Carving Positions (mm)</h3>
-                                <p style="font-size: 11px; color: #888; margin-bottom: 15px;">Configure position setpoints for the 8 stud carving pairs.</p>
-                                <!-- Stud pairs would go here - simplified for now -->
-                                <p style="color: #666; font-style: italic;">Stud position editor coming soon...</p>
-                            </div>
-                        </div>
-
-                        <!-- Windows Tab -->
-                        <div id="editor-tab-windows" class="editor-tab-content">
-                            <div class="form-section">
-                                <h3>Window/Door Positions (mm)</h3>
-                                <p style="font-size: 11px; color: #888; margin-bottom: 15px;">Configure position setpoints for window and door cutting.</p>
-                                <p style="color: #666; font-style: italic;">Window/door position editor coming soon...</p>
-                            </div>
-                        </div>
-
-                        <!-- Electrical Tab -->
-                        <div id="editor-tab-electrical" class="editor-tab-content">
-                            <div class="form-section">
-                                <h3>Electrical Trough Positions (mm)</h3>
-                                <p style="font-size: 11px; color: #888; margin-bottom: 15px;">Configure position setpoints for electrical trough cutting.</p>
-                                <p style="color: #666; font-style: italic;">Electrical position editor coming soon...</p>
-                            </div>
-                        </div>
-
-                        <!-- Motion Params Tab -->
-                        <div id="editor-tab-motion" class="editor-tab-content">
-                            <div class="form-section">
-                                <h3>Motion Parameters</h3>
-                                <div class="form-grid">
-                                    <div class="form-group"><label>Default Velocity (mm/s)</label><input type="number" step="0.1" id="edit_defaultVelocity"></div>
-                                    <div class="form-group"><label>Default Acceleration (mm/s2)</label><input type="number" step="0.1" id="edit_defaultAcceleration"></div>
-                                    <div class="form-group"><label>Default Deceleration (mm/s2)</label><input type="number" step="0.1" id="edit_defaultDeceleration"></div>
-                                    <div class="form-group"><label>Default Jerk (mm/s3)</label><input type="number" step="0.1" id="edit_defaultJerk"></div>
-                                    <div class="form-group"><label>Position Tolerance (mm)</label><input type="number" step="0.01" id="edit_positionTolerance"></div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Buttons -->
-                        <div class="button-row">
-                            <button class="btn btn-success" onclick="saveRecipeChanges()" id="btnSaveRecipe" disabled>Save Changes</button>
-                            <button class="btn btn-primary" onclick="downloadRecipeToPLC()" id="btnDownloadRecipe" disabled>Download to PLC</button>
-                            <button class="btn btn-secondary" onclick="revertRecipeChanges()" id="btnRevertRecipe" disabled>Revert Changes</button>
-                            <button class="btn btn-estop" style="margin-left: auto; padding: 14px 16px; font-size: 13px;" onclick="deleteCurrentRecipe()" id="btnDeleteRecipe" disabled>Delete Recipe</button>
-                        </div>
                     </div>
                 </div>
+
+                <!-- ── Right Panel: G-code Files ── -->
+                <div class="panel">
+                    <div class="panel-title">G-code Files</div>
+                    <div class="panel-body">
+
+                        <div id="camGcodeEmpty" style="color:#555;font-size:13px;text-align:center;padding:40px 10px;">
+                            No G-code generated yet
+                        </div>
+
+                        <!-- Wire file list (shown after analysis) -->
+                        <div id="camGcodeList" style="display:none;"></div>
+
+                        <!-- G-code text preview (shown when wire selected) -->
+                        <div id="camGcodePreviewSection" style="display:none;margin-top:10px;">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+                                <span id="camGcodePreviewLabel" style="font-size:11px;color:#888;font-weight:600;"></span>
+                                <button class="btn btn-secondary" style="font-size:11px;padding:3px 10px;" onclick="camDownloadGcode()">
+                                    Download
+                                </button>
+                            </div>
+                            <textarea id="camGcodeText"
+                                style="width:100%;height:260px;background:#111;color:#8bc34a;border:1px solid #2a2a2a;
+                                       border-radius:3px;font-family:'Consolas',monospace;font-size:11px;padding:8px;
+                                       resize:vertical;tab-size:4;line-height:1.5;" readonly></textarea>
+                        </div>
+
+                        <!-- Download all button -->
+                        <div id="camDownloadAllSection" style="display:none;margin-top:10px;">
+                            <button class="btn cam-convert-btn" style="margin-top:0;" onclick="camDownloadAll()">
+                                Download All G-code Files
+                            </button>
+                        </div>
+
+                    </div>
+                </div>
+
             </div>
         </div>
 
@@ -1763,14 +1910,6 @@
             btnReset: 'PLC_PRG.btn_Reset',
             btnEStop: 'PLC_PRG.btn_EStop',
             btnDriveOn: 'PLC_PRG.btn_DriveOn',
-            recipeSelect: 'PLC_PRG.HMI_RecipeSelect',
-            activeRecipe: 'PLC_PRG.HMI_ActiveRecipe',
-            recipeName: 'PLC_PRG.HMI_RecipeName',
-            recipeDescription: 'PLC_PRG.HMI_RecipeDescription',
-            recipeLocked: 'PLC_PRG.HMI_RecipeLocked',
-            enableStuds: 'PLC_PRG.HMI_EnableStuds',
-            enableWindows: 'PLC_PRG.HMI_EnableWindows',
-            enableElectrical: 'PLC_PRG.HMI_EnableElectrical',
             motionStep: 'PLC_PRG.HMI_MotionStep',
             motionSubStep: 'PLC_PRG.HMI_MotionSubStep',
             activeAxesMask: 'PLC_PRG.HMI_ActiveAxesMask',
@@ -1794,9 +1933,7 @@
             allAxesHomed: 'PLC_PRG.HMI_AllAxesHomed',
             homePosition: 'PLC_PRG.HMI_HomePosition',
             // Per-axis homed status (array base path - append [n] for individual axes)
-            axisIsHomedBase: 'PLC_PRG.HMI_AxisIsHomed',
-            // Loaded recipe tracking
-            loadedRecipeId: 'PLC_PRG.HMI_LoadedRecipeId'
+            axisIsHomedBase: 'PLC_PRG.HMI_AxisIsHomed'
         };
 
         const machineStates = {
@@ -1856,22 +1993,8 @@
             36: { name: 'Electrical 2', slaves: [] }
         };
 
-        // Recipe data (local cache - will sync with PLC)
-        let recipes = [
-            { recipeID: 1, recipeName: '8ft Standard Block', recipeDescription: 'Standard 8ft block with all features', enableStuds: true, enableWindowsDoors: true, enableElectrical: true },
-            { recipeID: 2, recipeName: '10ft Studs Only', recipeDescription: '10ft block with studs only', enableStuds: true, enableWindowsDoors: false, enableElectrical: false },
-            { recipeID: 3, recipeName: '8ft Windows Only', recipeDescription: '8ft block with windows/doors only', enableStuds: false, enableWindowsDoors: true, enableElectrical: false },
-            { recipeID: 4, recipeName: '8ft Electrical Only', recipeDescription: '8ft block with electrical trough only', enableStuds: false, enableWindowsDoors: false, enableElectrical: true },
-            { recipeID: 5, recipeName: '12ft Full Block', recipeDescription: '12ft block with all features', enableStuds: true, enableWindowsDoors: true, enableElectrical: true },
-            { recipeID: 6, recipeName: '4ft Quick Test', recipeDescription: '4ft test block at reduced speed', enableStuds: true, enableWindowsDoors: true, enableElectrical: true },
-            { recipeID: 7, recipeName: '8ft Studs+Windows', recipeDescription: '8ft block with studs and windows', enableStuds: true, enableWindowsDoors: true, enableElectrical: false }
-        ];
-
-        let selectedRecipeIndex = -1;
-        let originalRecipe = null;
         let selectedAxis = 1; // Default to axis 1 for manual jog
         let selectedHomingAxis = 1; // Default to axis 1 for homing
-        let loadedRecipeId = 1; // The recipe currently loaded in PLC memory
 
         let authToken = null;
         let drivesOn = false;
@@ -1880,7 +2003,6 @@
         window.onload = async function() {
             document.getElementById('plcAddress').textContent = config.plcAddress;
             initializeAxisLists();
-            renderRecipeList();
             startUpdates();
 
             // Initialize PLC axis selection variables to match JavaScript defaults
@@ -1990,7 +2112,7 @@
 
         async function startJog(direction) {
             if (!selectedAxis) {
-                showRecipeAlert('Please select an axis first', 'warning');
+                showError('Please select an axis first');
                 return;
             }
             jogActive = true;
@@ -2051,7 +2173,7 @@
 
         async function homeSingleAxis() {
             if (!selectedHomingAxis) {
-                showRecipeAlert('Please select an axis first', 'warning');
+                showError('Please select an axis first');
                 return;
             }
             const speed = parseFloat(document.getElementById('homeSpeed').value) || 10;
@@ -2190,170 +2312,6 @@
             }
         }
 
-        // ================================================================
-        // RECIPE EDITOR
-        // ================================================================
-        function renderRecipeList() {
-            const list = document.getElementById('recipeList');
-            list.innerHTML = '';
-            recipes.forEach((r, i) => {
-                const isLoaded = r.recipeID === loadedRecipeId;
-                const item = document.createElement('div');
-                item.className = `recipe-item ${i === selectedRecipeIndex ? 'selected' : ''}`;
-                item.onclick = () => selectRecipeForEdit(i);
-                item.innerHTML = `
-                    <div class="recipe-id">Recipe ${r.recipeID}</div>
-                    <div class="recipe-title">${r.recipeName}</div>
-                    ${isLoaded ? '<span class="recipe-status-badge active">ACTIVE</span>' : ''}
-                `;
-                list.appendChild(item);
-            });
-
-            // Add "Add New Recipe" button at the bottom
-            const addBtn = document.createElement('div');
-            addBtn.className = 'recipe-item';
-            addBtn.style.textAlign = 'center';
-            addBtn.style.color = '#4caf50';
-            addBtn.style.fontWeight = '600';
-            addBtn.style.border = '2px dashed #4caf50';
-            addBtn.style.background = '#e8f5e9';
-            addBtn.onclick = () => addNewRecipe();
-            addBtn.innerHTML = '+ Add New Recipe';
-            list.appendChild(addBtn);
-        }
-
-        function addNewRecipe() {
-            const newId = recipes.length > 0 ? Math.max(...recipes.map(r => r.recipeID)) + 1 : 1;
-            const newRecipe = {
-                recipeID: newId,
-                recipeName: `New Recipe ${newId}`,
-                recipeDescription: 'New recipe description',
-                enableStuds: true,
-                enableWindowsDoors: true,
-                enableElectrical: true
-            };
-            recipes.push(newRecipe);
-            renderRecipeList();
-            selectRecipeForEdit(recipes.length - 1);
-            showRecipeAlert('New recipe created. Edit and save to keep changes.', 'success');
-        }
-
-        function deleteCurrentRecipe() {
-            if (selectedRecipeIndex < 0) return;
-            const r = recipes[selectedRecipeIndex];
-
-            if (r.recipeID === loadedRecipeId) {
-                showRecipeAlert('Cannot delete the currently loaded recipe!', 'error');
-                return;
-            }
-
-            if (recipes.length <= 1) {
-                showRecipeAlert('Cannot delete the last recipe!', 'error');
-                return;
-            }
-
-            if (!confirm(`Are you sure you want to delete "${r.recipeName}"?`)) return;
-
-            recipes.splice(selectedRecipeIndex, 1);
-            selectedRecipeIndex = -1;
-            originalRecipe = null;
-            document.getElementById('editingRecipeName').textContent = 'Select a recipe';
-            document.getElementById('btnSaveRecipe').disabled = true;
-            document.getElementById('btnDownloadRecipe').disabled = true;
-            document.getElementById('btnRevertRecipe').disabled = true;
-            document.getElementById('btnDeleteRecipe').disabled = true;
-            renderRecipeList();
-            showRecipeAlert('Recipe deleted.', 'warning');
-        }
-
-        function selectRecipeForEdit(index) {
-            selectedRecipeIndex = index;
-            originalRecipe = JSON.parse(JSON.stringify(recipes[index]));
-            loadRecipeIntoEditor(recipes[index]);
-            renderRecipeList();
-            document.getElementById('editingRecipeName').textContent = recipes[index].recipeName;
-            document.getElementById('btnSaveRecipe').disabled = false;
-            document.getElementById('btnDownloadRecipe').disabled = false;
-            document.getElementById('btnRevertRecipe').disabled = false;
-            document.getElementById('btnDeleteRecipe').disabled = false;
-            updateTabVisibility();
-        }
-
-        function loadRecipeIntoEditor(r) {
-            document.getElementById('edit_recipeId').value = r.recipeID;
-            document.getElementById('edit_recipeName').value = r.recipeName;
-            document.getElementById('edit_recipeDescription').value = r.recipeDescription;
-            document.getElementById('edit_enableStuds').checked = r.enableStuds;
-            document.getElementById('edit_enableWindowsDoors').checked = r.enableWindowsDoors;
-            document.getElementById('edit_enableElectrical').checked = r.enableElectrical;
-        }
-
-        // Show/hide editor tabs based on feature flags
-        function updateTabVisibility() {
-            const enableStuds = document.getElementById('edit_enableStuds').checked;
-            const enableWindows = document.getElementById('edit_enableWindowsDoors').checked;
-            const enableElectrical = document.getElementById('edit_enableElectrical').checked;
-
-            // Get tab buttons
-            const studsTab = document.querySelector('.editor-tab[onclick="switchEditorTab(\'studs\')"]');
-            const windowsTab = document.querySelector('.editor-tab[onclick="switchEditorTab(\'windows\')"]');
-            const electricalTab = document.querySelector('.editor-tab[onclick="switchEditorTab(\'electrical\')"]');
-
-            // Show/hide tabs
-            studsTab.style.display = enableStuds ? '' : 'none';
-            windowsTab.style.display = enableWindows ? '' : 'none';
-            electricalTab.style.display = enableElectrical ? '' : 'none';
-
-            // If current tab is hidden, switch to general
-            const currentTab = document.querySelector('.editor-tab.active');
-            if (currentTab && currentTab.style.display === 'none') {
-                switchEditorTab('general');
-            }
-        }
-
-        function switchEditorTab(tabName) {
-            document.querySelectorAll('.editor-tab').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.editor-tab-content').forEach(c => c.classList.remove('active'));
-            document.querySelector(`.editor-tab[onclick="switchEditorTab('${tabName}')"]`).classList.add('active');
-            document.getElementById(`editor-tab-${tabName}`).classList.add('active');
-        }
-
-        function saveRecipeChanges() {
-            if (selectedRecipeIndex < 0) return;
-            const r = recipes[selectedRecipeIndex];
-            r.recipeName = document.getElementById('edit_recipeName').value;
-            r.recipeDescription = document.getElementById('edit_recipeDescription').value;
-            r.enableStuds = document.getElementById('edit_enableStuds').checked;
-            r.enableWindowsDoors = document.getElementById('edit_enableWindowsDoors').checked;
-            r.enableElectrical = document.getElementById('edit_enableElectrical').checked;
-            originalRecipe = JSON.parse(JSON.stringify(r));
-            showRecipeAlert('Recipe saved successfully!', 'success');
-            renderRecipeList();
-            document.getElementById('editingRecipeName').textContent = r.recipeName;
-        }
-
-        function downloadRecipeToPLC() {
-            saveRecipeChanges();
-            showRecipeAlert('Recipe downloaded to PLC successfully!', 'success');
-            // TODO: Implement actual PLC write
-        }
-
-        function revertRecipeChanges() {
-            if (!originalRecipe) return;
-            recipes[selectedRecipeIndex] = JSON.parse(JSON.stringify(originalRecipe));
-            loadRecipeIntoEditor(originalRecipe);
-            showRecipeAlert('Changes reverted.', 'warning');
-        }
-
-        function showRecipeAlert(msg, type) {
-            const container = document.getElementById('recipeAlertContainer');
-            const alert = document.createElement('div');
-            alert.className = `alert alert-${type}`;
-            alert.textContent = msg;
-            container.appendChild(alert);
-            setTimeout(() => alert.remove(), 3000);
-        }
-
         function startUpdates() {
             updateHMI();
             setInterval(updateHMI, config.updateInterval);
@@ -2426,24 +2384,6 @@
                 updateGuidanceMessage();
 
                 try {
-                    const recipeLocked = await readPLCVariable(plcVars.recipeLocked);
-                    const recipeName = await readPLCVariable(plcVars.recipeName);
-                    const recipeDesc = await readPLCVariable(plcVars.recipeDescription);
-                    const enableStuds = await readPLCVariable(plcVars.enableStuds);
-                    const enableWindows = await readPLCVariable(plcVars.enableWindows);
-                    const enableElectrical = await readPLCVariable(plcVars.enableElectrical);
-
-                    document.getElementById('recipeName').textContent = recipeName || 'Recipe 1';
-                    document.getElementById('recipeDesc').textContent = recipeDesc || 'Standard parameters';
-                    document.getElementById('recipeLocked').style.display = recipeLocked ? 'inline-block' : 'none';
-                    document.getElementById('recipeSelect').disabled = recipeLocked;
-
-                    updateOperationCheck('opStuds', enableStuds);
-                    updateOperationCheck('opWindows', enableWindows);
-                    updateOperationCheck('opElectrical', enableElectrical);
-                } catch (e) {}
-
-                try {
                     const motionStep = await readPLCVariable(plcVars.motionStep);
                     const motionSubStep = await readPLCVariable(plcVars.motionSubStep);
                     const activeAxesMask = await readPLCVariable(plcVars.activeAxesMask);
@@ -2471,17 +2411,6 @@
                         // (HMI_HomeAxis is already set when axis is selected, PLC reads it via axisDataHome)
                         const position = await readPLCVariable(plcVars.homePosition);
                         document.getElementById('homingAxisPosition').textContent = (position || 0).toFixed(3);
-                    }
-                } catch (e) {}
-
-                // Update loaded recipe ID for recipe page
-                try {
-                    const loadedId = await readPLCVariable(plcVars.loadedRecipeId);
-                    if (loadedId !== loadedRecipeId) {
-                        loadedRecipeId = loadedId || 1;
-                        if (currentPage === 'recipes') {
-                            renderRecipeList();
-                        }
                     }
                 } catch (e) {}
 
@@ -2606,15 +2535,6 @@
             } else {
                 btn.textContent = 'Drives Off';
                 btn.classList.remove('on');
-            }
-        }
-
-        async function selectRecipe() {
-            const recipeId = parseInt(document.getElementById('recipeSelect').value);
-            try {
-                await writePLCVariable(plcVars.recipeSelect, recipeId, 'UINT');
-            } catch (error) {
-                showError('Recipe selection failed: ' + error.message);
             }
         }
 
@@ -3037,6 +2957,591 @@
                 manualModeEl.textContent = stateText;
                 manualModeEl.className = 'mode-value ' + stateText;
             }
+        }
+
+        // ================================================================
+        // PROGRAM TAB  — CAM Analysis & Visualization
+        // ================================================================
+
+        const PIPELINE_URL = 'http://localhost:8000';
+
+        // State tracking for the program tab
+        let camState = {
+            file:         null,
+            analysisData: null,      // last /analyze-step response
+            currentView:  'bottom',  // 'bottom' | 'top' | 'window'
+            selectedWire: null,      // e.g. 'W1_bottom'
+        };
+
+        // Wire color palette (matches channel_gcode_gui.py conventions)
+        const CAM_WIRE_COLORS = {
+            1: '#F44336',   // red    — Face B bottom (Wire 1)
+            2: '#FF8F00',   // amber  — Face B top    (Wire 2)
+            3: '#2196F3',   // blue   — Face A bottom (Wire 3)
+            4: '#4CAF50',   // green  — Face A top    (Wire 4)
+            5: '#9C27B0',   // purple — Window bottom (Wire 5)
+            6: '#CE93D8',   // light purple — Window top (Wire 6)
+        };
+        const CAM_WIRE_NAMES = {
+            'W1_bottom': 'Wire 1 — Face B bottom',
+            'W2_top':    'Wire 2 — Face B top',
+            'W3_bottom': 'Wire 3 — Face A bottom',
+            'W4_top':    'Wire 4 — Face A top',
+            'W5_bottom': 'Wire 5 — Window bottom',
+            'W6_top':    'Wire 6 — Window top',
+        };
+
+        // ── File handling ────────────────────────────────────────────────
+
+        function camHandleDrop(event) {
+            event.preventDefault();
+            document.getElementById('camDropZone').classList.remove('drag-over');
+            const file = event.dataTransfer.files[0];
+            if (file) camSetFile(file);
+        }
+
+        function camHandleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) camSetFile(file);
+        }
+
+        function camSetFile(file) {
+            const n = file.name.toLowerCase();
+            if (!n.endsWith('.step') && !n.endsWith('.stp')) {
+                camSetStatus('Only .step / .stp files are supported.', 'error');
+                return;
+            }
+            camState.file = file;
+            camState.analysisData = null;
+
+            const fileInfo = document.getElementById('camFileName');
+            fileInfo.textContent = `${file.name}  (${(file.size / 1024).toFixed(1)} KB)`;
+            fileInfo.style.display = 'block';
+
+            document.getElementById('camAnalyzeBtn').disabled = false;
+            camSetStatus('File selected. Click Analyze & Generate G-code.', '');
+            camResetVisualization();
+        }
+
+        function camResetVisualization() {
+            document.getElementById('camPreviewPlaceholder').style.display = 'block';
+            document.getElementById('camSpinner').style.display = 'none';
+            ['Bottom', 'Top', 'Window'].forEach(v =>
+                document.getElementById(`camView${v}`).style.display = 'none'
+            );
+            document.getElementById('camViewTabs').style.display = 'none';
+            document.getElementById('camLegend').style.display = 'none';
+            document.getElementById('camBlockInfo').style.display = 'none';
+            document.getElementById('camGcodeList').style.display = 'none';
+            document.getElementById('camGcodeEmpty').style.display = 'block';
+            document.getElementById('camGcodePreviewSection').style.display = 'none';
+            document.getElementById('camDownloadAllSection').style.display = 'none';
+        }
+
+        // ── Analysis ─────────────────────────────────────────────────────
+
+        async function camAnalyzeStep() {
+            if (!camState.file) return;
+
+            const btn = document.getElementById('camAnalyzeBtn');
+            btn.disabled = true;
+            camSetStatus('Analyzing STEP file…', '');
+            camShowSpinner(true);
+
+            const formData = new FormData();
+            formData.append('file', camState.file);
+
+            const params = new URLSearchParams({
+                machine_height: document.getElementById('camMachineHeight').value,
+                feed_rate:      document.getElementById('camFeedRate').value,
+                safe_retract:   document.getElementById('camSafeRetract').value,
+            });
+
+            try {
+                const resp = await fetch(`${PIPELINE_URL}/analyze-step?${params}`, {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                camShowSpinner(false);
+
+                if (!resp.ok) {
+                    const err = await resp.json().catch(() => ({ detail: resp.statusText }));
+                    camSetStatus(`Error: ${err.detail || resp.statusText}`, 'error');
+                    btn.disabled = false;
+                    return;
+                }
+
+                const data = await resp.json();
+                camState.analysisData = data;
+
+                camRenderBlockInfo(data);
+                camRenderGcodePanel(data);
+                camRenderAllViews(data);
+
+                const totalSlots = data.studs.length;
+                const windowMsg  = data.hasWindow ? ', window void detected' : '';
+                camSetStatus(
+                    `✓ Analysis complete: ${totalSlots} stud slot(s)${windowMsg}.`,
+                    'success'
+                );
+
+            } catch (err) {
+                camShowSpinner(false);
+                camSetStatus(`Failed to reach pipeline service: ${err.message}`, 'error');
+                btn.disabled = false;
+            }
+        }
+
+        // ── Block info panel ─────────────────────────────────────────────
+
+        function camRenderBlockInfo(data) {
+            document.getElementById('camInfoThickness').textContent = data.blockThickness.toFixed(1);
+            document.getElementById('camInfoHeight').textContent    = data.blockHeight.toFixed(1);
+            document.getElementById('camInfoLength').textContent    = data.blockLength.toFixed(1);
+            document.getElementById('camInfoPass').textContent      = data.machineHeight.toFixed(1);
+
+            const studsBottom = data.studs.filter(s => s.blockHalf === 'bottom').length;
+            const studsTop    = data.studs.filter(s => s.blockHalf === 'top').length;
+            const faceA       = data.studs.filter(s => s.face === 'A').length;
+            const faceB       = data.studs.filter(s => s.face === 'B').length;
+
+            const chips = [
+                { label: `${data.studs.length} stud slot(s) total`,  color: CAM_WIRE_COLORS[1] },
+                { label: `Bottom block: ${studsBottom} slot(s)`,      color: CAM_WIRE_COLORS[1] },
+                { label: `Top block: ${studsTop} slot(s)`,            color: CAM_WIRE_COLORS[2] },
+                { label: `Face A: ${faceA}  |  Face B: ${faceB}`,     color: CAM_WIRE_COLORS[3] },
+            ];
+            if (data.hasWindow) {
+                const w = data.window;
+                const wW = (w.xRight - w.xLeft).toFixed(0);
+                const wH = (w.zTop   - w.zBot).toFixed(0);
+                chips.push({ label: `Window void: ${wW} × ${wH} mm`, color: CAM_WIRE_COLORS[5] });
+            }
+
+            const list = document.getElementById('camFeatureList');
+            list.innerHTML = '';
+            chips.forEach(chip => {
+                const el = document.createElement('div');
+                el.className = 'cam-feature-chip';
+                el.style.borderLeftColor = chip.color;
+                el.textContent = chip.label;
+                list.appendChild(el);
+            });
+
+            document.getElementById('camBlockInfo').style.display = 'block';
+        }
+
+        // ── G-code panel ─────────────────────────────────────────────────
+
+        function camRenderGcodePanel(data) {
+            const list = document.getElementById('camGcodeList');
+            list.innerHTML = '';
+            list.style.display = 'block';
+            document.getElementById('camGcodeEmpty').style.display = 'none';
+
+            const wireOrder = ['W1_bottom', 'W2_top', 'W3_bottom', 'W4_top', 'W5_bottom', 'W6_top'];
+
+            wireOrder.forEach(label => {
+                if (!data.gcodeFiles[label]) return;
+                const wireNum = parseInt(label[1]);
+                const stats   = data.gcodeStats[label];
+                const color   = CAM_WIRE_COLORS[wireNum];
+
+                const item = document.createElement('div');
+                item.className = 'cam-gcode-item';
+                item.style.borderLeftColor = color;
+                item.innerHTML = `
+                    <div style="font-size:12px;font-weight:600;color:#ccc;">${CAM_WIRE_NAMES[label]}</div>
+                    <div style="font-size:11px;color:#666;margin-top:2px;">${stats.moveCount} moves</div>
+                `;
+                item.dataset.label = label;
+                item.onclick = () => camSelectWire(label);
+                list.appendChild(item);
+            });
+
+            document.getElementById('camDownloadAllSection').style.display = 'block';
+
+            // Auto-select first available wire
+            const first = wireOrder.find(l => data.gcodeFiles[l]);
+            if (first) camSelectWire(first);
+        }
+
+        function camSelectWire(label) {
+            camState.selectedWire = label;
+
+            document.querySelectorAll('.cam-gcode-item').forEach(el => {
+                el.classList.toggle('active', el.dataset.label === label);
+            });
+
+            document.getElementById('camGcodePreviewLabel').textContent = CAM_WIRE_NAMES[label] || label;
+            document.getElementById('camGcodeText').value = camState.analysisData.gcodeFiles[label] || '';
+            document.getElementById('camGcodePreviewSection').style.display = 'block';
+        }
+
+        function camDownloadGcode() {
+            if (!camState.selectedWire || !camState.analysisData) return;
+            const text = camState.analysisData.gcodeFiles[camState.selectedWire];
+            const stem = camState.file ? camState.file.name.replace(/\.[^.]+$/, '') : 'program';
+            camTriggerDownload(`${stem}_${camState.selectedWire}.nc`, text, 'text/plain');
+        }
+
+        function camDownloadAll() {
+            if (!camState.analysisData) return;
+            const stem = camState.file ? camState.file.name.replace(/\.[^.]+$/, '') : 'program';
+            Object.entries(camState.analysisData.gcodeFiles).forEach(([label, text]) => {
+                camTriggerDownload(`${stem}_${label}.nc`, text, 'text/plain');
+            });
+        }
+
+        function camTriggerDownload(filename, text, mime) {
+            const blob = new Blob([text], { type: mime });
+            const url  = URL.createObjectURL(blob);
+            const a    = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // ── Visualization ─────────────────────────────────────────────────
+
+        function camRenderAllViews(data) {
+            // End views: wider right pad for annotations, taller for top-block subtitle
+            const VW = 580, VH = 540;
+            document.getElementById('camViewBottom').innerHTML = camBuildEndViewSVG(data, 'bottom', VW, VH);
+            document.getElementById('camViewTop').innerHTML    = camBuildEndViewSVG(data, 'top',    VW, VH);
+
+            if (data.hasWindow) {
+                // Window view: two stacked panels (W5 + separator + W6)
+                document.getElementById('camViewWindow').innerHTML = camBuildWindowViewSVG(data, 580, 640);
+                document.getElementById('camWindowTab').style.display = '';
+                document.getElementById('camWindowLegendItem').style.display = 'flex';
+            } else {
+                document.getElementById('camWindowTab').style.display = 'none';
+                document.getElementById('camWindowLegendItem').style.display = 'none';
+            }
+
+            document.getElementById('camViewTabs').style.display = 'flex';
+            document.getElementById('camLegend').style.display   = 'flex';
+            camSwitchView('bottom');
+        }
+
+        function camSwitchView(view) {
+            camState.currentView = view;
+
+            document.querySelectorAll('.cam-view-tab').forEach(t =>
+                t.classList.toggle('active', t.dataset.view === view)
+            );
+            ['bottom', 'top', 'window'].forEach(v => {
+                const el = document.getElementById('camView' + v.charAt(0).toUpperCase() + v.slice(1));
+                el.style.display = (v === view) ? 'block' : 'none';
+            });
+            document.getElementById('camPreviewPlaceholder').style.display = 'none';
+        }
+
+        // ── SVG: End-view of foam block cross-section (stud cuts) ─────────
+        // Matches channel_gcode_gui.py _draw_end_view() visual output.
+        // For the top block (flipZ=true) the block is physically placed cut-face UP,
+        // so Z=0 (cut face / wire entry) appears at the TOP of the diagram.
+
+        function camBuildEndViewSVG(data, blockHalf, W, H) {
+            const flipZ  = blockHalf === 'top';
+            const pad    = { left: 56, right: 120, top: flipZ ? 46 : 38, bottom: 24 };
+            const drawW  = W - pad.left - pad.right;
+            const drawH  = H - pad.top  - pad.bottom;
+
+            const thick = data.blockThickness;
+            // Each block half has its own pass height; top block coords are already 0-based.
+            const passH = blockHalf === 'bottom'
+                ? Math.min(data.machineHeight, data.blockHeight)
+                : Math.max(0, data.blockHeight - data.machineHeight);
+            const safe  = data.safeRetract;
+
+            // X: foam thickness direction (same for both block halves)
+            const xRange = thick + 2 * safe;
+            const toSvgX = (mx) => pad.left + (mx + safe) / xRange * drawW;
+
+            // Y: height direction — flipped for top block so Z=0 (cut face) is at TOP
+            const toSvgY = flipZ
+                ? (mz) => pad.top + (mz        / passH) * drawH   // Z=0 → top
+                : (mz) => pad.top + (1 - mz    / passH) * drawH;  // Z=0 → bottom
+
+            const BG        = '#1a1a1a';
+            const FOAM_FILL = 'rgba(200,170,110,0.10)';
+            const FOAM_EDGE = '#6a5a30';
+            const GRID_C    = 'rgba(255,255,255,0.04)';
+
+            const L = [];
+            L.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" style="background:${BG};display:block;margin:0 auto;">`);
+
+            // Title
+            const wireLabels = blockHalf === 'bottom' ? 'W1 &amp; W3' : 'W2 &amp; W4';
+            L.push(`<text x="${(W/2).toFixed(0)}" y="18" text-anchor="middle" font-family="Consolas,monospace" font-size="11" fill="#666">${blockHalf === 'bottom' ? 'Bottom Block' : 'Top Block'} &#8212; End View (${wireLabels})</text>`);
+            if (flipZ) L.push(`<text x="${(W/2).toFixed(0)}" y="32" text-anchor="middle" font-family="Consolas,monospace" font-size="9" fill="#444">block flipped &#8212; cut face (Z=0) at top</text>`);
+
+            // Light grid lines
+            const zStep = passH > 1000 ? 200 : 100;
+            for (let z = 0; z <= passH; z += zStep) {
+                const sy = toSvgY(z);
+                L.push(`<line x1="${pad.left}" y1="${sy.toFixed(1)}" x2="${(pad.left + drawW).toFixed(1)}" y2="${sy.toFixed(1)}" stroke="${GRID_C}" stroke-width="1"/>`);
+            }
+
+            // Safe retract dashed vertical boundary lines
+            const sxL = toSvgX(-safe), sxR = toSvgX(thick + safe);
+            L.push(`<line x1="${sxL.toFixed(1)}" y1="${pad.top}" x2="${sxL.toFixed(1)}" y2="${pad.top + drawH}" stroke="#333" stroke-width="1" stroke-dasharray="5,4"/>`);
+            L.push(`<line x1="${sxR.toFixed(1)}" y1="${pad.top}" x2="${sxR.toFixed(1)}" y2="${pad.top + drawH}" stroke="#333" stroke-width="1" stroke-dasharray="5,4"/>`);
+
+            // Foam block rectangle
+            const fx0   = toSvgX(0), fx1 = toSvgX(thick);
+            const fyTop = Math.min(toSvgY(0), toSvgY(passH));
+            const fh    = Math.abs(toSvgY(passH) - toSvgY(0));
+            L.push(`<rect x="${fx0.toFixed(1)}" y="${fyTop.toFixed(1)}" width="${(fx1-fx0).toFixed(1)}" height="${fh.toFixed(1)}" fill="${FOAM_FILL}" stroke="${FOAM_EDGE}" stroke-width="1.5"/>`);
+
+            // Z tick labels on left
+            for (let z = 0; z <= passH; z += zStep) {
+                const sy = toSvgY(z);
+                L.push(`<line x1="${pad.left - 4}" y1="${sy.toFixed(1)}" x2="${pad.left}" y2="${sy.toFixed(1)}" stroke="#3a3a3a" stroke-width="1"/>`);
+                L.push(`<text x="${pad.left - 7}" y="${(sy + 3.5).toFixed(1)}" text-anchor="end" font-family="Consolas,monospace" font-size="9" fill="#555">${z}</text>`);
+            }
+
+            // Face A / Face B column labels
+            L.push(`<text x="${toSvgX(0).toFixed(1)}" y="${pad.top - 8}" text-anchor="middle" font-family="Consolas,monospace" font-size="10" fill="#777">Face A</text>`);
+            L.push(`<text x="${toSvgX(thick).toFixed(1)}" y="${pad.top - 8}" text-anchor="middle" font-family="Consolas,monospace" font-size="10" fill="#777">Face B</text>`);
+
+            // Thickness dimension at bottom
+            L.push(`<text x="${toSvgX(thick/2).toFixed(1)}" y="${H - 5}" text-anchor="middle" font-family="Consolas,monospace" font-size="9" fill="#444">${thick.toFixed(0)} mm thick</text>`);
+
+            // Wire color mapping
+            const colorByFace = blockHalf === 'bottom'
+                ? { A: CAM_WIRE_COLORS[3], B: CAM_WIRE_COLORS[1] }
+                : { A: CAM_WIRE_COLORS[4], B: CAM_WIRE_COLORS[2] };
+
+            // Draw each stud slot
+            data.studs.filter(s => s.blockHalf === blockHalf).forEach(slot => {
+                const color  = colorByFace[slot.face];
+                const xSafe  = slot.face === 'A' ? -safe : thick + safe;
+                const xFace  = slot.xEntry;
+                const xDepth = slot.xDepth;
+                const zBot   = slot.zBot;
+                const zTop   = slot.zTop;
+
+                // Filled channel pocket (semi-transparent) — matches _draw_slot alpha=0.12
+                const pxE = toSvgX(xFace), pxD = toSvgX(xDepth);
+                const pyB = toSvgY(zBot),  pyT = toSvgY(zTop);
+                L.push(`<rect x="${Math.min(pxE,pxD).toFixed(1)}" y="${Math.min(pyB,pyT).toFixed(1)}" width="${Math.abs(pxD-pxE).toFixed(1)}" height="${Math.abs(pyT-pyB).toFixed(1)}" fill="${color}" opacity="0.12" rx="1"/>`);
+
+                // G00 rapid approach: safe position → face at zBot (dashed)
+                L.push(`<line x1="${toSvgX(xSafe).toFixed(1)}" y1="${toSvgY(zBot).toFixed(1)}" x2="${toSvgX(xFace).toFixed(1)}" y2="${toSvgY(zBot).toFixed(1)}" stroke="${color}" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.55"/>`);
+
+                // G01 feed cut: bracket path face@zBot → depth@zBot → depth@zTop → face@zTop
+                const cutp = [[xFace,zBot],[xDepth,zBot],[xDepth,zTop],[xFace,zTop]]
+                    .map(([mx,mz]) => `${toSvgX(mx).toFixed(1)},${toSvgY(mz).toFixed(1)}`).join(' ');
+                L.push(`<polyline points="${cutp}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`);
+
+                // G00 rapid retract: face@zTop → safe position at zTop (dashed)
+                L.push(`<line x1="${toSvgX(xFace).toFixed(1)}" y1="${toSvgY(zTop).toFixed(1)}" x2="${toSvgX(xSafe).toFixed(1)}" y2="${toSvgY(zTop).toFixed(1)}" stroke="${color}" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.55"/>`);
+
+                // G00 rapid waypoint markers — open squares (like GUI markerfacecolor="white")
+                for (const [wx, wz] of [[xSafe, zBot], [xSafe, zTop]]) {
+                    const sx = toSvgX(wx), sy = toSvgY(wz);
+                    L.push(`<rect x="${(sx-4).toFixed(1)}" y="${(sy-4).toFixed(1)}" width="8" height="8" fill="${BG}" stroke="${color}" stroke-width="1.5"/>`);
+                }
+
+                // G01 feed waypoint markers — filled circles (4 cut corners)
+                for (const [wx, wz] of [[xFace,zBot],[xDepth,zBot],[xDepth,zTop],[xFace,zTop]]) {
+                    const sx = toSvgX(wx), sy = toSvgY(wz);
+                    L.push(`<circle cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" r="3.5" fill="${color}"/>`);
+                }
+            });
+
+            // Slot annotations on right: "Z lo–hi mm / depth X.X mm"
+            const annotX = pad.left + drawW + 6;
+            data.studs.filter(s => s.blockHalf === blockHalf).forEach(slot => {
+                const color = colorByFace[slot.face];
+                const midY  = (toSvgY(slot.zBot) + toSvgY(slot.zTop)) / 2;
+                const zLo   = Math.min(slot.zBot, slot.zTop).toFixed(0);
+                const zHi   = Math.max(slot.zBot, slot.zTop).toFixed(0);
+                const depth = Math.abs(slot.xDepth - slot.xEntry).toFixed(1);
+                L.push(`<rect x="${annotX}" y="${(midY-17).toFixed(1)}" width="110" height="34" rx="3" fill="rgba(0,0,0,0.7)" stroke="${color}" stroke-width="0.8"/>`);
+                L.push(`<text x="${annotX + 5}" y="${(midY - 3).toFixed(1)}" font-family="Consolas,monospace" font-size="8.5" fill="${color}">Z ${zLo}&#8211;${zHi} mm</text>`);
+                L.push(`<text x="${annotX + 5}" y="${(midY + 11).toFixed(1)}" font-family="Consolas,monospace" font-size="8.5" fill="#777">depth ${depth} mm</text>`);
+            });
+
+            L.push('</svg>');
+            return L.join('\n');
+        }
+
+        // ── SVG: Window cut side view — two stacked panels (W5 bottom, W6 top) ──
+        // Matches channel_gcode_gui.py Tab 3: _draw_window_view() for each block half.
+        // W5 shows bottom block in normal orientation (Z=0 at bottom).
+        // W6 shows top block flipped (cut face up → Z=0 at top of its sub-diagram).
+
+        function camBuildWindowViewSVG(data, W, H) {
+            const machH  = data.machineHeight;
+            const passH5 = Math.min(machH, data.blockHeight);          // bottom block height
+            const passH6 = Math.max(0, data.blockHeight - machH);      // top block height
+            const bLen   = data.blockLength;
+            const safe   = data.safeRetract;
+            const void_  = data.window;
+
+            // Layout: title(20px) | W5 section(sH) | separator(34px) | W6 section(sH) | footer(10px)
+            const sH   = Math.floor((H - 20 - 34 - 10) / 2);
+            const S5Y0 = 20;                   // section 5 top edge
+            const S6Y0 = 20 + sH + 34;        // section 6 top edge
+            const padL = 52, padR = 18;
+            const drawW = W - padL - padR;
+            const spadT = 22, spadB = 12;      // inner top/bottom padding per section
+            const drawH = sH - spadT - spadB;
+
+            // X mapping: panel length direction (same for both sections)
+            const toX = (lx) => padL + lx / bLen * drawW;
+
+            // Y mappings: W5 normal (Z=0 at bottom), W6 flipped (Z=0 at top)
+            const toY5 = (z) => S5Y0 + spadT + (1 - z / passH5) * drawH;
+            const toY6 = (z) => S6Y0 + spadT + (z        / passH6) * drawH;
+
+            const BG  = '#1a1a1a';
+            const FF  = 'rgba(200,170,110,0.10)';
+            const FE  = '#6a5a30';
+            const W5C = CAM_WIRE_COLORS[5];
+            const W6C = CAM_WIRE_COLORS[6];
+
+            const L = [];
+            L.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" style="background:${BG};display:block;margin:0 auto;">`);
+            L.push(`<text x="${(W/2).toFixed(0)}" y="14" text-anchor="middle" font-family="Consolas,monospace" font-size="11" fill="#555">Window Cut &#8212; Side View</text>`);
+
+            // ── W5: Bottom Block ──────────────────────────────────────────────────
+            {
+                L.push(`<text x="${padL}" y="${S5Y0 + 14}" font-family="Consolas,monospace" font-size="10" fill="${W5C}">W5 &#8212; Bottom Block (wire enters from above)</text>`);
+
+                // Foam block
+                const bw = toX(bLen) - toX(0);
+                const bh = toY5(0) - toY5(passH5);
+                L.push(`<rect x="${toX(0).toFixed(1)}" y="${toY5(passH5).toFixed(1)}" width="${bw.toFixed(1)}" height="${bh.toFixed(1)}" fill="${FF}" stroke="${FE}" stroke-width="1.5"/>`);
+
+                // Window void in bottom block (clip zTop to passH5)
+                const vZBot5 = void_.zBot;
+                const vZTop5 = Math.min(void_.zTop, passH5);
+                if (vZTop5 > vZBot5 && void_.xRight > void_.xLeft) {
+                    const vx0 = toX(void_.xLeft), vx1 = toX(void_.xRight);
+                    L.push(`<rect x="${vx0.toFixed(1)}" y="${toY5(vZTop5).toFixed(1)}" width="${(vx1-vx0).toFixed(1)}" height="${(toY5(vZBot5)-toY5(vZTop5)).toFixed(1)}" fill="${W5C}" opacity="0.15" stroke="${W5C}" stroke-width="1" stroke-dasharray="4,3"/>`);
+                }
+
+                // Wire path: safe (above top) → sill (void.zBot) → across → retract
+                const syS5 = toY5(passH5 + safe);   // slightly above foam top
+                const syT5 = toY5(vZBot5);
+                const xL = void_.xLeft, xR = void_.xRight;
+                // Left plunge (dashed rapid)
+                L.push(`<line x1="${toX(xL).toFixed(1)}" y1="${syS5.toFixed(1)}" x2="${toX(xL).toFixed(1)}" y2="${syT5.toFixed(1)}" stroke="${W5C}" stroke-width="2" stroke-dasharray="5,3" opacity="0.65"/>`);
+                // Traverse cut (solid)
+                L.push(`<line x1="${toX(xL).toFixed(1)}" y1="${syT5.toFixed(1)}" x2="${toX(xR).toFixed(1)}" y2="${syT5.toFixed(1)}" stroke="${W5C}" stroke-width="2.5"/>`);
+                // Right rise (dashed rapid)
+                L.push(`<line x1="${toX(xR).toFixed(1)}" y1="${syT5.toFixed(1)}" x2="${toX(xR).toFixed(1)}" y2="${syS5.toFixed(1)}" stroke="${W5C}" stroke-width="2" stroke-dasharray="5,3" opacity="0.65"/>`);
+
+                // Waypoint markers: open squares=G00, filled circles=G01
+                for (const [px, sy, isRapid] of [
+                    [xL, syS5, true], [xL, syT5, false], [xR, syT5, false], [xR, syS5, true]
+                ]) {
+                    const sx = toX(px);
+                    if (isRapid) L.push(`<rect x="${(sx-4).toFixed(1)}" y="${(sy-4).toFixed(1)}" width="8" height="8" fill="${BG}" stroke="${W5C}" stroke-width="1.8"/>`);
+                    else         L.push(`<circle cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" r="4" fill="${W5C}"/>`);
+                }
+
+                // Z-axis ticks (left)
+                const zSt5 = passH5 > 1000 ? 200 : 100;
+                for (let z = 0; z <= passH5; z += zSt5) {
+                    const sy = toY5(z);
+                    if (sy >= S5Y0 + spadT - 2 && sy <= S5Y0 + sH + 2) {
+                        L.push(`<line x1="${padL - 4}" y1="${sy.toFixed(1)}" x2="${padL}" y2="${sy.toFixed(1)}" stroke="#3a3a3a" stroke-width="1"/>`);
+                        L.push(`<text x="${padL - 7}" y="${(sy + 3.5).toFixed(1)}" text-anchor="end" font-family="Consolas,monospace" font-size="9" fill="#555">${z}</text>`);
+                    }
+                }
+            }
+
+            // ── Separator ─────────────────────────────────────────────────────────
+            const sepY = S5Y0 + sH + 17;
+            L.push(`<line x1="${padL}" y1="${sepY}" x2="${W - padR}" y2="${sepY}" stroke="#282828" stroke-width="1" stroke-dasharray="8,4"/>`);
+            L.push(`<text x="${(W/2).toFixed(0)}" y="${sepY + 12}" text-anchor="middle" font-family="Consolas,monospace" font-size="9" fill="#383838">4 ft split &#8212; top block placed cut-face up (Z=0 at top)</text>`);
+
+            // ── W6: Top Block ─────────────────────────────────────────────────────
+            if (passH6 > 0) {
+                // Window void in local top-block coords (subtract machineHeight)
+                const vZBot6 = Math.max(0, void_.zBot - machH);
+                const vZTop6 = Math.min(passH6, Math.max(0, void_.zTop - machH));
+
+                L.push(`<text x="${padL}" y="${S6Y0 + 14}" font-family="Consolas,monospace" font-size="10" fill="${W6C}">W6 &#8212; Top Block (cut face at top, Z=0 up)</text>`);
+
+                // Foam block
+                const bw = toX(bLen) - toX(0);
+                const bh = toY6(passH6) - toY6(0);
+                L.push(`<rect x="${toX(0).toFixed(1)}" y="${toY6(0).toFixed(1)}" width="${bw.toFixed(1)}" height="${bh.toFixed(1)}" fill="${FF}" stroke="${FE}" stroke-width="1.5"/>`);
+
+                // Window void in top block (local coords; zTop6 is DEEPER from cut face)
+                if (vZTop6 > vZBot6 && void_.xRight > void_.xLeft) {
+                    const vx0 = toX(void_.xLeft), vx1 = toX(void_.xRight);
+                    const vy0 = toY6(vZBot6), vy1 = toY6(vZTop6);
+                    L.push(`<rect x="${vx0.toFixed(1)}" y="${Math.min(vy0,vy1).toFixed(1)}" width="${(vx1-vx0).toFixed(1)}" height="${Math.abs(vy1-vy0).toFixed(1)}" fill="${W6C}" opacity="0.15" stroke="${W6C}" stroke-width="1" stroke-dasharray="4,3"/>`);
+                }
+
+                // Wire path: enters from Z=-safe (just above cut face = top of diagram)
+                // plunges to z_traverse = vZTop6 (deepest from cut face)
+                const syS6 = toY6(-safe);          // slightly above foam top (above section area)
+                const syT6 = toY6(vZTop6);
+                const xL = void_.xLeft, xR = void_.xRight;
+                L.push(`<line x1="${toX(xL).toFixed(1)}" y1="${syS6.toFixed(1)}" x2="${toX(xL).toFixed(1)}" y2="${syT6.toFixed(1)}" stroke="${W6C}" stroke-width="2" stroke-dasharray="5,3" opacity="0.65"/>`);
+                L.push(`<line x1="${toX(xL).toFixed(1)}" y1="${syT6.toFixed(1)}" x2="${toX(xR).toFixed(1)}" y2="${syT6.toFixed(1)}" stroke="${W6C}" stroke-width="2.5"/>`);
+                L.push(`<line x1="${toX(xR).toFixed(1)}" y1="${syT6.toFixed(1)}" x2="${toX(xR).toFixed(1)}" y2="${syS6.toFixed(1)}" stroke="${W6C}" stroke-width="2" stroke-dasharray="5,3" opacity="0.65"/>`);
+
+                for (const [px, sy, isRapid] of [
+                    [xL, syS6, true], [xL, syT6, false], [xR, syT6, false], [xR, syS6, true]
+                ]) {
+                    const sx = toX(px);
+                    if (isRapid) L.push(`<rect x="${(sx-4).toFixed(1)}" y="${(sy-4).toFixed(1)}" width="8" height="8" fill="${BG}" stroke="${W6C}" stroke-width="1.8"/>`);
+                    else         L.push(`<circle cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" r="4" fill="${W6C}"/>`);
+                }
+
+                // Z-axis ticks (left) — local Z, 0=cut face at top
+                const zSt6 = passH6 > 1000 ? 200 : 100;
+                for (let z = 0; z <= passH6; z += zSt6) {
+                    const sy = toY6(z);
+                    if (sy >= S6Y0 + spadT - 2 && sy <= S6Y0 + sH + 2) {
+                        L.push(`<line x1="${padL - 4}" y1="${sy.toFixed(1)}" x2="${padL}" y2="${sy.toFixed(1)}" stroke="#3a3a3a" stroke-width="1"/>`);
+                        L.push(`<text x="${padL - 7}" y="${(sy + 3.5).toFixed(1)}" text-anchor="end" font-family="Consolas,monospace" font-size="9" fill="#555">${z}</text>`);
+                    }
+                }
+            } else {
+                L.push(`<text x="${(W/2).toFixed(0)}" y="${(S6Y0 + sH/2).toFixed(0)}" text-anchor="middle" font-family="Consolas,monospace" font-size="10" fill="#444">W6 &#8212; not needed (single-pass panel)</text>`);
+            }
+
+            L.push('</svg>');
+            return L.join('\n');
+        }
+
+        // ── UI helpers ───────────────────────────────────────────────────
+
+        function camShowSpinner(show) {
+            document.getElementById('camSpinner').style.display = show ? 'flex' : 'none';
+            if (show) {
+                document.getElementById('camPreviewPlaceholder').style.display = 'none';
+            }
+        }
+
+        function camSetStatus(msg, type) {
+            const el = document.getElementById('camConvertStatus');
+            el.textContent = msg;
+            el.className = 'cam-status-msg' + (type ? ` ${type}` : '');
+        }
+
+        function camClear() {
+            camState = { file: null, analysisData: null, currentView: 'bottom', selectedWire: null };
+            document.getElementById('camFileName').style.display = 'none';
+            document.getElementById('camAnalyzeBtn').disabled = true;
+            document.getElementById('camFileInput').value = '';
+            camSetStatus('', '');
+            camResetVisualization();
         }
     </script>
 

@@ -57,6 +57,16 @@ after e stop (ie any time drive off is toggled) it forces you to home all axis. 
 
 ## Completed
 
+### Version 3.0 - February 2026
+- [x] G-Code pipeline integration for hot wire cutting
+- [x] Python FastAPI service to receive G-Code from upstream systems
+- [x] FB_MotionStep_Cutting replaces separate Studs/WindowsDoors/Electrical steps
+- [x] GVL_GCode for Python-to-PLC communication via Data Layer
+- [x] E_MoveType and ST_GCodeMove data types for move queue
+- [x] Simplified E_MotionStep enum (4 steps instead of 6)
+- [x] Updated FB_ErrorHandler for unified cutting errors
+- [x] No Bosch G-Code Runtime license required - uses PLCopen FBs directly
+
 ### Version 2.2 - January 2026
 - [x] Add FB_AxisHome for single and batch axis homing
 - [x] Move FB_AxisManual into FB_MachineStateMachine for proper state control

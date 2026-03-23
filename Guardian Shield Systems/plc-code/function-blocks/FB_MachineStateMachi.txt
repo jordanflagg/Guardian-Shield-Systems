@@ -8,7 +8,6 @@ VAR_INPUT
     manualMode : BOOL;
     eStopActive : BOOL;
     resetButton : BOOL;
-    selectedRecipe : UNIT := 1;     // Recipe selection from HMI (1-10)
 END_VAR
 
 VAR_OUTPUT
@@ -17,8 +16,6 @@ VAR_OUTPUT
     isFaulted : BOOL;
 	isManualMode : BOOL;
     isHomed : BOOL;
-    activeRecipeID : UNIT;              // Currently active recipe
-    recipeLocked : BOOL;                // TRUE when recipe cannot be changed
 
     // Motion sequence visualization (pass-through from FB_MotionSequence)
     motionStepOut : E_MotionStep;       // Current motion step
@@ -39,10 +36,6 @@ VAR
 
     // Motion sequence controller
     motionSequence : FB_MotionSequence;
-
-    // Axis gearing manager
-    axisGearing : FB_AxisGearing;
-    gearingNeeded : BOOL := TRUE;       // Flag to trigger gearing re-engagement
 
     // Centralized error handler (collects errors from all subsystems)
     errorHandler : FB_ErrorHandler;
@@ -82,10 +75,6 @@ CASE currentState OF
     E_MachineState.IDLE:
         // Update outputs
         isRunning := FALSE;
-        recipeLocked := FALSE;  // Allow recipe changes in IDLE
-
-        // Track selected recipe (FB_MotionSequence loads it automatically when it changes)
-        activeRecipeID := selectedRecipe;
 
         // Check for operator commands and transition accordingly
         IF homeButton THEN
@@ -95,7 +84,6 @@ CASE currentState OF
             currentState := E_MachineState.MANUAL;
 
         ELSIF startButton THEN
-            recipeLocked := TRUE;  // Lock recipe when starting
             currentState := E_MachineState.RUNNING;
 
         END_IF;
@@ -157,31 +145,15 @@ CASE currentState OF
     E_MachineState.RUNNING:
         // Update outputs
         isRunning := TRUE;
-        recipeLocked := TRUE;  // Keep recipe locked while running
 
-        // Engage/re-engage gearing if needed (after halt, e-stop, etc.)
-        IF gearingNeeded THEN
-            axisGearing(Execute := TRUE);
+        // Run motion sequence (gantry groups configured in Bosch web interface)
+        motionSequence(
+            Enable := TRUE
+        );
 
-            // Wait for gearing to complete before running motion
-            IF axisGearing.Done THEN
-                gearingNeeded := FALSE;
-            ELSIF axisGearing.Error THEN
-                // Gearing failed - go to fault state
-                currentState := E_MachineState.FAULTED;
-            END_IF
-        ELSE
-            // Gearing is active - run motion sequence
-            motionSequence(
-                Enable := TRUE,
-                RecipeID := activeRecipeID
-            );
-
-            // Check if sequence completed
-            IF motionSequence.SequenceComplete THEN
-                // Could auto-stop or continue for next block
-                // For now, continue running for next cycle
-            END_IF
+        // Check if sequence completed
+        IF motionSequence.SequenceComplete THEN
+            // Continue running for next cycle
         END_IF
 
         // Check for any errors (motion, gearing, or power) via centralized handler
@@ -200,10 +172,6 @@ CASE currentState OF
         isRunning := FALSE;
 		startButton := FALSE;
 
-        // Gearing will need to be re-engaged after stopping
-        gearingNeeded := TRUE;
-        axisGearing(Execute := FALSE);
-
         // TODO: Command all active axes to decelerate in a controlled manner
         // In real implementation, you'd use MC_Halt for each axis
         // and wait for them to reach zero velocity
@@ -217,10 +185,6 @@ CASE currentState OF
         isRunning := FALSE;
         isFaulted := TRUE;
 
-        // Gearing will need to be re-engaged after fault recovery
-        gearingNeeded := TRUE;
-        axisGearing(Execute := FALSE);
-
         // TODO: Log which axis faulted, display error message
 
         // Wait for operator to acknowledge and reset
@@ -233,10 +197,6 @@ CASE currentState OF
         // Update outputs
         isRunning := FALSE;
         isFaulted := TRUE;
-
-        // Gearing will need to be re-engaged after E-stop recovery
-        gearingNeeded := TRUE;
-        axisGearing(Execute := FALSE);
 
         // Immediately halt all axes (emergency stop)
 		FOR i := MOTIF_CONFIG.MIN_AXIS_INDEX TO MOTIF_CONFIG.MAX_AXIS_INDEX DO
@@ -309,18 +269,10 @@ errorHandler(
     // Motion step errors (from FB_MotionSequence)
     LoadBlockError := motionSequence.LoadBlockError,
     LoadBlockErrorAxisID := motionSequence.LoadBlockErrorAxisID,
-    StudsError := motionSequence.StudsError,
-    StudsErrorAxisID := motionSequence.StudsErrorAxisID,
-    WindowsDoorsError := motionSequence.WindowsDoorsError,
-    WindowsDoorsErrorAxisID := motionSequence.WindowsDoorsErrorAxisID,
-    ElectricalError := motionSequence.ElectricalError,
-    ElectricalErrorAxisID := motionSequence.ElectricalErrorAxisID,
+    CuttingError := motionSequence.CuttingError,           // G-Code cutting (replaces Studs/Windows/Electrical)
+    CuttingErrorAxisID := motionSequence.CuttingErrorAxisID,
     UnloadError := motionSequence.UnloadError,
     UnloadErrorAxisID := motionSequence.UnloadErrorAxisID,
-
-    // Gearing errors (from FB_AxisGearing)
-    GearingError := axisGearing.Error,
-    GearingErrorAxisID := axisGearing.ErrorAxisID,
 
 //     // Power errors (from FB_AxisPower via inputs)
 //     PowerError := powerError,

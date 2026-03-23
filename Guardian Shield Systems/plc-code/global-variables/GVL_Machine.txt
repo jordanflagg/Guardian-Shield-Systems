@@ -1,0 +1,22 @@
+(*
+==============================================================================
+  GVL_Machine
+  Machine configuration — position setpoints and motion parameters
+
+  Replaces the recipe system. All loading/unloading positions and motion
+  tuning parameters live here as a single configuration set.
+
+  To adjust positions or speeds, edit these values directly in ctrlX PLC
+  Engineering and download. No recipe selection needed.
+==============================================================================
+*)
+
+{attribute 'qualified_only'}
+VAR_GLOBAL
+    // Position setpoints for block loading and unloading axes
+    // Units: mm — set these to actual machine positions before running
+    Positions : ST_PositionSetpoints;
+
+    // Velocity, acceleration, deceleration, jerk for loading/unloading moves
+    MotionParams : ST_MotionParameters;
+END_VAR

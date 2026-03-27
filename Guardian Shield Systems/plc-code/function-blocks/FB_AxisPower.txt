@@ -3,6 +3,15 @@ FUNCTION_BLOCK FB_AxisPower
 // Centralized power management for all 36 axes
 // Handles MC_Power enable and MC_Reset for fault clearing
 // Uses CXA_Datalayer DL_WriteNode to clear all errors on the Core
+//
+// After drives are ready, connects all 18 gantry slave axes to their masters
+// via CXA_MOTION.ML_AxsAddToGantry. This is REQUIRED before PosAbs works on
+// gantry masters — the ctrlX commissioning tab assignment does not auto-connect
+// at runtime; ML_AxsAddToGantry is the runtime mechanism.
+//
+// Gantry connections persist through drive power cycles (slaves stay in
+// GANTRY_SLAVE state even when masters go DISABLED), so ML_AxsAddToGantry is
+// only called once per PLC restart. gantryState is only reset to 0 on Reset.
 
 VAR_INPUT
     PowerOn : BOOL;         // Enable power to all drives
@@ -10,9 +19,11 @@ VAR_INPUT
 END_VAR
 
 VAR_OUTPUT
-    DrivesReady : BOOL;     // TRUE when all drives are powered and ready
-    AllResetDone : BOOL;    // TRUE when all resets complete
-    ErrorAxisID : UINT;     // First axis with error (0 = none)
+    DrivesReady : BOOL;         // TRUE when drives ready, gantry connected, AND kinematics enabled
+    AllResetDone : BOOL;        // TRUE when all resets complete
+    ErrorAxisID : UINT;         // First axis with error (0 = none)
+    GantryConnected : BOOL;     // TRUE when all 18 slave axes connected to their masters
+    KinematicsEnabled : BOOL;   // TRUE when all 5 wire kinematics are enabled
 END_VAR
 
 VAR
@@ -26,8 +37,17 @@ VAR
     allReady : BOOL;
     allReset : BOOL;
     firstError : UINT;
-    resetState : UINT := 0;          // 0=idle, 1=clearing errors, 2=axis reset, 3=wait for axis reset
+    resetState : UINT := 0;          // 0=idle, 1=clear errors via DL, 2=reset slaves, 3=wait slaves, 4=reset masters, 5=wait masters
     rtrigReset : R_TRIG;            // Rising edge detection for Reset input
+
+    // Gantry connection
+    gantryState : UINT := 0;        // 0=init, 1=call functions, 2=connected
+    fbGantry : ARRAY[1..18] OF ML_AxsAddToGantryData;
+
+    // Kinematics enable
+    kinState : UINT := 0;           // 0=init, 1=reset kins, 2=enable kins, 3=enabled
+    fbKinReset : ARRAY[1..5] OF ML_KinResetData;
+    fbKin      : ARRAY[1..5] OF ML_KinEnableData;
 END_VAR
 
 ///////////////////////////////////////////////////////////////////
@@ -41,6 +61,10 @@ IF Reset THEN
         0: // Idle - start reset sequence on rising edge
             IF rtrigReset.Q THEN
                 AllResetDone := FALSE;
+                GantryConnected := FALSE;
+                KinematicsEnabled := FALSE;
+                gantryState := 0;  // Force gantry reconnect after reset
+                kinState := 0;     // Force kinematics re-enable after reset
                 resetState := 1;
             END_IF
 
@@ -55,39 +79,72 @@ IF Reset THEN
                 resetState := 2;
             END_IF
 
-        2: // Axis resets via MC_Reset - execute all at once
-            FOR i := MOTIF_CONFIG.MIN_AXIS_INDEX TO MOTIF_CONFIG.MAX_AXIS_INDEX DO
-                fbReset[i](
+        2: // Reset SLAVE axes first — gantry slave error must clear before master can clear
+            FOR i := 1 TO GVL_Axes.SLAVE_AXIS_COUNT DO
+                fbReset[GVL_Axes.SLAVE_AXES[i]](
                     Execute := TRUE,
-                    Axis := AXIF_CONFIG_INDEXES[i]
+                    Axis    := AXIF_CONFIG_INDEXES[GVL_Axes.SLAVE_AXES[i]]
                 );
             END_FOR
             resetState := 3;
 
-        3: // Wait for all axis resets to complete
-            // Keep calling MC_Reset with Execute TRUE
-            FOR i := MOTIF_CONFIG.MIN_AXIS_INDEX TO MOTIF_CONFIG.MAX_AXIS_INDEX DO
-                fbReset[i](
+        3: // Wait for all slave resets to complete
+            FOR i := 1 TO GVL_Axes.SLAVE_AXIS_COUNT DO
+                fbReset[GVL_Axes.SLAVE_AXES[i]](
                     Execute := TRUE,
-                    Axis := AXIF_CONFIG_INDEXES[i]
+                    Axis    := AXIF_CONFIG_INDEXES[GVL_Axes.SLAVE_AXES[i]]
                 );
             END_FOR
 
-            // Check if all resets are done
             allReset := TRUE;
-            FOR i := MOTIF_CONFIG.MIN_AXIS_INDEX TO MOTIF_CONFIG.MAX_AXIS_INDEX DO
-                IF NOT fbReset[i].Done THEN
+            FOR i := 1 TO GVL_Axes.SLAVE_AXIS_COUNT DO
+                IF NOT fbReset[GVL_Axes.SLAVE_AXES[i]].Done THEN
                     allReset := FALSE;
                     EXIT;
                 END_IF
             END_FOR
 
             IF allReset THEN
-                // All resets complete - clear Execute and finish
-                FOR i := MOTIF_CONFIG.MIN_AXIS_INDEX TO MOTIF_CONFIG.MAX_AXIS_INDEX DO
-                    fbReset[i](
+                // Slaves done — clear their Execute flags then proceed to masters
+                FOR i := 1 TO GVL_Axes.SLAVE_AXIS_COUNT DO
+                    fbReset[GVL_Axes.SLAVE_AXES[i]](
                         Execute := FALSE,
-                        Axis := AXIF_CONFIG_INDEXES[i]
+                        Axis    := AXIF_CONFIG_INDEXES[GVL_Axes.SLAVE_AXES[i]]
+                    );
+                END_FOR
+                resetState := 4;
+            END_IF
+
+        4: // Now reset MASTER axes (slaves are already clear)
+            FOR i := 1 TO GVL_Axes.MASTER_AXIS_COUNT DO
+                fbReset[GVL_Axes.MASTER_AXES[i]](
+                    Execute := TRUE,
+                    Axis    := AXIF_CONFIG_INDEXES[GVL_Axes.MASTER_AXES[i]]
+                );
+            END_FOR
+            resetState := 5;
+
+        5: // Wait for all master resets to complete
+            FOR i := 1 TO GVL_Axes.MASTER_AXIS_COUNT DO
+                fbReset[GVL_Axes.MASTER_AXES[i]](
+                    Execute := TRUE,
+                    Axis    := AXIF_CONFIG_INDEXES[GVL_Axes.MASTER_AXES[i]]
+                );
+            END_FOR
+
+            allReset := TRUE;
+            FOR i := 1 TO GVL_Axes.MASTER_AXIS_COUNT DO
+                IF NOT fbReset[GVL_Axes.MASTER_AXES[i]].Done THEN
+                    allReset := FALSE;
+                    EXIT;
+                END_IF
+            END_FOR
+
+            IF allReset THEN
+                FOR i := 1 TO GVL_Axes.MASTER_AXIS_COUNT DO
+                    fbReset[GVL_Axes.MASTER_AXES[i]](
+                        Execute := FALSE,
+                        Axis    := AXIF_CONFIG_INDEXES[GVL_Axes.MASTER_AXES[i]]
                     );
                 END_FOR
                 AllResetDone := TRUE;
@@ -95,14 +152,14 @@ IF Reset THEN
             END_IF
     END_CASE
 ELSE
-    // Reset not active - clear state and MC_Reset execute flags
+    // Reset not active - clear state and all MC_Reset execute flags
     resetState := 0;
     fbPLC_Reset(Execute := FALSE);
-    FOR i := MOTIF_CONFIG.MIN_AXIS_INDEX TO MOTIF_CONFIG.MAX_AXIS_INDEX DO
-        fbReset[i](
-            Execute := FALSE,
-            Axis := AXIF_CONFIG_INDEXES[i]
-        );
+    FOR i := 1 TO GVL_Axes.SLAVE_AXIS_COUNT DO
+        fbReset[GVL_Axes.SLAVE_AXES[i]](Execute := FALSE, Axis := AXIF_CONFIG_INDEXES[GVL_Axes.SLAVE_AXES[i]]);
+    END_FOR
+    FOR i := 1 TO GVL_Axes.MASTER_AXIS_COUNT DO
+        fbReset[GVL_Axes.MASTER_AXES[i]](Execute := FALSE, Axis := AXIF_CONFIG_INDEXES[GVL_Axes.MASTER_AXES[i]]);
     END_FOR
 END_IF
 
@@ -116,27 +173,138 @@ END_FOR
 
 // Check if all drives are ready
 allReady := TRUE;
-allReset := TRUE;
 firstError := 0;
 
 FOR i := MOTIF_CONFIG.MIN_AXIS_INDEX TO MOTIF_CONFIG.MAX_AXIS_INDEX DO
-    // Check power status
     IF PowerOn AND NOT fbPower[i].Status THEN
         allReady := FALSE;
     END_IF
 
-    // Check for errors
     IF fbPower[i].Error AND firstError = 0 THEN
         firstError := i;
     END_IF
-
-    // Check reset status
-    IF Reset AND NOT fbReset[i].Done THEN
-        allReset := FALSE;
-    END_IF
 END_FOR
 
-// Update outputs
-DrivesReady := PowerOn AND allReady AND (firstError = 0);
-ErrorAxisID := firstError;
+// ============================================================================
+// GANTRY CONNECTION
+// ML_AxsAddToGantry is required at runtime before PosAbs works on gantry masters.
+// Called once when drives are first ready. gantryState persists through drive
+// power cycles because slaves stay in GANTRY_SLAVE even when masters go DISABLED.
+// Reset button resets gantryState := 0 to force reconnect after a fault clear.
+// ============================================================================
+IF PowerOn AND allReady AND (firstError = 0) THEN
+    CASE gantryState OF
 
+        0: // Fill all 18 Data structs (Data.In.AxisName = slave, MasterName = master)
+            // Load table lift: master Axis_2, slaves Axis_3/4/5
+            fbGantry[1].In.AxisName := 'Axis_3';  fbGantry[1].In.MasterName := 'Axis_2';  fbGantry[1].In.Source := 'FB_AxisPower';
+            fbGantry[2].In.AxisName := 'Axis_4';  fbGantry[2].In.MasterName := 'Axis_2';  fbGantry[2].In.Source := 'FB_AxisPower';
+            fbGantry[3].In.AxisName := 'Axis_5';  fbGantry[3].In.MasterName := 'Axis_2';  fbGantry[3].In.Source := 'FB_AxisPower';
+            // Load pusher: master Axis_6, slave Axis_7
+            fbGantry[4].In.AxisName := 'Axis_7';  fbGantry[4].In.MasterName := 'Axis_6';  fbGantry[4].In.Source := 'FB_AxisPower';
+            // Process pusher: master Axis_8, slave Axis_9
+            fbGantry[5].In.AxisName := 'Axis_9';  fbGantry[5].In.MasterName := 'Axis_8';  fbGantry[5].In.Source := 'FB_AxisPower';
+            // Process lift: master Axis_10, slaves Axis_11/12/13
+            fbGantry[6].In.AxisName := 'Axis_11'; fbGantry[6].In.MasterName := 'Axis_10'; fbGantry[6].In.Source := 'FB_AxisPower';
+            fbGantry[7].In.AxisName := 'Axis_12'; fbGantry[7].In.MasterName := 'Axis_10'; fbGantry[7].In.Source := 'FB_AxisPower';
+            fbGantry[8].In.AxisName := 'Axis_13'; fbGantry[8].In.MasterName := 'Axis_10'; fbGantry[8].In.Source := 'FB_AxisPower';
+            // Hot wire station 1: masters Axis_14/15, slaves Axis_16/17
+            fbGantry[9].In.AxisName  := 'Axis_16'; fbGantry[9].In.MasterName  := 'Axis_14'; fbGantry[9].In.Source  := 'FB_AxisPower';
+            fbGantry[10].In.AxisName := 'Axis_17'; fbGantry[10].In.MasterName := 'Axis_15'; fbGantry[10].In.Source := 'FB_AxisPower';
+            // Hot wire station 2: masters Axis_18/19, slaves Axis_20/21
+            fbGantry[11].In.AxisName := 'Axis_20'; fbGantry[11].In.MasterName := 'Axis_18'; fbGantry[11].In.Source := 'FB_AxisPower';
+            fbGantry[12].In.AxisName := 'Axis_21'; fbGantry[12].In.MasterName := 'Axis_19'; fbGantry[12].In.Source := 'FB_AxisPower';
+            // Hot wire station 3: masters Axis_22/23, slaves Axis_24/25
+            fbGantry[13].In.AxisName := 'Axis_24'; fbGantry[13].In.MasterName := 'Axis_22'; fbGantry[13].In.Source := 'FB_AxisPower';
+            fbGantry[14].In.AxisName := 'Axis_25'; fbGantry[14].In.MasterName := 'Axis_23'; fbGantry[14].In.Source := 'FB_AxisPower';
+            // Hot wire station 4: masters Axis_26/27, slaves Axis_28/29
+            fbGantry[15].In.AxisName := 'Axis_28'; fbGantry[15].In.MasterName := 'Axis_26'; fbGantry[15].In.Source := 'FB_AxisPower';
+            fbGantry[16].In.AxisName := 'Axis_29'; fbGantry[16].In.MasterName := 'Axis_27'; fbGantry[16].In.Source := 'FB_AxisPower';
+            // Hot wire large station: masters Axis_30/31, slaves Axis_32/33
+            fbGantry[17].In.AxisName := 'Axis_32'; fbGantry[17].In.MasterName := 'Axis_30'; fbGantry[17].In.Source := 'FB_AxisPower';
+            fbGantry[18].In.AxisName := 'Axis_33'; fbGantry[18].In.MasterName := 'Axis_31'; fbGantry[18].In.Source := 'FB_AxisPower';
+            gantryState := 1;
+
+        1: // Call ML_AxsAddToGantry for all 18 slave axes
+            CXA_MOTION.ML_AxsAddToGantry(Data := fbGantry[1]);
+            CXA_MOTION.ML_AxsAddToGantry(Data := fbGantry[2]);
+            CXA_MOTION.ML_AxsAddToGantry(Data := fbGantry[3]);
+            CXA_MOTION.ML_AxsAddToGantry(Data := fbGantry[4]);
+            CXA_MOTION.ML_AxsAddToGantry(Data := fbGantry[5]);
+            CXA_MOTION.ML_AxsAddToGantry(Data := fbGantry[6]);
+            CXA_MOTION.ML_AxsAddToGantry(Data := fbGantry[7]);
+            CXA_MOTION.ML_AxsAddToGantry(Data := fbGantry[8]);
+            CXA_MOTION.ML_AxsAddToGantry(Data := fbGantry[9]);
+            CXA_MOTION.ML_AxsAddToGantry(Data := fbGantry[10]);
+            CXA_MOTION.ML_AxsAddToGantry(Data := fbGantry[11]);
+            CXA_MOTION.ML_AxsAddToGantry(Data := fbGantry[12]);
+            CXA_MOTION.ML_AxsAddToGantry(Data := fbGantry[13]);
+            CXA_MOTION.ML_AxsAddToGantry(Data := fbGantry[14]);
+            CXA_MOTION.ML_AxsAddToGantry(Data := fbGantry[15]);
+            CXA_MOTION.ML_AxsAddToGantry(Data := fbGantry[16]);
+            CXA_MOTION.ML_AxsAddToGantry(Data := fbGantry[17]);
+            CXA_MOTION.ML_AxsAddToGantry(Data := fbGantry[18]);
+            gantryState := 2;
+
+        2: // Connections issued - gantryState stays here through power cycles
+            GantryConnected := TRUE;
+
+    END_CASE
+ELSE
+    // Drives not ready - clear DrivesReady but preserve gantryState.
+    // Gantry connections persist through drive power cycles (slaves stay GANTRY_SLAVE
+    // even when masters go DISABLED), so ML_AxsAddToGantry must NOT be called again
+    // on next power-on or it will fault with "already connected".
+    GantryConnected := FALSE;
+END_IF
+
+// ============================================================================
+// KINEMATICS ENABLE
+// ML_KinEnable activates Wire1-Wire5 coordinated motion groups at runtime.
+// Axes are already assigned to each kinematic group in the ctrlX web UI.
+// Called once per PLC restart after gantry is connected. kinState is reset
+// to 0 by the Reset button to force re-enable after a fault clear.
+// ============================================================================
+IF GantryConnected THEN
+    CASE kinState OF
+
+        0: // Fill kinematic group names for both reset and enable structs
+            fbKinReset[1].In.KinName := 'Wire1';  fbKinReset[1].In.Source := 'FB_AxisPower';
+            fbKinReset[2].In.KinName := 'Wire2';  fbKinReset[2].In.Source := 'FB_AxisPower';
+            fbKinReset[3].In.KinName := 'Wire3';  fbKinReset[3].In.Source := 'FB_AxisPower';
+            fbKinReset[4].In.KinName := 'Wire4';  fbKinReset[4].In.Source := 'FB_AxisPower';
+            fbKinReset[5].In.KinName := 'Wire5';  fbKinReset[5].In.Source := 'FB_AxisPower';
+            fbKin[1].In.KinName := 'Wire1';  fbKin[1].In.Source := 'FB_AxisPower';
+            fbKin[2].In.KinName := 'Wire2';  fbKin[2].In.Source := 'FB_AxisPower';
+            fbKin[3].In.KinName := 'Wire3';  fbKin[3].In.Source := 'FB_AxisPower';
+            fbKin[4].In.KinName := 'Wire4';  fbKin[4].In.Source := 'FB_AxisPower';
+            fbKin[5].In.KinName := 'Wire5';  fbKin[5].In.Source := 'FB_AxisPower';
+            kinState := 1;
+
+        1: // Reset all 5 kinematic groups first — required if they are in ERRORSTOP
+            CXA_MOTION.ML_KinReset(Data := fbKinReset[1]);
+            CXA_MOTION.ML_KinReset(Data := fbKinReset[2]);
+            CXA_MOTION.ML_KinReset(Data := fbKinReset[3]);
+            CXA_MOTION.ML_KinReset(Data := fbKinReset[4]);
+            CXA_MOTION.ML_KinReset(Data := fbKinReset[5]);
+            kinState := 2;
+
+        2: // Enable all 5 kinematic groups
+            CXA_MOTION.ML_KinEnable(Data := fbKin[1]);
+            CXA_MOTION.ML_KinEnable(Data := fbKin[2]);
+            CXA_MOTION.ML_KinEnable(Data := fbKin[3]);
+            CXA_MOTION.ML_KinEnable(Data := fbKin[4]);
+            CXA_MOTION.ML_KinEnable(Data := fbKin[5]);
+            kinState := 3;
+
+        3: // Kinematics enabled - stays here through power cycles
+            KinematicsEnabled := TRUE;
+
+    END_CASE
+ELSE
+    KinematicsEnabled := FALSE;
+END_IF
+
+// Update outputs
+DrivesReady := PowerOn AND allReady AND (firstError = 0) AND GantryConnected AND KinematicsEnabled;
+ErrorAxisID := firstError;

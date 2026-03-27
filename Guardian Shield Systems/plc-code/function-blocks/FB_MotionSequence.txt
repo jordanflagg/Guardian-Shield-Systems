@@ -89,7 +89,6 @@ CASE motionStep OF
     E_MotionStep.WAIT_FOR_LOAD:
         SequenceComplete := FALSE;
         CurrentSubStep := 0;
-        StepDescription := 'Waiting for block to load';
         ActiveAxesMask := 0;
 
         HasError := FALSE;
@@ -99,8 +98,19 @@ CASE motionStep OF
         stepCutting(Enable := FALSE);
         stepUnload(Enable := FALSE);
 
-        IF blockLoaded THEN
+        // Both conditions must be true before advancing:
+        //   blockLoaded    — operator/sensor confirms foam block is on the table
+        //   bFilesReady    — Python pipeline has uploaded G-code for THIS block
+        // If the block is loaded but G-code isn't ready yet, hold here and
+        // tell the operator what to do via the status string.
+        IF blockLoaded AND GVL_GCode.bFilesReady THEN
+            GVL_GCode.sStatus := '';
             motionStep := E_MotionStep.SHIFT_TO_PROCESSING_AREA;
+        ELSIF blockLoaded AND NOT GVL_GCode.bFilesReady THEN
+            StepDescription := 'Waiting for G-code upload';
+            GVL_GCode.sStatus := 'Block loaded - upload G-code for next block via pipeline';
+        ELSE
+            StepDescription := 'Waiting for block to load';
         END_IF
 
     // ────────────────────────────────────────────────────────────────────────
@@ -116,8 +126,7 @@ CASE motionStep OF
         StepDescription := stepLoadBlock.StepDescription;
 
         IF stepLoadBlock.Error THEN
-            HasError := TRUE;
-            ErrorAxisID := stepLoadBlock.ErrorAxisID;
+            // Error details exposed via EXPOSE STEP ERRORS block below
         ELSIF stepLoadBlock.Done THEN
             stepLoadBlock(Enable := FALSE);
             motionStep := E_MotionStep.CUTTING;
@@ -136,8 +145,7 @@ CASE motionStep OF
         CuttingTotalMoves := stepCutting.TotalMoves;
 
         IF stepCutting.Error THEN
-            HasError := TRUE;
-            ErrorAxisID := stepCutting.ErrorAxisID;
+            // Error details exposed via EXPOSE STEP ERRORS block below
         ELSIF stepCutting.Done THEN
             stepCutting(Enable := FALSE);
             motionStep := E_MotionStep.SHIFT_TO_UNLOAD_AREA;
@@ -156,8 +164,7 @@ CASE motionStep OF
         StepDescription := stepUnload.StepDescription;
 
         IF stepUnload.Error THEN
-            HasError := TRUE;
-            ErrorAxisID := stepUnload.ErrorAxisID;
+            // Error details exposed via EXPOSE STEP ERRORS block below
         ELSIF stepUnload.Done THEN
             stepUnload(Enable := FALSE);
             SequenceComplete := TRUE;

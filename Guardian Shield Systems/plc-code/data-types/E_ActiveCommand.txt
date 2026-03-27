@@ -1,0 +1,10 @@
+TYPE E_ActiveCommand :
+(
+    CMD_NONE    := 0,   // No active command
+    CMD_START   := 1,   // Start / run machine
+    CMD_STOP    := 2,   // Stop machine
+    CMD_HOME    := 3,   // Home axes
+    CMD_MANUAL  := 4,   // Enter manual jog mode
+    CMD_RESET   := 5    // Reset faults
+);
+END_TYPE

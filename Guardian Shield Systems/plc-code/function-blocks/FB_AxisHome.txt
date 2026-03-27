@@ -49,8 +49,8 @@ VAR
     isMaster : BOOL;
     i : UINT;
 
-    // Position reading for homed status
-    fbReadPos : ARRAY[1..36] OF MC_ReadActualPosition;
+    // Position reading for homed status (one entry per master axis, indexed 1..18)
+    fbReadPos : ARRAY[1..18] OF MC_ReadActualPosition;
     currentPos : LREAL;
 END_VAR
 
@@ -72,22 +72,26 @@ FOR i := 1 TO GVL_Axes.MASTER_AXIS_COUNT DO
 END_FOR
 InvalidAxis := (HomeAxis > 0) AND NOT isMaster;
 
-// Read all axis positions and update homed status
+// Read MASTER axis positions only — slave axes are kinematically coupled in the
+// ctrlX web UI and must not be addressed directly via PLCopen function blocks.
 // NOTE: Position reading is ALWAYS enabled (independent of homing mode Enable)
 // This ensures AxisIsHomed status is always up-to-date for HMI display
-FOR i := 1 TO 36 DO
+FOR i := 1 TO GVL_Axes.MASTER_AXIS_COUNT DO
     fbReadPos[i](
         Enable := TRUE,
-        Axis := AXIF_CONFIG_INDEXES[i]
+        Axis := AXIF_CONFIG_INDEXES[GVL_Axes.MASTER_AXES[i]]
     );
 
+    // Absolute encoders always know position — Valid may be FALSE during drive
+    // initialization even though position data is correct. Update homed status
+    // whenever Valid is TRUE; preserve last known status when Valid is FALSE
+    // (prevents false NOT HOME during power-on sequencing).
     IF fbReadPos[i].Valid THEN
         currentPos := fbReadPos[i].Position;
         // Axis is "homed" if within tolerance of position 0
-        AxisIsHomed[i] := ABS(currentPos) <= PositionTolerance;
-    ELSE
-        AxisIsHomed[i] := FALSE;
+        AxisIsHomed[GVL_Axes.MASTER_AXES[i]] := ABS(currentPos) <= PositionTolerance;
     END_IF
+    // When Valid = FALSE: AxisIsHomed retains its previous value (latch)
 END_FOR
 
 // Check if all master axes are homed

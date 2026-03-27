@@ -22,7 +22,7 @@ VAR_GLOBAL CONSTANT
     //   35,36  - Hot wire cutting independent
     // ============================================================================
 
-    MASTER_AXES : ARRAY[1..18] OF INT := [
+    MASTER_AXES : ARRAY[1..18] OF UINT := [
         1,      // Shift left
         2,      // Load table lift
         6,      // Shift center
@@ -43,7 +43,32 @@ VAR_GLOBAL CONSTANT
         36      // Hot wire independent 2
     ];
 
-    MASTER_AXIS_COUNT : INT := 18;
-    TOTAL_AXIS_COUNT : INT := 36;
+    // Slave axes MUST be reset before their masters.
+    // Resetting simultaneously leaves the master's gantry error uncleared
+    // because the ctrlX requires the slave to be error-free first.
+    SLAVE_AXES : ARRAY[1..18] OF UINT := [
+        3,      // Follows Axis 2  (load table lift)
+        4,      // Follows Axis 2
+        5,      // Follows Axis 2
+        7,      // Follows Axis 6  (shift center)
+        9,      // Follows Axis 8  (pusher)
+        11,     // Follows Axis 10 (unload table lift)
+        12,     // Follows Axis 10
+        13,     // Follows Axis 10
+        16,     // Follows Axis 14 (station 1 Y)
+        17,     // Follows Axis 15 (station 1 X)
+        20,     // Follows Axis 18 (station 2 Y)
+        21,     // Follows Axis 19 (station 2 X)
+        24,     // Follows Axis 22 (station 3 Y)
+        25,     // Follows Axis 23 (station 3 X)
+        28,     // Follows Axis 26 (station 4 Y)
+        29,     // Follows Axis 27 (station 4 X)
+        32,     // Follows Axis 30 (large station X)
+        33      // Follows Axis 31 (large station Y)
+    ];
+
+    MASTER_AXIS_COUNT : UINT := 18;
+    SLAVE_AXIS_COUNT  : UINT := 18;
+    TOTAL_AXIS_COUNT  : UINT := 36;
 
 END_VAR

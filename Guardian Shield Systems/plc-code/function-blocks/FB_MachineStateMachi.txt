@@ -19,14 +19,14 @@ VAR_OUTPUT
 
     // Motion sequence visualization (pass-through from FB_MotionSequence)
     motionStepOut : E_MotionStep;       // Current motion step
-    motionSubStep : UNIT;                // Current substep
+    motionSubStep : UINT;                // Current substep
     activeAxesMask : LWORD;             // Bitmask of moving axes
     stepDescription : STRING[80];       // Human-readable step description
 
     // Centralized error information (from FB_ErrorHandler)
     hasError : BOOL;                    // Any error occurred (power, gearing, motion)
     errorInfo : ST_MotionError;         // Detailed error information
-    errorCount : UNIT;                  // Total error count since last reset
+    errorCount : UINT;                  // Total error count since last reset
 
     
 END_VAR
@@ -84,7 +84,13 @@ CASE currentState OF
             currentState := E_MachineState.MANUAL;
 
         ELSIF startButton THEN
-            currentState := E_MachineState.RUNNING;
+            // Do not allow cycle start until the Python pipeline has staged
+            // G-code files on the ctrlX and set bFilesReady := TRUE.
+            IF GVL_GCode.bFilesReady THEN
+                currentState := E_MachineState.RUNNING;
+            ELSE
+                GVL_GCode.sStatus := 'Not ready - upload G-code via pipeline first';
+            END_IF;
 
         END_IF;
     

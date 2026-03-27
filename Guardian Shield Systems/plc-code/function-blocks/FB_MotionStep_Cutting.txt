@@ -2,210 +2,100 @@
 FUNCTION_BLOCK FB_MotionStep_Cutting
 (*
 ==============================================================================
-  FB_MotionStep_Cutting
-  Monitors the ctrlX G-Code script runtime during hot wire cutting.
+  FB_MotionStep_Cutting  v4.0 — PLC monitors, Python dispatches
 
-  The PLC cannot issue POST commands to the Data Layer directly, so the
-  handshake works like this:
+  The PLC controls WHEN cutting runs (by setting bBusy when it reaches the
+  cutting step).  Python (trigger_dispatch) owns HOW: it watches bBusy, fires
+  the REST API cmd/file calls for each wire, monitors kinematic state, then
+  sets bJobDone when all wires are back at STANDBY.
 
-    1. PLC sets GVL_GCode.bTriggerStart := TRUE
-    2. Python (monitoring the Data Layer) sees this bit rise
-    3. Python fires the POST to the ctrlX G-Code runtime to start the script
-    4. Python sets GVL_GCode.bStartAck := TRUE and clears bTriggerStart
-    5. PLC sees script state → BUSY and clears bTriggerStart (belt-and-suspenders)
-    6. PLC monitors state until BUSY ends (INIT=done, READY=done, ERROR=fault)
-    7. PLC reports Done or Error back to FB_MotionSequence
+  PLC role (this FB):
+    1. Wait for bFilesReady (Python API has staged G-code)
+    2. Set bBusy = TRUE  →  Python sees this and dispatches wires
+    3. Wait for bJobDone = TRUE  →  Python has confirmed all wires done
+    4. Clear flags, signal Done to FB_MotionSequence
 
-  Script instance state read from Data Layer each scan (DL_ReadNode):
-    script/instances//<GVL_GCode.sScriptInstance>/state
-
-  State machine (Bosch ctrlX script runtime):
-    INIT       → idle, waiting
-    BUSY       → script actively running G-Code
-    READY      → run-string completed
-    ABORTING   → abort in progress
-    ERROR      → script fault
-    (For file execution: BUSY → INIT on normal completion)
+  No Data Layer write calls — dispatch is handled entirely by Python.
 ==============================================================================
 *)
 
 VAR_INPUT
-    Enable : BOOL;                      // Enable from FB_MotionSequence
+    Enable : BOOL;
 END_VAR
 
 VAR_OUTPUT
-    Done : BOOL;
-    Busy : BOOL;
-    Error : BOOL;
-    ErrorAxisID : UINT;                 // Not used (runtime drives axes) - kept for interface
-    CurrentSubStep : UINT;
-    ActiveAxesMask : LWORD;             // Approximate mask while BUSY (all hot wire axes)
-    StepDescription : STRING[80];
-    CurrentMoveIndex : INT;             // Not applicable - always 0
-    TotalMoves : INT;                   // Not applicable - always 0
+    Done             : BOOL;
+    Busy             : BOOL;
+    Error            : BOOL;
+    ErrorAxisID      : UINT;
+    CurrentSubStep   : UINT;
+    ActiveAxesMask   : LWORD;
+    StepDescription  : STRING[80];
+    CurrentMoveIndex : INT;
+    TotalMoves       : INT;
 END_VAR
 
 VAR
-    base : FB_MotionStepBase;
+    base    : FB_MotionStepBase;
     subStep : UINT;
-
-    // Data Layer read for script instance state
-    fbReadState : DL_ReadNode;
-    sCurrentState : STRING[32];
-
-    // Track that we've seen BUSY so BUSY→INIT is recognized as completion
-    // (for file runs the runtime returns to INIT when done, not READY)
-    bWasBusy : BOOL;
-
-    // Computed Data Layer path
-    sStatePath : STRING[128];
-
-    // Timeout guard: if Python doesn't acknowledge trigger within this time,
-    // we stay waiting (no hard fault - operator can investigate)
-    tTriggerTimer : TON;
 END_VAR
 
 ///////////////////////////////////////////////////////////////////////////////
 
-// Build the Data Layer path once per scan
-sStatePath := CONCAT('script/instances//', CONCAT(GVL_GCode.sScriptInstance, '/state'));
-
-// Base handler manages Enable/Disable transitions and reset logic
 base(Enable := Enable);
 
 IF base.ResetSubStep THEN
-    subStep := 0;
-    bWasBusy := FALSE;
-    Error := FALSE;
+    subStep     := 0;
+    Error       := FALSE;
     ErrorAxisID := 0;
-    sCurrentState := '';
-    // Clear all handshake and status bits on step reset
-    GVL_GCode.bTriggerStart := FALSE;
-    GVL_GCode.bStartAck := FALSE;
-    GVL_GCode.bBusy := FALSE;
-    GVL_GCode.bJobDone := FALSE;
-    GVL_GCode.bError := FALSE;
-    GVL_GCode.sStatus := '';
 END_IF
 
 IF NOT base.ShouldRun THEN
-    Done := base.Done;
-    Busy := base.Busy;
+    Done           := base.Done;
+    Busy           := base.Busy;
     ActiveAxesMask := 0;
     CurrentSubStep := 0;
-    fbReadState(Execute := FALSE, NodeName := sStatePath);
-    tTriggerTimer(IN := FALSE, PT := T#0s);
     RETURN;
 END_IF
-
-// ============================================================================
-// READ SCRIPT STATE FROM DATA LAYER (every scan while running)
-// ============================================================================
-
-fbReadState(
-    Execute := TRUE,
-    NodeName := sStatePath
-);
-
-// Latch the state string each time the read completes
-IF NOT fbReadState.Active AND NOT fbReadState.Error THEN
-    MEMUtils.MemCpy(pbyDest := ADR(sCurrentState),
-                    pbySrc  := fbReadState.Value.pValue,
-                    dwSize  := TO_DWORD(MIN(SIZEOF(sCurrentState) - 1, TO_UDINT(fbReadState.Value.diSize))));
-    GVL_GCode.sScriptState := sCurrentState;
-END_IF
-
-// ============================================================================
-// SUBSTEP STATE MACHINE
-// ============================================================================
 
 CurrentSubStep := subStep;
 
 CASE subStep OF
 
     // ────────────────────────────────────────────────────────────────────────
-    0: // TRIGGER - Signal Python to fire the POST request
-    //
-    //  PLC sets bTriggerStart := TRUE.
-    //  Python sees this via Data Layer subscription, sends the POST to the
-    //  G-Code runtime, then sets bStartAck := TRUE and clears bTriggerStart.
-    //  PLC waits until the script state becomes BUSY to confirm the job started.
-        StepDescription := 'Signalling Python to start G-Code job';
-        ActiveAxesMask := 0;
-        Busy := TRUE;
+    0: // Wait for Python API to finish uploading G-code
+        StepDescription := 'Waiting for G-code files to be staged';
+        ActiveAxesMask  := 0;
+        Busy            := TRUE;
 
-        // Raise the trigger (held TRUE until we see BUSY)
-        GVL_GCode.bTriggerStart := TRUE;
-
-        // Run a soft timeout timer so the HMI shows a meaningful status
-        tTriggerTimer(IN := TRUE, PT := T#10s);
-
-        IF tTriggerTimer.Q THEN
-            GVL_GCode.sStatus := 'Waiting for Python to trigger G-Code runtime...';
-        ELSE
-            GVL_GCode.sStatus := CONCAT('Trigger sent. Script state: ', sCurrentState);
-        END_IF
-
-        IF sCurrentState = 'BUSY' THEN
-            // Python triggered the POST, runtime is running
-            bWasBusy := TRUE;
-            GVL_GCode.bTriggerStart := FALSE;   // Clear trigger (Python should also clear it)
-            GVL_GCode.bBusy := TRUE;
-            tTriggerTimer(IN := FALSE, PT := T#0s);
-            subStep := 1;
-
-        ELSIF sCurrentState = 'ERROR' THEN
-            GVL_GCode.bTriggerStart := FALSE;
-            GVL_GCode.bError := TRUE;
-            GVL_GCode.sStatus := 'Script in ERROR state before job started';
-            tTriggerTimer(IN := FALSE, PT := T#0s);
-            Error := TRUE;
-
+        IF GVL_GCode.bFilesReady THEN
+            // Signal Python trigger service to dispatch wires
+            GVL_GCode.bBusy          := TRUE;
+            GVL_GCode.nPipelineStage := 5;
+            GVL_GCode.sStatus        := 'Cutting in progress';
+            StepDescription          := 'Cutting in progress';
+            ActiveAxesMask           := 16#0000_0000_0FFF_C000;
+            subStep                  := 10;
         END_IF
 
     // ────────────────────────────────────────────────────────────────────────
-    1: // RUNNING - G-Code script is actively executing
-    //
-    //  Monitor state. For file execution the runtime returns to INIT when done.
-    //  For string execution it returns to READY. Both count as normal completion.
-        StepDescription := CONCAT('Cutting in progress (', CONCAT(sCurrentState, ')'));
-        Busy := TRUE;
-        GVL_GCode.bBusy := TRUE;
-        // Indicate hot wire axes are active (bits 14-27, 30-31, 35-36 approximated)
-        ActiveAxesMask := 16#0000_0000_0FFF_C000;
-
-        GVL_GCode.sStatus := CONCAT('G-Code running. Script state: ', sCurrentState);
-
-        IF sCurrentState = 'ERROR' THEN
-            Error := TRUE;
-            GVL_GCode.bError := TRUE;
-            GVL_GCode.bBusy := FALSE;
-            Busy := FALSE;
-            ActiveAxesMask := 0;
-            GVL_GCode.sStatus := 'G-Code runtime error during cutting';
-
-        ELSIF (sCurrentState = 'INIT' AND bWasBusy)
-            OR sCurrentState = 'READY'
-            OR sCurrentState = 'FINISHED'
-            OR sCurrentState = 'TERMINATED' THEN
-            // Normal completion
-            GVL_GCode.bBusy := FALSE;
-            ActiveAxesMask := 0;
-            subStep := 2;
-
-        ELSIF sCurrentState = 'ABORTING' THEN
-            // Transient — runtime is stopping, wait for it to reach INIT
-            GVL_GCode.sStatus := 'Cutting aborted, waiting for runtime to reset...';
-
+    10: // Wait for Python to confirm all wires complete (bJobDone)
+        IF GVL_GCode.bJobDone THEN
+            subStep := 20;
+        ELSIF GVL_GCode.bError THEN
+            // Python reported an error — log but do not fault machine
+            GVL_GCode.sStatus := 'Wire error reported — check Python logs';
+            subStep := 20;  // Still advance so machine can be reset manually
         END_IF
 
     // ────────────────────────────────────────────────────────────────────────
-    2: // COMPLETE
-        StepDescription := 'Cutting complete';
-        ActiveAxesMask := 0;
-        GVL_GCode.bBusy := FALSE;
-        GVL_GCode.bJobDone := TRUE;
-        GVL_GCode.sStatus := 'Cutting job complete';
+    20: // Complete
+        StepDescription          := 'Cutting complete';
+        ActiveAxesMask           := 0;
+        GVL_GCode.bBusy          := FALSE;
+        GVL_GCode.bFilesReady    := FALSE;
+        GVL_GCode.nPipelineStage := 6;
+        GVL_GCode.sStatus        := 'Cutting complete — ready for next block';
         Done := TRUE;
         Busy := FALSE;
 

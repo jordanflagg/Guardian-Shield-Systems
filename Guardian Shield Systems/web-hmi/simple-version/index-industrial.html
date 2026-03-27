@@ -1198,194 +1198,207 @@
         }
 
         /* ================================================================
-           PROGRAM TAB STYLES
+           GCODE TAB STYLES
            ================================================================ */
 
-        .cam-drop-zone {
-            border: 2px dashed #555;
-            border-radius: 6px;
-            padding: 22px 12px;
-            text-align: center;
-            cursor: pointer;
-            transition: border-color 0.2s, background 0.2s;
-            background: #1e1e1e;
-            user-select: none;
+        .gcode-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
         }
-        .cam-drop-zone:hover, .cam-drop-zone.drag-over {
-            border-color: #f7941d;
-            background: #252010;
-        }
-        .cam-drop-icon {
-            font-size: 28px;
+        .gcode-full { grid-column: 1 / -1; }
+
+        /* Connection indicators */
+        .conn-row { display: flex; gap: 28px; padding: 6px 0; flex-wrap: wrap; }
+        .conn-item { display: flex; align-items: center; gap: 8px; }
+        .conn-led { width: 14px; height: 14px; border-radius: 50%; background: #2a2a2a; border: 2px solid #444; flex-shrink: 0; transition: all 0.3s; }
+        .conn-led.ok  { background: #4caf50; border-color: #2e7d32; box-shadow: 0 0 7px rgba(76,175,80,0.5); }
+        .conn-led.err { background: #f44336; border-color: #c62828; box-shadow: 0 0 7px rgba(244,67,54,0.5); }
+        .conn-label   { font-size: 13px; color: #999; }
+        .conn-badge   { font-family: 'Consolas', monospace; font-size: 12px; color: #f7941d; background: #1a1200; border: 1px solid #3a2800; border-radius: 3px; padding: 2px 8px; margin-left: 2px; }
+
+        /* Script state badge */
+        .script-state-badge {
+            display: inline-block;
+            padding: 8px 20px;
+            border-radius: 4px;
+            font-size: 20px;
             font-weight: 700;
-            color: #555;
             font-family: 'Consolas', monospace;
             letter-spacing: 2px;
-            margin-bottom: 8px;
+            margin-bottom: 14px;
         }
-        .cam-drop-zone:hover .cam-drop-icon,
-        .cam-drop-zone.drag-over .cam-drop-icon {
-            color: #f7941d;
+        .sstate-INIT       { background: #1e1e1e; color: #777; border: 1px solid #333; }
+        .sstate-BUSY       { background: #0a2010; color: #4caf50; border: 1px solid #2e7d32; animation: gcode-pulse 1.2s ease-in-out infinite; }
+        .sstate-ERROR      { background: #200a0a; color: #f44336; border: 1px solid #c62828; }
+        .sstate-ABORTING   { background: #201000; color: #ff9800; border: 1px solid #e65100; }
+        .sstate-READY      { background: #0a1020; color: #64b5f6; border: 1px solid #1565c0; }
+        .sstate-FINISHED   { background: #0a1020; color: #64b5f6; border: 1px solid #1565c0; }
+        .sstate-RESTART    { background: #1a1800; color: #ffeb3b; border: 1px solid #f57f17; }
+        .sstate-TERMINATED { background: #1a1a1a; color: #555; border: 1px solid #333; }
+        .sstate-unknown    { background: #1a1a1a; color: #555; border: 1px solid #333; }
+        @keyframes gcode-pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(76,175,80,0); }
+            50%       { box-shadow: 0 0 10px 4px rgba(76,175,80,0.35); }
         }
-        .cam-drop-label { font-size: 13px; color: #888; }
-        .cam-file-info {
-            margin-top: 8px;
-            padding: 8px 10px;
-            background: #1a2a12;
-            border: 1px solid #3a5a22;
-            border-radius: 4px;
-            font-size: 12px;
-            color: #8bc34a;
-            font-family: 'Consolas', monospace;
-            word-break: break-all;
-        }
-        .cam-param-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 8px;
-            font-size: 12px;
-        }
-        .cam-param-row label { color: #888; }
-        .cam-input {
-            width: 110px;
-            padding: 4px 8px;
-            background: #2a2a2a;
-            border: 1px solid #444;
-            border-radius: 3px;
-            color: #e0e0e0;
-            font-size: 12px;
-            font-family: 'Consolas', monospace;
-        }
-        .cam-input:focus { outline: none; border-color: #f7941d; }
-        .cam-convert-btn {
-            width: 100%;
-            margin-top: 14px;
-            background: linear-gradient(180deg, #f7941d 0%, #e07800 100%);
-            color: white;
-            font-weight: 600;
-            font-size: 13px;
-            padding: 10px;
-            letter-spacing: 0.5px;
-        }
-        .cam-convert-btn:disabled {
-            background: #333;
-            color: #666;
-            cursor: not-allowed;
-        }
-        .cam-status-msg {
-            margin-top: 8px;
-            font-size: 12px;
-            color: #aaa;
-            min-height: 18px;
-            word-break: break-word;
-        }
-        .cam-status-msg.error { color: #ef5350; }
-        .cam-status-msg.success { color: #8bc34a; }
 
-        /* Preview panel */
-        .cam-preview-container {
-            background: #1a1a1a;
-            border-radius: 4px;
-            min-height: 420px;
+        /* Flag rows */
+        .flag-row { display: flex; flex-direction: column; gap: 7px; }
+        .flag-item {
+            display: flex; align-items: center; gap: 10px;
+            padding: 8px 12px; background: #1e1e1e;
+            border-radius: 4px; border-left: 3px solid #2a2a2a;
+            transition: all 0.2s;
+        }
+        .flag-item.is-true  { border-left-color: #4caf50; background: #0d1f0d; }
+        .flag-item.is-error { border-left-color: #f44336; background: #1f0d0d; }
+        .flag-led { width: 10px; height: 10px; border-radius: 50%; background: #2a2a2a; flex-shrink: 0; transition: all 0.2s; }
+        .flag-led.on        { background: #4caf50; box-shadow: 0 0 5px rgba(76,175,80,0.6); }
+        .flag-led.on-red    { background: #f44336; box-shadow: 0 0 5px rgba(244,67,54,0.6); }
+        .flag-led.on-yellow { background: #ff9800; box-shadow: 0 0 5px rgba(255,152,0,0.6); }
+        .flag-led.on-blue   { background: #64b5f6; box-shadow: 0 0 5px rgba(100,181,246,0.6); }
+        .flag-name  { font-size: 12px; color: #777; font-family: 'Consolas', monospace; flex: 1; }
+        .flag-value { font-size: 12px; font-weight: 700; font-family: 'Consolas', monospace; color: #555; }
+        .flag-value.true  { color: #4caf50; }
+        .flag-value.false { color: #555; }
+        .flag-value.red   { color: #f44336; }
+
+        /* Status / diag text areas */
+        .gcode-field-label {
+            font-size: 10px; color: #555; font-weight: 600;
+            text-transform: uppercase; letter-spacing: 0.5px;
+            margin-top: 14px; margin-bottom: 4px;
+        }
+        .gcode-field-label:first-child { margin-top: 0; }
+        .gcode-text-box {
+            background: #111; border: 1px solid #252525; border-radius: 3px;
+            padding: 8px 10px; font-family: 'Consolas', monospace;
+            font-size: 12px; color: #555; min-height: 34px;
+            word-break: break-all; line-height: 1.5; transition: color 0.2s;
+        }
+        .gcode-text-box.active { color: #c8e6c9; border-color: #333; }
+        .gcode-text-box.error  { color: #ef9a9a; border-color: #333; }
+
+        /* Sequence context bar */
+        .context-bar { display: flex; border-radius: 4px; overflow: hidden; }
+        .context-cell {
+            flex: 1; padding: 12px 14px; background: #1a1a1a;
+            border-right: 1px solid #252525;
+        }
+        .context-cell:last-child { border-right: none; }
+        .context-label { font-size: 10px; color: #555; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; }
+        .context-value { font-size: 16px; font-family: 'Consolas', monospace; font-weight: 600; color: #aaa; }
+        .context-value.cutting { color: #f7941d; }
+        .context-value.running { color: #4caf50; }
+        .context-value.small   { font-size: 12px; }
+
+        /* Pipeline stepper */
+        .pipeline-stepper {
             display: flex;
-            align-items: center;
-            justify-content: center;
+            align-items: flex-start;
+            padding: 24px 12px 8px;
             position: relative;
-            overflow: hidden;
         }
-        .cam-preview-placeholder {
-            text-align: center;
-            padding: 40px;
-        }
-        .cam-spinner {
-            text-align: center;
-            padding: 40px;
-        }
-        .cam-spinner-ring {
-            width: 48px;
-            height: 48px;
-            border: 4px solid #333;
-            border-top-color: #f7941d;
-            border-radius: 50%;
-            animation: cam-spin 0.8s linear infinite;
-            margin: 0 auto;
-        }
-        @keyframes cam-spin { to { transform: rotate(360deg); } }
-
-        /* View tabs (bottom block / top block / window) */
-        .cam-view-tabs {
+        .ps-step {
             display: flex;
-            gap: 4px;
-            margin-bottom: 8px;
-            flex-wrap: wrap;
-        }
-        .cam-view-tab {
-            padding: 5px 14px;
-            background: #2a2a2a;
-            color: #888;
-            border: 1px solid #444;
-            border-radius: 3px;
-            font-size: 12px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.15s;
-            letter-spacing: 0.3px;
-        }
-        .cam-view-tab:hover { background: #333; color: #ccc; }
-        .cam-view-tab.active {
-            background: #122030;
-            color: #64b5f6;
-            border-color: #2196F3;
-        }
-
-        /* Block info / feature chips */
-        .cam-info-grid {
-            font-family: 'Consolas', monospace;
-            font-size: 12px;
-            color: #ccc;
-            line-height: 1.9;
-        }
-        .cam-feature-chip {
-            padding: 4px 8px;
-            margin-bottom: 4px;
-            background: #1e1e1e;
-            border-left: 3px solid #444;
-            border-radius: 2px;
-            font-size: 12px;
-            color: #aaa;
-            font-family: 'Consolas', monospace;
-        }
-
-        /* G-code file list items */
-        .cam-gcode-item {
-            padding: 8px 10px;
-            border-left: 3px solid #444;
-            background: #1e1e1e;
-            margin-bottom: 4px;
-            border-radius: 2px;
-            cursor: pointer;
-            transition: background 0.15s;
-        }
-        .cam-gcode-item:hover { background: #252525; }
-        .cam-gcode-item.active { background: #122030; border-left-width: 4px; }
-
-        /* Legend */
-        .cam-legend {
-            display: flex;
-            gap: 14px;
-            flex-wrap: wrap;
-            font-size: 11px;
-            color: #666;
-            margin-top: 8px;
-            padding-top: 8px;
-            border-top: 1px solid #2a2a2a;
-        }
-        .cam-legend-item {
-            display: flex;
+            flex-direction: column;
             align-items: center;
-            gap: 5px;
+            flex: 1;
+            position: relative;
         }
+        .ps-step:not(:last-child)::after {
+            content: '';
+            position: absolute;
+            top: 19px;
+            left: calc(50% + 20px);
+            right: calc(-50% + 20px);
+            height: 2px;
+            background: #2a2a2a;
+            transition: background 0.4s;
+        }
+        .ps-step.ps-done:not(:last-child)::after  { background: #2e7d32; }
+        .ps-step.ps-active:not(:last-child)::after { background: #2a2a2a; }
+        .ps-node {
+            width: 38px; height: 38px;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            background: #1a1a1a; border: 2px solid #333;
+            font-size: 15px; font-weight: 700; color: #444;
+            position: relative; z-index: 1;
+            transition: all 0.3s;
+        }
+        .ps-step.ps-done   .ps-node { background: #0d1f0d; border-color: #2e7d32; color: #4caf50; }
+        .ps-step.ps-active .ps-node { background: #1a1000; border-color: #f7941d; color: #f7941d; animation: ps-pulse 1.4s ease-in-out infinite; }
+        .ps-step.ps-error  .ps-node { background: #1f0505; border-color: #c62828; color: #f44336; }
+        @keyframes ps-pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(247,148,29,0); }
+            50%       { box-shadow: 0 0 0 7px rgba(247,148,29,0.25); }
+        }
+        .ps-label {
+            margin-top: 10px;
+            font-size: 10px; text-align: center; color: #444;
+            text-transform: uppercase; letter-spacing: 0.4px; line-height: 1.5;
+        }
+        .ps-step.ps-done   .ps-label { color: #4caf50; }
+        .ps-step.ps-active .ps-label { color: #f7941d; }
+        .ps-step.ps-error  .ps-label { color: #f44336; }
+        .ps-status-row {
+            display: flex; gap: 10px; align-items: flex-start;
+            margin-top: 6px; padding-top: 14px; border-top: 1px solid #1e1e1e;
+        }
+        .ps-status-label { font-size: 10px; color: #555; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; padding-top: 9px; }
+        .ps-status-text  { flex: 1; background: #111; border: 1px solid #1e1e1e; border-radius: 3px; padding: 7px 10px; font-family: 'Consolas', monospace; font-size: 12px; color: #555; min-height: 32px; transition: color 0.2s; }
+        .ps-status-text.active { color: #c8e6c9; }
+        .ps-status-text.error  { color: #ef9a9a; }
+
+        /* Compact flags row */
+        .flag-compact { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 0; }
+        .flag-chip {
+            display: flex; align-items: center; gap: 6px;
+            padding: 5px 10px; border-radius: 3px;
+            background: #1a1a1a; border: 1px solid #252525;
+            transition: all 0.2s;
+        }
+        .flag-chip.fc-true  { background: #0d1f0d; border-color: #2e4a2e; }
+        .flag-chip.fc-error { background: #1f0d0d; border-color: #4a2e2e; }
+        .flag-chip .fc-led  { width: 8px; height: 8px; border-radius: 50%; background: #2a2a2a; flex-shrink: 0; transition: all 0.2s; }
+        .flag-chip.fc-true  .fc-led { background: #4caf50; box-shadow: 0 0 4px rgba(76,175,80,0.5); }
+        .flag-chip.fc-error .fc-led { background: #f44336; box-shadow: 0 0 4px rgba(244,67,54,0.5); }
+        .flag-chip.fc-amber .fc-led { background: #ff9800; box-shadow: 0 0 4px rgba(255,152,0,0.5); }
+        .flag-chip.fc-amber { background: #1a1000; border-color: #3a2800; }
+        .fc-name  { font-size: 11px; color: #666; font-family: 'Consolas', monospace; }
+        .fc-val   { font-size: 11px; font-weight: 700; font-family: 'Consolas', monospace; color: #444; }
+        .flag-chip.fc-true  .fc-val { color: #4caf50; }
+        .flag-chip.fc-error .fc-val { color: #f44336; }
+        .flag-chip.fc-amber .fc-val { color: #ff9800; }
+
+        /* Fault Detail Panel */
+        .fault-detail-panel {
+            display: none;
+            background: #1f0d0d;
+            border: 2px solid #b71c1c;
+            border-radius: 4px;
+            padding: 12px 16px;
+            margin: 8px 0;
+        }
+        .fault-detail-panel.show { display: block; }
+        .fault-detail-panel .fdp-title {
+            color: #ef5350;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+        .fault-detail-panel .fdp-grid {
+            display: grid;
+            grid-template-columns: 130px 1fr;
+            gap: 4px 12px;
+            font-size: 12px;
+        }
+        .fault-detail-panel .fdp-label { color: #888; }
+        .fault-detail-panel .fdp-value { color: #ef9a9a; font-family: 'Consolas', monospace; word-break: break-word; }
+        .fault-detail-panel .fdp-value.highlight { color: #ff5252; font-weight: 700; }
     </style>
 </head>
 <body>
@@ -1398,7 +1411,7 @@
                     <button class="nav-tab active" onclick="switchPage('dashboard')">Dashboard</button>
                     <button class="nav-tab" onclick="switchPage('homing')">Homing</button>
                     <button class="nav-tab" onclick="switchPage('manual')">Manual</button>
-                    <button class="nav-tab" onclick="switchPage('program')">Program</button>
+                    <button class="nav-tab" onclick="switchPage('program')">GCode</button>
                 </div>
                 <div class="header-item">
                     <label>Mode:</label>
@@ -1711,169 +1724,153 @@
         </div>
 
         <!-- ================================================================== -->
-        <!-- PROGRAM PAGE -->
+        <!-- GCODE PAGE -->
         <!-- ================================================================== -->
         <div id="page-program" class="page-content">
-            <div class="main-content" style="grid-template-columns: 290px 1fr 300px; gap: 12px;">
+            <div class="main-content" style="grid-template-columns: 1fr; max-width: 1000px; margin: 0 auto;">
+                <div class="gcode-grid">
 
-                <!-- ── Left Panel: Upload & Machine Config ── -->
-                <div class="panel">
-                    <div class="panel-title">CAM — Upload &amp; Analyze</div>
-                    <div class="panel-body">
-
-                        <!-- Drag-drop zone -->
-                        <div id="camDropZone" class="cam-drop-zone"
-                             ondragover="event.preventDefault(); this.classList.add('drag-over')"
-                             ondragleave="this.classList.remove('drag-over')"
-                             ondrop="camHandleDrop(event)"
-                             onclick="document.getElementById('camFileInput').click()">
-                            <div class="cam-drop-icon">STEP</div>
-                            <div class="cam-drop-label">Drop STEP file here<br><span style="color:#aaa;font-size:11px;">(.step / .stp) &nbsp;or click to browse</span></div>
-                            <input type="file" id="camFileInput" accept=".step,.stp" style="display:none"
-                                   onchange="camHandleFileSelect(event)">
-                        </div>
-                        <div id="camFileName" class="cam-file-info" style="display:none"></div>
-
-                        <!-- Machine config parameters -->
-                        <div class="form-section" style="margin-top:14px;">
-                            <h3>Machine Config</h3>
-                            <div class="cam-param-row">
-                                <label>Pass Height (mm)</label>
-                                <input type="number" id="camMachineHeight" value="1219.2" min="100" max="3000" step="0.1" class="cam-input" title="Max machine Z travel per pass. 4ft = 1219.2mm">
-                            </div>
-                            <div class="cam-param-row">
-                                <label>Feed Rate (mm/min)</label>
-                                <input type="number" id="camFeedRate" value="500" min="10" max="3000" step="10" class="cam-input">
-                            </div>
-                            <div class="cam-param-row">
-                                <label>Safe Retract (mm)</label>
-                                <input type="number" id="camSafeRetract" value="10" min="1" max="100" step="1" class="cam-input" title="Wire clearance outside panel face before Z moves">
-                            </div>
-                        </div>
-
-                        <!-- Analyze button -->
-                        <button id="camAnalyzeBtn" class="btn cam-convert-btn" onclick="camAnalyzeStep()" disabled>
-                            Analyze &amp; Generate G-code
-                        </button>
-                        <div id="camConvertStatus" class="cam-status-msg"></div>
-
-                        <!-- Block info (shown after analysis) -->
-                        <div id="camBlockInfo" style="display:none">
-                            <div class="form-section" style="margin-top:16px;">
-                                <h3>Block Dimensions</h3>
-                                <div class="cam-info-grid">
-                                    <div>Thickness: <span id="camInfoThickness" style="color:#f7941d;">—</span> mm</div>
-                                    <div>Height: <span id="camInfoHeight" style="color:#f7941d;">—</span> mm</div>
-                                    <div>Length: <span id="camInfoLength" style="color:#f7941d;">—</span> mm</div>
-                                    <div>Pass height: <span id="camInfoPass" style="color:#f7941d;">—</span> mm</div>
+                    <!-- ── Connection Status (full width) ── -->
+                    <div class="panel gcode-full">
+                        <div class="panel-title">Pipeline Connection</div>
+                        <div class="panel-body">
+                            <div class="conn-row">
+                                <div class="conn-item">
+                                    <div id="gcPLCLed" class="conn-led"></div>
+                                    <span class="conn-label">PLC Online</span>
+                                </div>
+                                <div class="conn-item">
+                                    <div id="gcScriptLed" class="conn-led"></div>
+                                    <span class="conn-label">Script Runtime</span>
+                                    <span id="gcScriptInstance" class="conn-badge">—</span>
+                                </div>
+                                <div class="conn-item">
+                                    <div id="gcPythonLed" class="conn-led"></div>
+                                    <span class="conn-label">Python Server</span>
+                                    <span id="gcPythonUrl" style="font-size:11px;color:#555;margin-left:4px;">localhost:8001</span>
                                 </div>
                             </div>
-                            <div class="form-section">
-                                <h3>Detected Features</h3>
-                                <div id="camFeatureList"></div>
-                            </div>
-                            <button class="btn btn-secondary" style="width:100%;margin-top:8px;font-size:12px;" onclick="camClear()">
-                                Clear / New File
-                            </button>
                         </div>
-
                     </div>
-                </div>
 
-                <!-- ── Center Panel: Cut Path Visualization ── -->
-                <div class="panel">
-                    <div class="panel-title">Cut Path Visualization</div>
-                    <div class="panel-body" style="padding:10px;">
+                    <!-- ── Pipeline Status ── -->
+                    <div class="panel gcode-full">
+                        <div class="panel-title">Pipeline Status</div>
+                        <div class="panel-body">
 
-                        <!-- View selector tabs -->
-                        <div id="camViewTabs" class="cam-view-tabs" style="display:none;">
-                            <button class="cam-view-tab active" data-view="bottom" onclick="camSwitchView('bottom')">Bottom Block</button>
-                            <button class="cam-view-tab" data-view="top" onclick="camSwitchView('top')">Top Block</button>
-                            <button class="cam-view-tab" data-view="window" id="camWindowTab" onclick="camSwitchView('window')" style="display:none;">Window Cut</button>
+                            <div class="pipeline-stepper">
+                                <div class="ps-step" id="psStep1">
+                                    <div class="ps-node" id="psNode1">1</div>
+                                    <div class="ps-label">STEP File<br>Sent</div>
+                                </div>
+                                <div class="ps-step" id="psStep2">
+                                    <div class="ps-node" id="psNode2">2</div>
+                                    <div class="ps-label">G-Code<br>Generated</div>
+                                </div>
+                                <div class="ps-step" id="psStep3">
+                                    <div class="ps-node" id="psNode3">3</div>
+                                    <div class="ps-label">Uploaded to<br>ctrlX</div>
+                                </div>
+                                <div class="ps-step" id="psStep4">
+                                    <div class="ps-node" id="psNode4">4</div>
+                                    <div class="ps-label">Waiting to<br>Run</div>
+                                </div>
+                                <div class="ps-step" id="psStep5">
+                                    <div class="ps-node" id="psNode5">5</div>
+                                    <div class="ps-label">Cutting<br>Running</div>
+                                </div>
+                                <div class="ps-step" id="psStep6">
+                                    <div class="ps-node" id="psNode6">6</div>
+                                    <div class="ps-label">Complete</div>
+                                </div>
+                            </div>
+
+                            <div class="ps-status-row">
+                                <span class="ps-status-label">Status</span>
+                                <div id="psStatusText" class="ps-status-text">—</div>
+                            </div>
+
+                            <div style="margin-top:14px;">
+                                <div class="flag-compact" id="psFlagRow">
+                                    <div class="flag-chip" id="fcFilesReady">
+                                        <div class="fc-led"></div>
+                                        <span class="fc-name">bFilesReady</span>
+                                        <span class="fc-val" id="fcValFilesReady">FALSE</span>
+                                    </div>
+                                    <div class="flag-chip" id="fcActiveWires">
+                                        <div class="fc-led"></div>
+                                        <span class="fc-name">nActiveWires</span>
+                                        <span class="fc-val" id="fcValActiveWires">4</span>
+                                    </div>
+                                    <div class="flag-chip" id="fcWire5">
+                                        <div class="fc-led"></div>
+                                        <span class="fc-name">bWire5Active</span>
+                                        <span class="fc-val" id="fcValWire5">FALSE</span>
+                                    </div>
+                                    <div class="flag-chip" id="fcBusy">
+                                        <div class="fc-led"></div>
+                                        <span class="fc-name">bBusy</span>
+                                        <span class="fc-val" id="fcValBusy">FALSE</span>
+                                    </div>
+                                    <div class="flag-chip" id="fcDone">
+                                        <div class="fc-led"></div>
+                                        <span class="fc-name">bJobDone</span>
+                                        <span class="fc-val" id="fcValDone">FALSE</span>
+                                    </div>
+                                    <div class="flag-chip" id="fcError">
+                                        <div class="fc-led"></div>
+                                        <span class="fc-name">bError</span>
+                                        <span class="fc-val" id="fcValError">FALSE</span>
+                                    </div>
+                                </div>
+                            </div>
+
                         </div>
-
-                        <!-- SVG visualization area -->
-                        <div id="camVisContainer" class="cam-preview-container" style="min-height:500px;overflow:auto;">
-                            <div id="camPreviewPlaceholder" class="cam-preview-placeholder">
-                                <div style="font-size:14px;color:#555;">No program loaded</div>
-                                <div style="font-size:12px;color:#444;margin-top:6px;">Upload a STEP file and click<br>Analyze &amp; Generate G-code</div>
-                            </div>
-                            <div id="camSpinner" class="cam-spinner" style="display:none;">
-                                <div class="cam-spinner-ring"></div>
-                                <div style="margin-top:12px;font-size:13px;color:#888;">Analyzing STEP file…</div>
-                            </div>
-                            <div id="camViewBottom" style="display:none;width:100%;text-align:center;"></div>
-                            <div id="camViewTop"    style="display:none;width:100%;text-align:center;"></div>
-                            <div id="camViewWindow" style="display:none;width:100%;text-align:center;"></div>
-                        </div>
-
-                        <!-- Wire color legend -->
-                        <div id="camLegend" class="cam-legend" style="display:none;">
-                            <div class="cam-legend-item">
-                                <svg width="18" height="8"><line x1="0" y1="4" x2="18" y2="4" stroke="#F44336" stroke-width="2.5"/></svg>
-                                Wire 1 (Face B bottom)
-                            </div>
-                            <div class="cam-legend-item">
-                                <svg width="18" height="8"><line x1="0" y1="4" x2="18" y2="4" stroke="#FF8F00" stroke-width="2.5"/></svg>
-                                Wire 2 (Face B top)
-                            </div>
-                            <div class="cam-legend-item">
-                                <svg width="18" height="8"><line x1="0" y1="4" x2="18" y2="4" stroke="#2196F3" stroke-width="2.5"/></svg>
-                                Wire 3 (Face A bottom)
-                            </div>
-                            <div class="cam-legend-item">
-                                <svg width="18" height="8"><line x1="0" y1="4" x2="18" y2="4" stroke="#4CAF50" stroke-width="2.5"/></svg>
-                                Wire 4 (Face A top)
-                            </div>
-                            <div class="cam-legend-item" id="camWindowLegendItem" style="display:none;">
-                                <svg width="18" height="8"><line x1="0" y1="4" x2="18" y2="4" stroke="#9C27B0" stroke-width="2.5"/></svg>
-                                Wires 5/6 (Window)
-                            </div>
-                            <div class="cam-legend-item" style="color:#555;">
-                                <svg width="18" height="8"><line x1="0" y1="4" x2="18" y2="4" stroke="#555" stroke-width="1.5" stroke-dasharray="4,3"/></svg>
-                                Rapid approach/retract
-                            </div>
-                        </div>
-
                     </div>
-                </div>
 
-                <!-- ── Right Panel: G-code Files ── -->
-                <div class="panel">
-                    <div class="panel-title">G-code Files</div>
-                    <div class="panel-body">
-
-                        <div id="camGcodeEmpty" style="color:#555;font-size:13px;text-align:center;padding:40px 10px;">
-                            No G-code generated yet
-                        </div>
-
-                        <!-- Wire file list (shown after analysis) -->
-                        <div id="camGcodeList" style="display:none;"></div>
-
-                        <!-- G-code text preview (shown when wire selected) -->
-                        <div id="camGcodePreviewSection" style="display:none;margin-top:10px;">
-                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
-                                <span id="camGcodePreviewLabel" style="font-size:11px;color:#888;font-weight:600;"></span>
-                                <button class="btn btn-secondary" style="font-size:11px;padding:3px 10px;" onclick="camDownloadGcode()">
-                                    Download
-                                </button>
+                    <!-- ── Sequence Context (full width) ── -->
+                    <div class="panel gcode-full">
+                        <div class="panel-title">Sequence Context</div>
+                        <div class="panel-body" style="padding:0;">
+                            <div class="context-bar">
+                                <div class="context-cell">
+                                    <div class="context-label">Machine State</div>
+                                    <div class="context-value" id="gcMachineState">—</div>
+                                </div>
+                                <div class="context-cell">
+                                    <div class="context-label">Motion Step</div>
+                                    <div class="context-value" id="gcMotionStep">—</div>
+                                </div>
+                                <div class="context-cell">
+                                    <div class="context-label">Substep</div>
+                                    <div class="context-value" id="gcSubStep">—</div>
+                                </div>
+                                <div class="context-cell" style="flex:2;">
+                                    <div class="context-label">Description</div>
+                                    <div class="context-value small" id="gcStepDesc">—</div>
+                                </div>
                             </div>
-                            <textarea id="camGcodeText"
-                                style="width:100%;height:260px;background:#111;color:#8bc34a;border:1px solid #2a2a2a;
-                                       border-radius:3px;font-family:'Consolas',monospace;font-size:11px;padding:8px;
-                                       resize:vertical;tab-size:4;line-height:1.5;" readonly></textarea>
                         </div>
-
-                        <!-- Download all button -->
-                        <div id="camDownloadAllSection" style="display:none;margin-top:10px;">
-                            <button class="btn cam-convert-btn" style="margin-top:0;" onclick="camDownloadAll()">
-                                Download All G-code Files
-                            </button>
-                        </div>
-
                     </div>
-                </div>
 
+                </div>
+            </div>
+        </div>
+
+        <!-- Fault Detail Panel — shown whenever machine is FAULTED -->
+        <div id="faultDetailPanel" class="fault-detail-panel">
+            <div class="fdp-title">&#9888; Fault Details</div>
+            <div class="fdp-grid">
+                <span class="fdp-label">Description</span>
+                <span class="fdp-value highlight" id="fdpDescription">—</span>
+                <span class="fdp-label">Error Code</span>
+                <span class="fdp-value" id="fdpCode">—</span>
+                <span class="fdp-label">Step / Substep</span>
+                <span class="fdp-value" id="fdpStep">—</span>
+                <span class="fdp-label">Pipeline Status</span>
+                <span class="fdp-value" id="fdpPipelineStatus">—</span>
+                <span class="fdp-label">Active Wires</span>
+                <span class="fdp-value" id="fdpActiveWires">—</span>
             </div>
         </div>
 
@@ -1933,7 +1930,23 @@
             allAxesHomed: 'PLC_PRG.HMI_AllAxesHomed',
             homePosition: 'PLC_PRG.HMI_HomePosition',
             // Per-axis homed status (array base path - append [n] for individual axes)
-            axisIsHomedBase: 'PLC_PRG.HMI_AxisIsHomed'
+            axisIsHomedBase: 'PLC_PRG.HMI_AxisIsHomed',
+            // G-Code pipeline (GVL_GCode)
+            gcBusy:           'GVL_GCode.bBusy',
+            gcJobDone:        'GVL_GCode.bJobDone',
+            gcError:          'GVL_GCode.bError',
+            gcStatus:         'GVL_GCode.sStatus',
+            gcPipelineStage:  'GVL_GCode.nPipelineStage',
+            gcFilesReady:     'GVL_GCode.bFilesReady',
+            gcActiveWires:    'GVL_GCode.nActiveWires',
+            gcWire5Active:    'GVL_GCode.bWire5Active',
+            // Fault diagnostics (FB_MachineStateMachine errorHandler outputs)
+            errHasError:      'PLC_PRG/stateMachine/hasError',
+            errDescription:   'PLC_PRG/stateMachine/errorInfo/errorDescription',
+            errCode:          'PLC_PRG/stateMachine/errorInfo/errorCode',
+            errStep:          'PLC_PRG/stateMachine/errorInfo/errorStep',
+            errSubStep:       'PLC_PRG/stateMachine/errorInfo/errorSubStep',
+            errAxisID:        'PLC_PRG/stateMachine/errorInfo/errorAxisID'
         };
 
         const machineStates = {
@@ -2334,6 +2347,14 @@
                 updatePilotLight('ledFaulted', faulted, 'red');
                 updatePilotLight('ledDrives', drivesState, 'green');
 
+                // Show/hide fault detail panel based on machine state
+                if (machineStateValue === 'FAULTED') {
+                    updateFaultDetails();
+                } else {
+                    const panel = document.getElementById('faultDetailPanel');
+                    if (panel) panel.classList.remove('show');
+                }
+
                 // Update manual page status LEDs
                 updatePilotLight('manualHomedLed', homed, 'green');
                 updatePilotLight('manualDrivesLed', drivesState, 'green');
@@ -2394,7 +2415,32 @@
                     document.getElementById('stepDescription').textContent = stepDesc || 'Waiting...';
 
                     updateActiveAxes(activeAxesMask);
+
+                    // Update GCode tab sequence context
+                    const stateNum = await readPLCVariable(plcVars.machineState);
+                    const stateName = machineStates[stateNum] || '—';
+                    const stepNames = { 1:'WAIT_FOR_LOAD', 2:'SHIFT_TO_PROC', 3:'CUTTING', 4:'SHIFT_TO_UNLOAD', 5:'SEQ_COMPLETE' };
+                    const stepName = stepNames[motionStep] || (motionStep ? String(motionStep) : '—');
+                    const gcMachineStateEl = document.getElementById('gcMachineState');
+                    const gcMotionStepEl   = document.getElementById('gcMotionStep');
+                    if (gcMachineStateEl) {
+                        gcMachineStateEl.textContent = stateName;
+                        gcMachineStateEl.className = 'context-value' + (stateName === 'RUNNING' ? ' running' : '');
+                    }
+                    if (gcMotionStepEl) {
+                        gcMotionStepEl.textContent = stepName;
+                        gcMotionStepEl.className = 'context-value' + (stepName === 'CUTTING' ? ' cutting' : '');
+                    }
+                    const gcSubStepEl  = document.getElementById('gcSubStep');
+                    const gcStepDescEl = document.getElementById('gcStepDesc');
+                    if (gcSubStepEl)  gcSubStepEl.textContent  = motionSubStep !== undefined ? motionSubStep : '—';
+                    if (gcStepDescEl) gcStepDescEl.textContent = stepDesc || '—';
                 } catch (e) {}
+
+                // Update GCode pipeline variables (only read when on gcode tab to reduce load)
+                if (currentPage === 'program') {
+                    await updateGCodeTab();
+                }
 
                 // Update manual jog position display
                 try {
@@ -2642,6 +2688,9 @@
                 led.className = 'connection-led offline';
                 text.textContent = 'Offline';
             }
+            // Mirror to GCode tab PLC LED
+            const gcLed = document.getElementById('gcPLCLed');
+            if (gcLed) gcLed.className = 'conn-led' + (isConnected ? ' ok' : ' err');
         }
 
         function showError(message) {
@@ -2960,18 +3009,12 @@
         }
 
         // ================================================================
-        // PROGRAM TAB  — CAM Analysis & Visualization
+        // GCODE TAB  — Pipeline Diagnostics
         // ================================================================
 
-        const PIPELINE_URL = 'http://localhost:8000';
-
-        // State tracking for the program tab
-        let camState = {
-            file:         null,
-            analysisData: null,      // last /analyze-step response
-            currentView:  'bottom',  // 'bottom' | 'top' | 'window'
-            selectedWire: null,      // e.g. 'W1_bottom'
-        };
+        const PIPELINE_URL = 'http://localhost:8001';
+        let gcPythonOk = false;
+        let gcPythonCheckTimer = null;
 
         // Wire color palette (matches channel_gcode_gui.py conventions)
         const CAM_WIRE_COLORS = {
@@ -3094,6 +3137,187 @@
         }
 
         // ── Block info panel ─────────────────────────────────────────────
+
+        async function updateFaultDetails() {
+            const panel = document.getElementById('faultDetailPanel');
+            if (!panel) return;
+            panel.classList.add('show');
+
+            try {
+                const [desc, code, step, substep, axisId, gcStatus, activeWires, wire5] = await Promise.allSettled([
+                    readPLCVariable(plcVars.errDescription),
+                    readPLCVariable(plcVars.errCode),
+                    readPLCVariable(plcVars.errStep),
+                    readPLCVariable(plcVars.errSubStep),
+                    readPLCVariable(plcVars.errAxisID),
+                    readPLCVariable(plcVars.gcStatus),
+                    readPLCVariable(plcVars.gcActiveWires),
+                    readPLCVariable(plcVars.gcWire5Active),
+                ]);
+
+                const v = (r, fb) => r.status === 'fulfilled' ? (r.value ?? fb) : fb;
+                const descVal   = v(desc,        '—');
+                const codeVal   = v(code,        '—');
+                const stepVal   = v(step,        '—');
+                const subVal    = v(substep,     '—');
+                const axisVal   = v(axisId,      0);
+                const statusVal = v(gcStatus,    '—');
+                const wiresVal  = v(activeWires, '?');
+                const wire5Val  = v(wire5,       false);
+
+                const stepNames = { 1:'WAIT_FOR_LOAD', 2:'SHIFT_TO_PROC', 3:'CUTTING', 4:'SHIFT_TO_UNLOAD', 5:'SEQ_COMPLETE' };
+                const stepText  = (stepNames[stepVal] || `step ${stepVal}`) + ` / sub ${subVal}`;
+                const codeText  = codeVal !== '—' ? `${codeVal}${axisVal ? ' (Axis ' + axisVal + ')' : ''}` : '—';
+
+                const el = (id) => document.getElementById(id);
+                if (el('fdpDescription'))    el('fdpDescription').textContent    = descVal   || '(no description — check PLC watchlist)';
+                if (el('fdpCode'))           el('fdpCode').textContent           = codeText;
+                if (el('fdpStep'))           el('fdpStep').textContent           = stepText;
+                if (el('fdpPipelineStatus')) el('fdpPipelineStatus').textContent = statusVal;
+                if (el('fdpActiveWires'))    el('fdpActiveWires').textContent    = `${wiresVal} wires, Wire5=${wire5Val}`;
+            } catch(e) {
+                console.warn('Fault detail read failed:', e);
+            }
+        }
+
+        // ── GCode tab update ─────────────────────────────────────────────
+
+        async function updateGCodeTab() {
+            try {
+                const [busy, done, err, status, stage, filesReady, activeWires, wire5] = await Promise.allSettled([
+                    readPLCVariable(plcVars.gcBusy),
+                    readPLCVariable(plcVars.gcJobDone),
+                    readPLCVariable(plcVars.gcError),
+                    readPLCVariable(plcVars.gcStatus),
+                    readPLCVariable(plcVars.gcPipelineStage),
+                    readPLCVariable(plcVars.gcFilesReady),
+                    readPLCVariable(plcVars.gcActiveWires),
+                    readPLCVariable(plcVars.gcWire5Active),
+                ]);
+
+                // Extract values
+                const busyVal       = busy.status       === 'fulfilled' ? busy.value       : false;
+                const doneVal       = done.status       === 'fulfilled' ? done.value       : false;
+                const errVal        = err.status        === 'fulfilled' ? err.value        : false;
+                const statusVal     = status.status     === 'fulfilled' ? (status.value || '') : '';
+                const stageVal      = stage.status      === 'fulfilled' ? parseInt(stage.value) || 0 : 0;
+                const filesReadyVal = filesReady.status === 'fulfilled' ? filesReady.value : false;
+                const activeWiresVal = activeWires.status === 'fulfilled' ? (activeWires.value ?? 4) : 4;
+                const wire5Val      = wire5.status      === 'fulfilled' ? wire5.value      : false;
+
+                // ── Pipeline stepper ──────────────────────────────────────
+                updatePipelineStepper(stageVal, errVal);
+
+                // ── Status text ───────────────────────────────────────────
+                const stEl = document.getElementById('psStatusText');
+                if (stEl) {
+                    stEl.textContent = statusVal || '—';
+                    stEl.className = 'ps-status-text' + (errVal ? ' error' : (statusVal ? ' active' : ''));
+                }
+
+                // ── Compact flag chips ────────────────────────────────────
+                setFlagChip('fcFilesReady',  'fcValFilesReady',  filesReadyVal,    false);
+                setFlagChip('fcActiveWires', 'fcValActiveWires', activeWiresVal,   false);
+                setFlagChip('fcWire5',       'fcValWire5',       wire5Val,         false);
+                setFlagChip('fcBusy',        'fcValBusy',        busyVal,          false);
+                setFlagChip('fcDone',        'fcValDone',        doneVal,          false);
+                setFlagChip('fcError',       'fcValError',       errVal,           true);
+
+            } catch (e) {
+                console.error('GCode tab update failed:', e);
+            }
+        }
+
+        function updatePipelineStepper(stage, isError) {
+            const STEP_COUNT = 6;
+            // Step N is "done" when stage > N, "active" when stage === N, else "pending"
+            // stage 0=idle, 1=step1 active, 2=step1 done+step2 active, etc.
+            // Map: step 1 active at stage 1, done at stage>=2
+            //       step 2 active at stage 2, done at stage>=3  ... etc.
+            for (let i = 1; i <= STEP_COUNT; i++) {
+                const stepEl = document.getElementById(`psStep${i}`);
+                const nodeEl = document.getElementById(`psNode${i}`);
+                if (!stepEl || !nodeEl) continue;
+
+                let cls = 'ps-step';
+                let icon = String(i);
+
+                if (isError) {
+                    if (stage >= i + 1) {
+                        cls += ' ps-done'; icon = '✓';
+                    } else if (stage === i) {
+                        cls += ' ps-error'; icon = '✗';
+                    }
+                    // stage < i = still pending (no class)
+                } else {
+                    if (stage >= i + 1) {
+                        cls += ' ps-done'; icon = '✓';
+                    } else if (stage === i) {
+                        cls += ' ps-active';
+                    }
+                }
+                stepEl.className = cls;
+                nodeEl.textContent = icon;
+            }
+        }
+
+        function setFlagChip(chipId, valId, isTrue, isErrorFlag, isAmber) {
+            const chip = document.getElementById(chipId);
+            const val  = document.getElementById(valId);
+            if (!chip || !val) return;
+            val.textContent = isTrue ? 'TRUE' : 'FALSE';
+            if (isTrue && isErrorFlag) {
+                chip.className = 'flag-chip fc-error';
+            } else if (isTrue && isAmber) {
+                chip.className = 'flag-chip fc-amber';
+            } else if (isTrue) {
+                chip.className = 'flag-chip fc-true';
+            } else {
+                chip.className = 'flag-chip';
+            }
+        }
+
+        function setGCodeText(elId, val) {
+            const el = document.getElementById(elId);
+            if (!el) return;
+            const str = val ? String(val).trim() : '';
+            el.textContent = str || '—';
+            el.className = 'gcode-text-box' + (str ? ' active' : '');
+        }
+
+        function setGCodeFlag(itemId, ledId, valId, isTrue, colorClass, isErrorFlag) {
+            const item = document.getElementById(itemId);
+            const led  = document.getElementById(ledId);
+            const val  = document.getElementById(valId);
+            if (!item || !led || !val) return;
+
+            const on = Boolean(isTrue);
+            item.className = 'flag-item' + (on && isErrorFlag ? ' is-error' : on ? ' is-true' : '');
+            led.className  = 'flag-led'  + (on ? (' on-' + colorClass === 'on-on' ? ' on' : ' on-' + colorClass) : '');
+            // Fix: 'on' class directly if colorClass === 'on'
+            if (on && colorClass === 'on') led.className = 'flag-led on';
+            val.textContent = on ? 'TRUE' : 'FALSE';
+            val.className   = 'flag-value' + (on && isErrorFlag ? ' red' : on ? ' true' : ' false');
+        }
+
+        // ── Python server health check ────────────────────────────────────
+
+        async function checkPythonServer() {
+            try {
+                const resp = await fetch(`${PIPELINE_URL}/health`, { method: 'GET', signal: AbortSignal.timeout(2000) });
+                gcPythonOk = resp.ok;
+            } catch (e) {
+                gcPythonOk = false;
+            }
+            const led = document.getElementById('gcPythonLed');
+            if (led) led.className = 'conn-led' + (gcPythonOk ? ' ok' : ' err');
+        }
+
+        // Check Python server every 5s
+        setInterval(checkPythonServer, 5000);
+        checkPythonServer();
+
+        // ── Legacy CAM stubs (kept to avoid reference errors) ─────────────
 
         function camRenderBlockInfo(data) {
             document.getElementById('camInfoThickness').textContent = data.blockThickness.toFixed(1);
@@ -3520,29 +3744,10 @@
             return L.join('\n');
         }
 
-        // ── UI helpers ───────────────────────────────────────────────────
-
-        function camShowSpinner(show) {
-            document.getElementById('camSpinner').style.display = show ? 'flex' : 'none';
-            if (show) {
-                document.getElementById('camPreviewPlaceholder').style.display = 'none';
-            }
-        }
-
-        function camSetStatus(msg, type) {
-            const el = document.getElementById('camConvertStatus');
-            el.textContent = msg;
-            el.className = 'cam-status-msg' + (type ? ` ${type}` : '');
-        }
-
-        function camClear() {
-            camState = { file: null, analysisData: null, currentView: 'bottom', selectedWire: null };
-            document.getElementById('camFileName').style.display = 'none';
-            document.getElementById('camAnalyzeBtn').disabled = true;
-            document.getElementById('camFileInput').value = '';
-            camSetStatus('', '');
-            camResetVisualization();
-        }
+        // ── UI helpers (stubs — CAM elements removed) ────────────────────
+        function camShowSpinner() {}
+        function camSetStatus() {}
+        function camClear() {}
     </script>
 
     <!-- ================================================================== -->

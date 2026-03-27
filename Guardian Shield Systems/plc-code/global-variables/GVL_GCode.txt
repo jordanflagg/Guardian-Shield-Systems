@@ -1,77 +1,97 @@
 (*
 ==============================================================================
   GVL_GCode
-  Global Variable List - G-Code Script Runtime Interface
+  Global Variable List — G-Code Pipeline Interface
 
-  The Python pipeline writes a G-Code file directly to the ctrlX filesystem
-  and triggers execution via a POST command to the Data Layer. The PLC monitors
-  the script instance state to determine when cutting is complete or faulted.
+  Architecture (v2.0 — Native PLC Dispatch):
+    The Python API (launch_api.bat) processes STEP files, generates G-code,
+    uploads Wire*.npg files to the ctrlX via WebDAV, then sets bFilesReady.
 
-  Script instance state is read from:
-    script/instances//<sScriptInstance>/state
+    FB_MotionStep_Cutting takes it from there — entirely within the PLC:
+      1. Waits for bFilesReady = TRUE
+      2. Prepares each wire kinematic (check state, reset+enable if needed)
+      3. Resets each script instance
+      4. Dispatches Wire1-Wire4 (Wire5 if bWire5Active) via DL_WriteNode
+      5. Monitors kinematic opstate until all STANDBY (cutting done)
+      6. Dispatches Wire*_home.npg to retract wires to X=0
+      7. Waits for home moves to complete
+      8. Clears bFilesReady, sets bJobDone, reports Done
 
-  State machine (from Bosch ctrlX documentation):
-    INIT       - Instance created, ready to run
-    BUSY       - Script actively executing (G-Code running kinematics)
-    READY      - Run-string completed normally
-    RESTART    - Exception occurred, awaiting restart/reset
-    TERMINATED - After restart/reset or shutdown
-    FINISHED   - After TERMINATED via shutdown
-    ERROR      - Script error
-    ABORTING   - Abort command received, transitioning back to INIT
+  The trigger_dispatch.py Python service is no longer needed.
+  The API sets nActiveWires and bWire5Active when staging files.
 
-  For file execution (Python POST to run file):
-    INIT → BUSY → INIT   (normal completion)
-    INIT → BUSY → ERROR  (fault)
-    INIT → BUSY → ABORTING → INIT  (abort)
-
-  Diagnostic info available at:
-    script/instances//<sScriptInstance>/diag
+  Script file paths on ctrlX:
+    Cutting : /var/snap/rexroth-solutions/common/solutions/
+              activeConfiguration/scripts/gcode/Wire{N}.npg
+    Home    : same folder / Wire{N}_home.npg
 ==============================================================================
 *)
 
 {attribute 'qualified_only'}
+{attribute 'symbol' := 'readwrite'}
 VAR_GLOBAL
-    // ═══════════════════════════════════════════════════════════════════════
-    // SCRIPT INSTANCE CONFIGURATION
-    // Must match the instance name configured in ctrlX script runtime
-    // ═══════════════════════════════════════════════════════════════════════
-
-    sScriptInstance : STRING[64] := 'cutting';      // Instance name in ctrlX runtime
 
     // ═══════════════════════════════════════════════════════════════════════
-    // SCRIPT STATE (Written by FB_MotionStep_Cutting via Data Layer read)
-    // Values: INIT / BUSY / READY / RESTART / TERMINATED / FINISHED / ERROR / ABORTING
+    // WIRE CONFIGURATION
+    // Set by the Python API at staging time before bFilesReady goes TRUE.
     // ═══════════════════════════════════════════════════════════════════════
 
-    sScriptState : STRING[32];                      // Current state from Data Layer
+    // Wire name lookup — index matches FB_MotionStep_Cutting loop (1..5)
+    WIRE_NAMES : ARRAY[1..5] OF STRING[20] := [
+        'Wire1', 'Wire2', 'Wire3', 'Wire4', 'Wire5'
+    ];
+
+    // Base path for all .npg files on the ctrlX filesystem
+    SCRIPT_BASE_PATH : STRING[120] :=
+        '/var/snap/rexroth-solutions/common/solutions/activeConfiguration/scripts/gcode/';
+
+    // Number of active wires this cycle (4 = stud cuts only, 5 = includes window/door)
+    // Written by the Python API before setting bFilesReady.
+    {attribute 'symbol' := 'readwrite'}
+    nActiveWires : INT := 4;
+
+    // TRUE when a Wire5 script (window/door opening) was staged this cycle.
+    // Set by the Python API alongside nActiveWires.
+    {attribute 'symbol' := 'readwrite'}
+    bWire5Active : BOOL := FALSE;
 
     // ═══════════════════════════════════════════════════════════════════════
-    // HANDSHAKE BITS (PLC writes, Python reads via Data Layer subscription)
+    // PIPELINE HANDSHAKE
     // ═══════════════════════════════════════════════════════════════════════
 
-    // PLC sets this TRUE when it wants Python to POST to the G-Code runtime.
-    // Python sees it, fires the POST, then clears it (sets FALSE).
-    // PLC also clears it once it confirms the script is BUSY (belt-and-suspenders).
-    bTriggerStart : BOOL;   // PLC → Python: "please start the cutting job now"
+    // Python API → PLC: G-code files uploaded and ready to run.
+    // FB_MotionStep_Cutting will not dispatch until this is TRUE.
+    // Cleared by FB_MotionStep_Cutting when the cycle completes so the next
+    // block requires a fresh pipeline upload.
+    {attribute 'symbol' := 'readwrite'}
+    bFilesReady : BOOL;
 
-    // Optional: Python sets TRUE to acknowledge it received the trigger and fired the POST.
-    // PLC can use this to distinguish "trigger sent but not yet seen" from "POST sent".
-    bStartAck     : BOOL;   // Python → PLC: "POST has been sent"
+    // Pipeline progress stage — written by the Python API as it advances,
+    // then updated by FB_MotionStep_Cutting during execution.
+    // 0=Idle  1=STEP processing  2=G-code generated  3=Uploaded
+    // 4=Ready to run  5=Cutting  6=Complete  99=Error
+    {attribute 'symbol' := 'readwrite'}
+    nPipelineStage : INT;
 
     // ═══════════════════════════════════════════════════════════════════════
-    // STATUS FLAGS (Derived from sScriptState by FB_MotionStep_Cutting)
+    // STATUS FLAGS (written by FB_MotionStep_Cutting)
+    // Readable by the Python API and HMI via Data Layer subscription.
     // ═══════════════════════════════════════════════════════════════════════
 
-    bBusy        : BOOL;    // TRUE while G-Code script is executing
-    bJobDone     : BOOL;    // TRUE when script completed successfully
-    bError       : BOOL;    // TRUE when script is in ERROR state
+    {attribute 'symbol' := 'readwrite'}
+    bBusy    : BOOL;    // TRUE while wires are cutting or homing
+
+    {attribute 'symbol' := 'readwrite'}
+    bJobDone : BOOL;    // TRUE when cutting + homing completed normally
+
+    {attribute 'symbol' := 'readwrite'}
+    bError   : BOOL;    // TRUE when a dispatch or kinematic error occurred
 
     // ═══════════════════════════════════════════════════════════════════════
     // HMI / DIAGNOSTIC
     // ═══════════════════════════════════════════════════════════════════════
 
-    sStatus      : STRING[255];                     // Human-readable status for HMI
-    sDiag        : STRING[255];                     // Diagnostic info (from /diag path)
+    {attribute 'symbol' := 'readwrite'}
+    sStatus : STRING[255];      // Human-readable status string for HMI display
 
 END_VAR

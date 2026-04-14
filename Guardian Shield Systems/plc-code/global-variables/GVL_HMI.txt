@@ -1,0 +1,100 @@
+{attribute 'qualified_only'}
+{attribute 'symbol' := 'readwrite'}
+VAR_GLOBAL
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // BUTTON INPUTS  (written by HMI, read by PLC_PRG → FB_ButtonManager)
+    // ═══════════════════════════════════════════════════════════════════════
+    btn_Start   : BOOL := FALSE;
+    btn_Stop    : BOOL := FALSE;
+    btn_Home    : BOOL := FALSE;
+    btn_Manual  : BOOL := FALSE;
+    btn_Reset   : BOOL := FALSE;
+    btn_EStop   : BOOL := FALSE;
+    btn_DriveOn : BOOL := FALSE;
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // MACHINE STATUS  (read by HMI)
+    // ═══════════════════════════════════════════════════════════════════════
+    MACHINE_STATE : E_MachineState;
+    isRunning     : BOOL;
+    isFaulted     : BOOL;
+    isHomed       : BOOL;
+    HMI_DrivesReady  : BOOL := FALSE;
+    HMI_CyclePaused  : BOOL := FALSE;
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // MOTION SEQUENCE VISUALIZATION  (read by HMI)
+    // ═══════════════════════════════════════════════════════════════════════
+    HMI_MotionStep        : E_MotionStep;
+    HMI_MotionSubStep     : UINT;
+    HMI_ActiveAxesMask    : LWORD;
+    HMI_StepDescription   : STRING[80];
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // FAULT STATUS  (read by HMI)
+    // ═══════════════════════════════════════════════════════════════════════
+    HMI_HasFault    : BOOL := FALSE;
+
+    // The fault that triggered the latch — gives the HMI simple field paths
+    // (HMI_ActiveFault.description, .errorCode, .source, etc.)
+    HMI_ActiveFault : ST_FaultReport;
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ctrlX DIAGNOSTICS  (read by HMI — badge count and info strip)
+    // ═══════════════════════════════════════════════════════════════════════
+    HMI_DiagErrorCount : DINT := 0;
+    HMI_DiagWarnings   : DINT := 0;
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // MANUAL JOG CONTROL  (written by HMI)
+    // ═══════════════════════════════════════════════════════════════════════
+    HMI_JogAxis      : UINT  := 1;
+    HMI_JogDirection : BOOL  := FALSE;   // TRUE = positive direction
+    HMI_JogSpeed     : LREAL := 10.0;    // mm/s
+    HMI_JogEnable    : BOOL  := FALSE;
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // MANUAL JOG FEEDBACK  (read by HMI)
+    // ═══════════════════════════════════════════════════════════════════════
+    HMI_JogPosition    : LREAL := 0.0;
+    HMI_JogVelocity    : LREAL := 0.0;
+    HMI_JogActive      : BOOL  := FALSE;
+    HMI_JogError       : BOOL  := FALSE;
+    HMI_JogInvalidAxis : BOOL  := FALSE;
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // HOMING CONTROL  (written by HMI)
+    // ═══════════════════════════════════════════════════════════════════════
+    HMI_HomeAxis   : UINT  := 1;
+    HMI_HomeSingle : BOOL  := FALSE;
+    HMI_HomeAll    : BOOL  := FALSE;
+    HMI_HomeSpeed  : LREAL := 10.0;    // mm/s
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // HOMING FEEDBACK  (read by HMI)
+    // ═══════════════════════════════════════════════════════════════════════
+    HMI_HomeBusy        : BOOL  := FALSE;
+    HMI_HomeDone        : BOOL  := FALSE;
+    HMI_HomeError       : BOOL  := FALSE;
+    HMI_HomeErrorAxisID : UINT  := 0;
+    HMI_HomeInvalidAxis : BOOL  := FALSE;
+    HMI_AllAxesHomed    : BOOL  := FALSE;
+    HMI_AxisIsHomed     : ARRAY[1..36] OF BOOL;
+    HMI_HomePosition    : LREAL := 0.0;
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // DEBUG / TEST  (written by HMI)
+    // ═══════════════════════════════════════════════════════════════════════
+    HMI_DbgInterruptKins : BOOL := FALSE;
+    HMI_DbgContinueKins  : BOOL := FALSE;
+
+    // Manual kinematic enable/disable for commissioning (debug page Kin Test tab).
+    // HMI sets a wire number (1-5) to issue the command; PLC passes it to
+    // FB_KinematicEnable, which calls ML_KinEnable / ML_KinDisable for that wire.
+    // Mapping: 1=Wire1, 2=Wire2, 3=Wire3, 4=Wire4, 5=Wire5_6
+    // HMI resets to 0 after ~500 ms.
+    HMI_DbgKinEnableNum  : UINT := 0;   // 1..5 → enable that wire's kin group
+    HMI_DbgKinDisableNum : UINT := 0;   // 1..5 → disable that wire's kin group
+
+END_VAR

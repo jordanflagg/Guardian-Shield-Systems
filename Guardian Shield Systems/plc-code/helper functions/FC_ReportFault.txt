@@ -1,0 +1,47 @@
+FUNCTION FC_ReportFault : BOOL
+// ==============================================================================
+// FC_ReportFault
+// Capture the first fault into GVL_Faults.activeFault.
+//
+// First-fault-wins: once GVL_Faults.hasFault is TRUE, subsequent calls are
+// silently dropped until FB_FaultMonitor clears it via its reset sequence.
+// This ensures the original fault trigger is always preserved for the operator.
+//
+// Usage:
+//   FC_ReportFault('FB_MotionStep_LoadBlock', 1, moverAxis1.ErrorID,
+//                  'Axis 1 move failed', E_MotionStep.SHIFT_TO_PROCESSING_AREA, subStep);
+// ==============================================================================
+
+VAR_INPUT
+    source        : STRING[80];     // Reporting FB name: 'FB_MotionStep_LoadBlock', 'FB_AxisPower', etc.
+    axisID        : UINT;           // Faulting axis (0 = N/A)
+    errorCode     : DWORD;          // Raw PLCopen ErrorID or ctrlX code (0 = N/A)
+    description   : STRING[255];    // Human-readable description (255 to match ST_FaultReport)
+    motionStep    : E_MotionStep;   // Motion step active at time of fault
+    motionSubStep : UINT;           // Substep active at time of fault
+END_VAR
+
+///////////////////////////////////////////////////////////////////////////////
+
+// Set the per-axis or system fault flag for instant debugger visibility.
+// GVL_Faults.axisFlags[n] = TRUE means axis n is the fault source.
+// GVL_Faults.systemFault  = TRUE means a non-axis fault (cutting pipeline, diag error, etc.)
+IF axisID >= 1 AND axisID <= 36 THEN
+    GVL_Faults.axisFlags[axisID] := TRUE;
+ELSE
+    GVL_Faults.systemFault := TRUE;
+END_IF
+
+// First fault wins — write once. Don't overwrite until FB_FaultMonitor clears it.
+IF NOT GVL_Faults.hasFault THEN
+    GVL_Faults.activeFault.source        := source;
+    GVL_Faults.activeFault.axisID        := axisID;
+    GVL_Faults.activeFault.errorCode     := errorCode;
+    GVL_Faults.activeFault.description   := description;
+    GVL_Faults.activeFault.motionStep    := motionStep;
+    GVL_Faults.activeFault.motionSubStep := motionSubStep;
+    GVL_Faults.hasFault := TRUE;
+    FC_ReportFault := TRUE;
+ELSE
+    FC_ReportFault := FALSE;   // Dropped — original fault already captured
+END_IF

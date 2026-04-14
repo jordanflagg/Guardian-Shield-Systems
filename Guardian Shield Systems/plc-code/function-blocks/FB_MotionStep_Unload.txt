@@ -3,10 +3,12 @@ FUNCTION_BLOCK FB_MotionStep_Unload
 // ============================================================================
 // Handles SHIFT_TO_UNLOAD_AREA motion sequence
 // Moves completed block from processing center to unload table
-// Uses FB_MotionStepBase for enable/disable handling
 //
 // Axes: 8 (pusher), 10 (table lift) with slaves 9, 11, 12, 13
 // 5 substeps: raise -> shift -> lower -> return -> complete
+//
+// Errors are reported directly to GVL_Faults via FC_ReportFault — no error
+// outputs to wire through parent FBs.
 // ============================================================================
 
 VAR_INPUT
@@ -18,49 +20,42 @@ END_VAR
 VAR_OUTPUT
     Done : BOOL;                        // Step completed
     Busy : BOOL;                        // Step in progress
-    Error : BOOL;                       // Step failed
-    ErrorAxisID : UINT;                 // Which axis caused error
-    CurrentSubStep : UINT;               // Current substep (0-4)
+    CurrentSubStep : UINT;              // Current substep (0-4)
     ActiveAxesMask : LWORD;             // Bitmask of moving axes
     StepDescription : STRING[80];       // Human-readable description
 END_VAR
 
 VAR
-    // Base handler for enable/disable logic
-    base : FB_MotionStepBase;
-
-    // Unload axes
-    moverAxis8 : FB_AxisMover;          // Pusher master (slave: 9)
-    moverAxis10 : FB_AxisMover;         // Table lift master (slaves: 11, 12, 13)
-
-    // Local substep tracking
-    subStep : UINT;
+    moverAxis8  : FB_AxisMover;
+    moverAxis10 : FB_AxisMover;
+    subStep     : UINT;
+    stepStarted : BOOL;
+    localError  : BOOL;     // Halts state machine; cleared on next Enable := FALSE
 END_VAR
 
 ///////////////////////////////////////////////////////////////////////////////
 
-// Run base enable/disable handler
-base(Enable := Enable);
-
-// Reset substep on new enable
-IF base.ResetSubStep THEN
-    subStep := 0;
-END_IF
-
-// Handle disabled state
-IF NOT base.ShouldRun THEN
-    Done := base.Done;
-    Busy := base.Busy;
-    Error := FALSE;
-    ErrorAxisID := 0;
-    ActiveAxesMask := 0;
-    CurrentSubStep := 0;
-    StepDescription := '';
+IF NOT Enable THEN
+    Done := FALSE; Busy := FALSE;
+    ActiveAxesMask := 0; CurrentSubStep := 0; StepDescription := '';
+    subStep := 0; stepStarted := FALSE; localError := FALSE;
     RETURN;
 END_IF
 
-// Update outputs
+IF NOT stepStarted THEN
+    stepStarted := TRUE;
+    Busy := TRUE;
+    subStep := 0;
+END_IF
+
 CurrentSubStep := subStep;
+
+// Hold state machine on fault — wait for Enable := FALSE from parent chain
+IF localError THEN
+    Busy := FALSE;
+    ActiveAxesMask := 0;
+    RETURN;
+END_IF
 
 // Substep state machine
 CASE subStep OF
@@ -72,18 +67,17 @@ CASE subStep OF
         ActiveAxesMask := FC_BuildAxisMask(10, 0, 0, 0, 0, 0, 0, 0);
 
         // TODO: Disable suction cups first when I/O is available
-        // suctionCupsEnable := FALSE;
 
         moverAxis10(Execute := TRUE, AxisRef := Axis_10, Position := Positions.axis10_RaisePosition,
             Velocity := MotionParams.defaultVelocity, Acceleration := MotionParams.defaultAcceleration,
             Deceleration := MotionParams.defaultDeceleration, Jerk := MotionParams.defaultJerk);
 
         IF moverAxis10.Error THEN
-            Error := TRUE;
-            ErrorAxisID := 10;
+            FC_ReportFault('FB_MotionStep_Unload', 10, moverAxis10.ErrorID, 'Axis 10 raise failed', E_MotionStep.SHIFT_TO_UNLOAD_AREA, subStep);
+            localError := TRUE;
         ELSIF moverAxis10.Done THEN
             moverAxis10(Execute := FALSE);
-            subStep :=1;
+            subStep := 1;
         END_IF
 
     // =========================================================================
@@ -97,11 +91,11 @@ CASE subStep OF
             Deceleration := MotionParams.defaultDeceleration, Jerk := MotionParams.defaultJerk);
 
         IF moverAxis8.Error THEN
-            Error := TRUE;
-            ErrorAxisID := 8;
+            FC_ReportFault('FB_MotionStep_Unload', 8, moverAxis8.ErrorID, 'Axis 8 unload shift failed', E_MotionStep.SHIFT_TO_UNLOAD_AREA, subStep);
+            localError := TRUE;
         ELSIF moverAxis8.Done THEN
             moverAxis8(Execute := FALSE);
-            subStep :=2;
+            subStep := 2;
         END_IF
 
     // =========================================================================
@@ -115,11 +109,11 @@ CASE subStep OF
             Deceleration := MotionParams.defaultDeceleration, Jerk := MotionParams.defaultJerk);
 
         IF moverAxis10.Error THEN
-            Error := TRUE;
-            ErrorAxisID := 10;
+            FC_ReportFault('FB_MotionStep_Unload', 10, moverAxis10.ErrorID, 'Axis 10 lower failed', E_MotionStep.SHIFT_TO_UNLOAD_AREA, subStep);
+            localError := TRUE;
         ELSIF moverAxis10.Done THEN
             moverAxis10(Execute := FALSE);
-            subStep :=3;
+            subStep := 3;
         END_IF
 
     // =========================================================================
@@ -133,11 +127,11 @@ CASE subStep OF
             Deceleration := MotionParams.defaultDeceleration, Jerk := MotionParams.defaultJerk);
 
         IF moverAxis8.Error THEN
-            Error := TRUE;
-            ErrorAxisID := 8;
+            FC_ReportFault('FB_MotionStep_Unload', 8, moverAxis8.ErrorID, 'Axis 8 return failed', E_MotionStep.SHIFT_TO_UNLOAD_AREA, subStep);
+            localError := TRUE;
         ELSIF moverAxis8.Done THEN
             moverAxis8(Execute := FALSE);
-            subStep :=4;
+            subStep := 4;
         END_IF
 
     // =========================================================================
@@ -149,9 +143,3 @@ CASE subStep OF
         Busy := FALSE;
 
 END_CASE
-
-// Handle errors - stop motion and clear busy
-IF Error THEN
-    Busy := FALSE;
-    ActiveAxesMask := 0;
-END_IF

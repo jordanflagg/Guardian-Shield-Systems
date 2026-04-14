@@ -1,129 +1,25 @@
+// ==============================================================================
+// FB_ErrorHandler — DEPRECATED
+//
+// This function block has been superseded by the FB_FaultMonitor architecture.
+//
+// Old role: collected error signals propagated up through FB_MotionSequence
+//           into FB_MachineStateMachine and latched a single error record.
+//
+// New role: none. File retained to avoid missing-POU compiler warnings if
+//           the project still references this name. Remove from the CODESYS
+//           project tree and delete this file once confirmed unused.
+//
+// Replaced by:
+//   FB_FaultMonitor  — unconditional fault detection in PLC_PRG
+//   GVL_Faults       — shared fault queue (array, up to 16 simultaneous faults)
+//   FC_ReportFault   — one-liner helper any FB calls to post a fault entry
+//   ST_FaultReport   — per-entry structure (source, axisID, errorCode, description)
+// ==============================================================================
 FUNCTION_BLOCK FB_ErrorHandler
-(*
-==============================================================================
-  FB_ErrorHandler
-  Centralized error handling for the entire machine
-
-  Located in FB_MachineStateMachine to collect errors from all subsystems:
-    - FB_AxisPower (power errors)
-    - FB_MotionSequence (motion step errors: LoadBlock, Cutting, Unload)
-
-  Provides unified error reporting with error codes, descriptions, and context.
-
-  Updated for G-Code cutting integration - now uses single CuttingError input
-  instead of separate StudsError, WindowsDoorsError, ElectricalError.
-==============================================================================
-*)
-
 VAR_INPUT
-    Reset : BOOL;                       // Reset all errors
-
-    // Error inputs from motion steps
-    LoadBlockError : BOOL;
-    LoadBlockErrorAxisID : UINT;
-
-    CuttingError : BOOL;                // G-Code cutting error (replaces Studs/Windows/Electrical)
-    CuttingErrorAxisID : UINT;
-
-    UnloadError : BOOL;
-    UnloadErrorAxisID : UINT;
-
-    // Error inputs from other sources
-    PowerError : BOOL;
-    PowerErrorAxisID : UINT;
-
-    // Current motion state for error context
-    CurrentStep : E_MotionStep;
-    CurrentSubStep : UINT;
 END_VAR
-
 VAR_OUTPUT
-    HasError : BOOL;                    // TRUE if any error is active
-    ErrorInfo : ST_MotionError;         // Detailed error information
-    ErrorCount : UINT;                  // Total number of errors since last reset
 END_VAR
-
 VAR
-    errorLatched : BOOL := FALSE;       // Latches first error until reset
-    internalErrorCount : INT := 0;
 END_VAR
-
-///////////////////////////////////////////////////////////////////////////////
-
-// Reset handling
-IF Reset THEN
-    HasError := FALSE;
-    errorLatched := FALSE;
-    internalErrorCount := 0;
-
-    ErrorInfo.hasError := FALSE;
-    ErrorInfo.errorAxisID := 0;
-    ErrorInfo.errorCode := 0;
-    ErrorInfo.errorStep := E_MotionStep.WAIT_FOR_LOAD;
-    ErrorInfo.errorSubStep := 0;
-    ErrorInfo.errorDescription := '';
-
-    RETURN;
-END_IF
-
-// Check for new errors (only latch first error)
-IF NOT errorLatched THEN
-
-    // Check power error first (most critical)
-    IF PowerError THEN
-        errorLatched := TRUE;
-        HasError := TRUE;
-        internalErrorCount := internalErrorCount + 1;
-
-        ErrorInfo.hasError := TRUE;
-        ErrorInfo.errorAxisID := PowerErrorAxisID;
-        ErrorInfo.errorCode := 1001;
-        ErrorInfo.errorStep := CurrentStep;
-        ErrorInfo.errorSubStep := CurrentSubStep;
-        ErrorInfo.errorDescription := 'Drive power error';
-
-    // Check load block step error
-    ELSIF LoadBlockError THEN
-        errorLatched := TRUE;
-        HasError := TRUE;
-        internalErrorCount := internalErrorCount + 1;
-
-        ErrorInfo.hasError := TRUE;
-        ErrorInfo.errorAxisID := LoadBlockErrorAxisID;
-        ErrorInfo.errorCode := 2001;
-        ErrorInfo.errorStep := E_MotionStep.SHIFT_TO_PROCESSING_AREA;
-        ErrorInfo.errorSubStep := CurrentSubStep;
-        ErrorInfo.errorDescription := 'Load block motion error';
-
-    // Check G-Code cutting error (replaces separate Studs/Windows/Electrical errors)
-    ELSIF CuttingError THEN
-        errorLatched := TRUE;
-        HasError := TRUE;
-        internalErrorCount := internalErrorCount + 1;
-
-        ErrorInfo.hasError := TRUE;
-        ErrorInfo.errorAxisID := CuttingErrorAxisID;
-        ErrorInfo.errorCode := 2002;
-        ErrorInfo.errorStep := E_MotionStep.CUTTING;
-        ErrorInfo.errorSubStep := CurrentSubStep;
-        ErrorInfo.errorDescription := CONCAT('G-Code cutting error on axis ', UINT_TO_STRING(CuttingErrorAxisID));
-
-    // Check unload step error
-    ELSIF UnloadError THEN
-        errorLatched := TRUE;
-        HasError := TRUE;
-        internalErrorCount := internalErrorCount + 1;
-
-        ErrorInfo.hasError := TRUE;
-        ErrorInfo.errorAxisID := UnloadErrorAxisID;
-        ErrorInfo.errorCode := 2005;
-        ErrorInfo.errorStep := E_MotionStep.SHIFT_TO_UNLOAD_AREA;
-        ErrorInfo.errorSubStep := CurrentSubStep;
-        ErrorInfo.errorDescription := 'Unload motion error';
-
-    END_IF
-
-END_IF
-
-// Update error count output
-ErrorCount := internalErrorCount;

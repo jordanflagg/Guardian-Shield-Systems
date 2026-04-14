@@ -3,22 +3,43 @@
   GVL_GCode
   Global Variable List — G-Code Pipeline Interface
 
-  Architecture (v2.0 — Native PLC Dispatch):
-    The Python API (launch_api.bat) processes STEP files, generates G-code,
-    uploads Wire*.npg files to the ctrlX via WebDAV, then sets bFilesReady.
+  Architecture (v5.0 — Always-Enabled Kinematics):
 
-    FB_MotionStep_Cutting takes it from there — entirely within the PLC:
-      1. Waits for bFilesReady = TRUE
-      2. Prepares each wire kinematic (check state, reset+enable if needed)
-      3. Resets each script instance
-      4. Dispatches Wire1-Wire4 (Wire5 if bWire5Active) via DL_WriteNode
-      5. Monitors kinematic opstate until all STANDBY (cutting done)
-      6. Dispatches Wire*_home.npg to retract wires to X=0
-      7. Waits for home moves to complete
-      8. Clears bFilesReady, sets bJobDone, reports Done
+    Three services work together to execute a cutting cycle:
 
-  The trigger_dispatch.py Python service is no longer needed.
-  The API sets nActiveWires and bWire5Active when staging files.
+    1. Python API  (step_runner.py / launch_api.bat)
+         - Converts STEP file to per-wire G-code
+         - Uploads Wire1-Wire6.npg to ctrlX via WebDAV (as applicable)
+         - Sets bFilesReady = TRUE when staging is complete
+         - Sets bWire5Active, bWire6Active before bFilesReady
+
+    2. PLC  (FB_MotionStep_Cutting + FB_KinematicEnable)
+         - Waits for bFilesReady = TRUE
+         - Sets bBusy = TRUE  →  signals trigger_dispatch.py to act
+         - Waits for bJobDone = TRUE (or bError)
+         - Clears bBusy + bFilesReady, signals Done to FB_MotionSequence
+         - FB_KinematicEnable keeps Wire1-4 and Wire5_6 always enabled
+           (enabled once on DrivesReady rising edge, never disabled between groups)
+
+    3. trigger_dispatch.py  (launch_trigger_dispatch.bat)
+         - Polls bBusy and bHomeRequest every second
+         - On bBusy = TRUE: POSTs Wire1-4 scripts simultaneously, waits for
+           STANDBY (home is last line of each G-code script), then Wire5/Wire6
+           sequentially if active. Sets bJobDone = TRUE when done.
+         - On bHomeRequest = TRUE: dispatches Wire*_home.npg scripts and sets
+           bHomeDone = TRUE (used by FB_AxisHome for HMI Home button on kin axes)
+         NOTE: No KinReady handshake — kinematics are always enabled by PLC.
+               Python dispatches immediately without waiting for enable confirmation.
+
+  Ownership:
+    bFilesReady  — written by Python API; cleared ONLY by FB_MotionStep_Cutting step 20
+                   (normal cutting completion). Never cleared on fault/reset — the STEP
+                   file and intended cuts do not change due to a machine fault.
+    bBusy        — written by PLC, cleared by PLC
+    bJobDone     — written by trigger_dispatch.py, cleared by trigger_dispatch.py
+    bError       — written by trigger_dispatch.py, cleared by trigger_dispatch.py
+    bHomeRequest — written by PLC (FB_AxisHome), cleared by trigger_dispatch.py
+    bHomeDone    — written by trigger_dispatch.py, cleared by trigger_dispatch.py
 
   Script file paths on ctrlX:
     Cutting : /var/snap/rexroth-solutions/common/solutions/
@@ -36,24 +57,38 @@ VAR_GLOBAL
     // Set by the Python API at staging time before bFilesReady goes TRUE.
     // ═══════════════════════════════════════════════════════════════════════
 
-    // Wire name lookup — index matches FB_MotionStep_Cutting loop (1..5)
-    WIRE_NAMES : ARRAY[1..5] OF STRING[20] := [
-        'Wire1', 'Wire2', 'Wire3', 'Wire4', 'Wire5'
+    // Wire name lookup — index matches dispatch order (1..6)
+    //   Group A (1..4): stud carving — all run in parallel
+    //   Group B/C (5/6): both scripts run on Wire5_6 kinematic (axes 30, 31, 32, 33, 35, 36)
+    //     Wire5 = window/door (axes 30-33); Wire6 = electrical trough (axes 30,32,35,36)
+    //   Groups are sequential: A must home before B starts; Wire5 must home before Wire6 dispatches.
+    //   Homing is embedded as the final move in each G-code script.
+    WIRE_NAMES : ARRAY[1..6] OF STRING[20] := [
+        'Wire1', 'Wire2', 'Wire3', 'Wire4', 'Wire5', 'Wire6'
     ];
 
     // Base path for all .npg files on the ctrlX filesystem
     SCRIPT_BASE_PATH : STRING[120] :=
         '/var/snap/rexroth-solutions/common/solutions/activeConfiguration/scripts/gcode/';
 
-    // Number of active wires this cycle (4 = stud cuts only, 5 = includes window/door)
+    // Number of active wires this cycle:
+    //   4 = stud cuts only
+    //   5 = stud cuts + window/door (Wire5)
+    //   6 = stud cuts + window/door + electrical trough (Wire5 + Wire6)
     // Written by the Python API before setting bFilesReady.
     {attribute 'symbol' := 'readwrite'}
     nActiveWires : INT := 4;
 
-    // TRUE when a Wire5 script (window/door opening) was staged this cycle.
-    // Set by the Python API alongside nActiveWires.
+    // TRUE when a Wire5 script (window/door — axes 30, 31, 32, 33) was staged.
+    // Wire5 runs on the Wire5_6 kinematic. Set by the Python API alongside nActiveWires.
     {attribute 'symbol' := 'readwrite'}
     bWire5Active : BOOL := FALSE;
+
+    // TRUE when a Wire6 script (electrical trough — axes 30, 32, 35, 36) was staged.
+    // Wire6 shares the Wire5_6 kinematic with Wire5. Wire5 must complete and home
+    // before Wire6 dispatches. Set by the Python API alongside nActiveWires.
+    {attribute 'symbol' := 'readwrite'}
+    bWire6Active : BOOL := FALSE;
 
     // ═══════════════════════════════════════════════════════════════════════
     // PIPELINE HANDSHAKE
@@ -61,8 +96,9 @@ VAR_GLOBAL
 
     // Python API → PLC: G-code files uploaded and ready to run.
     // FB_MotionStep_Cutting will not dispatch until this is TRUE.
-    // Cleared by FB_MotionStep_Cutting when the cycle completes so the next
-    // block requires a fresh pipeline upload.
+    // Cleared ONLY by FB_MotionStep_Cutting step 20 (normal completion).
+    // Faults and resets do NOT clear this — the intended cuts on the block
+    // are unchanged regardless of how many faults occur along the way.
     {attribute 'symbol' := 'readwrite'}
     bFilesReady : BOOL;
 
@@ -88,10 +124,37 @@ VAR_GLOBAL
     bError   : BOOL;    // TRUE when a dispatch or kinematic error occurred
 
     // ═══════════════════════════════════════════════════════════════════════
+    // KINEMATIC HOME HANDSHAKE
+    // Used when the HMI Home button is pressed for kinematic axes.
+    // Kinematics are always enabled — individual axes inside a kin cannot be
+    // homed via MC_MoveAbsolute while the kin is active. FB_AxisHome sets
+    // bHomeRequest; trigger_dispatch.py dispatches Wire*_home.npg scripts
+    // and sets bHomeDone when all kinematic axes have returned to position 0.
+    //
+    // Not used during the cutting cycle — home is the last line of each
+    // cutting G-code script.
+    // ═══════════════════════════════════════════════════════════════════════
+
+    {attribute 'symbol' := 'readwrite'}
+    bHomeRequest : BOOL;    // PLC → Python: home all kinematic axes now (HMI Home button)
+    {attribute 'symbol' := 'readwrite'}
+    bHomeDone    : BOOL;    // Python → PLC: all Wire*_home.npg scripts complete
+
+    // ═══════════════════════════════════════════════════════════════════════
     // HMI / DIAGNOSTIC
     // ═══════════════════════════════════════════════════════════════════════
 
     {attribute 'symbol' := 'readwrite'}
     sStatus : STRING[255];      // Human-readable status string for HMI display
+
+    // Written by trigger_dispatch.py before setting bError = TRUE.
+    // Gives the PLC (and HMI) the full ctrlX error message rather than a generic string.
+    // sErrorWire    — which wire script errored: 'Wire1'..'Wire6', or '' for non-wire errors
+    // sErrorMessage — raw text from script/instances/{wire}/diag/err-msg
+    //                 e.g. "NC block execute failed with 'G01 Y914.400 Z1066.800 F500.0'..."
+    {attribute 'symbol' := 'readwrite'}
+    sErrorWire    : STRING[20];
+    {attribute 'symbol' := 'readwrite'}
+    sErrorMessage : STRING[255];
 
 END_VAR

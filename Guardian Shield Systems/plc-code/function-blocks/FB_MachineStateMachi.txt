@@ -8,52 +8,74 @@ VAR_INPUT
     manualMode : BOOL;
     eStopActive : BOOL;
     resetButton : BOOL;
+    HasFault : BOOL;    // From FB_FaultMonitor — any fault in queue (power, motion, or ctrlX)
 END_VAR
 
 VAR_OUTPUT
     currentStateOut : E_MachineState;   // So HMI and other code can see it
     isRunning : BOOL;
     isFaulted : BOOL;
-	isManualMode : BOOL;
+    isManualMode : BOOL;
     isHomed : BOOL;
 
     // Motion sequence visualization (pass-through from FB_MotionSequence)
     motionStepOut : E_MotionStep;       // Current motion step
-    motionSubStep : UINT;                // Current substep
+    motionSubStep : UINT;               // Current substep
     activeAxesMask : LWORD;             // Bitmask of moving axes
     stepDescription : STRING[80];       // Human-readable step description
 
-    // Centralized error information (from FB_ErrorHandler)
-    hasError : BOOL;                    // Any error occurred (power, gearing, motion)
-    errorInfo : ST_MotionError;         // Detailed error information
-    errorCount : UINT;                  // Total error count since last reset
+    // Kinematic interrupt/continue — wired to FB_AxisPower
+    interruptKinematics : BOOL;         // TRUE while wire kins should be held interrupted
+    continueKinematics  : BOOL;         // Pulse TRUE for one scan to resume interrupted kins
 
-    
+    // Cycle paused state — TRUE when Stop was pressed mid-cycle
+    cyclePausedOut : BOOL;
 END_VAR
 
 VAR
-    currentState : E_MachineState := E_MachineState.INIT;  // Internal state
+    currentState : E_MachineState := E_MachineState.INIT;
 
-    // Motion sequence controller
     motionSequence : FB_MotionSequence;
-
-    // Centralized error handler (collects errors from all subsystems)
-    errorHandler : FB_ErrorHandler;
-	
-	axisManual : FB_AxisManual;         // Jog control for manual mode
-	fbHome : FB_AxisHome;				// Axis control for home mode
+    axisManual : FB_AxisManual;
+    fbHome : FB_AxisHome;
 
     // Emergency halt function blocks
     fbHalt : ARRAY[MOTIF_CONFIG.MIN_AXIS_INDEX..MOTIF_CONFIG.MAX_AXIS_INDEX] OF MC_Halt;
     i : UINT;
+
+    // Resume tracking
+    kinematicsPaused : BOOL;
+    cyclePaused : BOOL;
 END_VAR
 
 /////////////////////////////////////////////////////////////////////
 
-
 // Check for E-stop - can interrupt any state except E_STOPPED itself
 IF eStopActive AND (currentState <> E_MachineState.E_STOPPED) THEN
+    IF currentState = E_MachineState.RUNNING AND
+       motionSequence.CurrentStep = E_MotionStep.CUTTING THEN
+        interruptKinematics := TRUE;
+        GVL_GCode.bBusy := FALSE;
+        kinematicsPaused := FALSE;
+        motionSequence(Enable := FALSE);
+    END_IF
     currentState := E_MachineState.E_STOPPED;
+END_IF;
+
+// Check for fault — interrupts any state except FAULTED/E_STOPPED/RESETTING.
+// E-stop takes priority over fault (handled above), so this only fires when
+// eStopActive is FALSE. RESETTING is excluded so the reset sequence can clear
+// the queue before HasFault goes FALSE.
+IF HasFault
+   AND (currentState <> E_MachineState.FAULTED)
+   AND (currentState <> E_MachineState.E_STOPPED)
+   AND (currentState <> E_MachineState.RESETTING) THEN
+    IF currentState = E_MachineState.RUNNING AND
+       motionSequence.CurrentStep = E_MotionStep.CUTTING THEN
+        interruptKinematics := TRUE;
+        GVL_GCode.bBusy     := FALSE;
+    END_IF
+    currentState := E_MachineState.FAULTED;
 END_IF;
 
 // Main state machine
@@ -61,22 +83,14 @@ CASE currentState OF
 
     // ------------------------------------------------------------------------
     E_MachineState.INIT:
-        // Reset all output flags
         isRunning := FALSE;
         isFaulted := FALSE;
-        isHomed := TRUE;  // Assume homed since we have absolute encoders
-        
-        // Initialize any other variables you need
-        
-        // Automatically transition to IDLE
         currentState := E_MachineState.IDLE;
-    
+
     // ------------------------------------------------------------------------
     E_MachineState.IDLE:
-        // Update outputs
         isRunning := FALSE;
 
-        // Check for operator commands and transition accordingly
         IF homeButton THEN
             currentState := E_MachineState.HOMING;
 
@@ -84,159 +98,137 @@ CASE currentState OF
             currentState := E_MachineState.MANUAL;
 
         ELSIF startButton THEN
-            // Do not allow cycle start until the Python pipeline has staged
-            // G-code files on the ctrlX and set bFilesReady := TRUE.
-            IF GVL_GCode.bFilesReady THEN
+            IF kinematicsPaused THEN
+                continueKinematics  := TRUE;
+                interruptKinematics := FALSE;
+                kinematicsPaused    := FALSE;
+                cyclePaused         := FALSE;
+                currentState := E_MachineState.RUNNING;
+            ELSIF cyclePaused THEN
+                cyclePaused := FALSE;
+                currentState := E_MachineState.RUNNING;
+            ELSIF GVL_GCode.bFilesReady THEN
                 currentState := E_MachineState.RUNNING;
             ELSE
                 GVL_GCode.sStatus := 'Not ready - upload G-code via pipeline first';
             END_IF;
 
         END_IF;
-    
+
     // ------------------------------------------------------------------------
     E_MachineState.HOMING:
-        // Homing mode: move selected axis or all axes to position 0
-        // Uses FB_AxisHome with HMI controls
-
         fbHome(
-            Enable := TRUE,
-            HomeAxis := PLC_PRG.HMI_HomeAxis,
-            HomeSingle := PLC_PRG.HMI_HomeSingle,
-            HomeAll := PLC_PRG.HMI_HomeAll,
-            Velocity := PLC_PRG.HMI_HomeSpeed,
+            Enable   := TRUE,
+            Abort    := stopButton,
+            HomeAxis := GVL_HMI.HMI_HomeAxis,
+            HomeSingle := GVL_HMI.HMI_HomeSingle,
+            HomeAll := GVL_HMI.HMI_HomeAll,
+            Velocity := GVL_HMI.HMI_HomeSpeed,
             Acceleration := 5.0,
             Deceleration := 5.0,
             Jerk := 10.0,
             PositionTolerance := 0.5
         );
 
-        // Update isHomed based on actual axis positions
         isHomed := fbHome.AllAxesHomed;
 
-        // Check for errors during homing
         IF fbHome.Error THEN
             currentState := E_MachineState.FAULTED;
         END_IF
 
-        // Exit homing mode when operator deselects it
-        IF NOT homeButton THEN
-            fbHome(Enable := FALSE);
+        IF NOT homeButton OR stopButton THEN
+            fbHome(Enable := FALSE, Abort := stopButton);
             currentState := E_MachineState.IDLE;
         END_IF
-    
-    // ------------------------------------------------------------------------
-    E_MachineState.MANUAL:	
-		// ============================================================================
-		// HMI MANUAL JOG CONTROL - Only active when machine is in MANUAL state
-		// Called directly from PLC_PRG for explicit control
-		// ============================================================================
-		isManualMode := TRUE;
-		
-		axisManual(
-			Enable := isManualMode,
-			AxisSelect := PLC_PRG.HMI_JogAxis,
-			JogPositive := PLC_PRG.HMI_JogEnable AND PLC_PRG.HMI_JogDirection,      // Enable + positive direction
-			JogNegative := PLC_PRG.HMI_JogEnable AND NOT PLC_PRG.HMI_JogDirection,  // Enable + negative direction
-			JogVelocity := PLC_PRG.HMI_JogSpeed
-		);
-		
-        // Exit manual mode when operator deselects it
-        IF NOT manualMode THEN
-			isManualMode := FALSE;
-            currentState := E_MachineState.IDLE;
-        END_IF;
-    
-    // ------------------------------------------------------------------------
-    E_MachineState.RUNNING:
-        // Update outputs
-        isRunning := TRUE;
 
-        // Run motion sequence (gantry groups configured in Bosch web interface)
-        motionSequence(
-            Enable := TRUE
+    // ------------------------------------------------------------------------
+    E_MachineState.MANUAL:
+        isManualMode := TRUE;
+
+        axisManual(
+            Enable := isManualMode,
+            AxisSelect := GVL_HMI.HMI_JogAxis,
+            JogPositive := GVL_HMI.HMI_JogEnable AND GVL_HMI.HMI_JogDirection,
+            JogNegative := GVL_HMI.HMI_JogEnable AND NOT GVL_HMI.HMI_JogDirection,
+            JogVelocity := GVL_HMI.HMI_JogSpeed
         );
 
-        // Check if sequence completed
-        IF motionSequence.SequenceComplete THEN
-            // Continue running for next cycle
-        END_IF
+        IF NOT manualMode THEN
+            isManualMode := FALSE;
+            currentState := E_MachineState.IDLE;
+        END_IF;
 
-        // Check for any errors (motion, gearing, or power) via centralized handler
-        IF errorHandler.HasError THEN
-            currentState := E_MachineState.FAULTED;
-        END_IF
+    // ------------------------------------------------------------------------
+    E_MachineState.RUNNING:
+        isRunning := TRUE;
+        continueKinematics := FALSE;  // Clear one-shot pulse
 
-        // Check for stop button
+        motionSequence(Enable := TRUE);
+
         IF stopButton THEN
             currentState := E_MachineState.STOPPING;
         END_IF
-    
+
     // ------------------------------------------------------------------------
     E_MachineState.STOPPING:
-        // Update outputs
         isRunning := FALSE;
-		startButton := FALSE;
-
-        // TODO: Command all active axes to decelerate in a controlled manner
-        // In real implementation, you'd use MC_Halt for each axis
-        // and wait for them to reach zero velocity
-
-        // For now, simplified transition back to IDLE
+        IF motionSequence.CurrentStep = E_MotionStep.CUTTING THEN
+            interruptKinematics := TRUE;
+            kinematicsPaused    := TRUE;
+        END_IF
+        cyclePaused := TRUE;
         currentState := E_MachineState.IDLE;
-    
+
     // ------------------------------------------------------------------------
     E_MachineState.FAULTED:
-        // Update outputs
         isRunning := FALSE;
         isFaulted := TRUE;
 
-        // TODO: Log which axis faulted, display error message
-
-        // Wait for operator to acknowledge and reset
         IF resetButton THEN
             currentState := E_MachineState.RESETTING;
         END_IF;
-    
+
     // ------------------------------------------------------------------------
     E_MachineState.E_STOPPED:
-        // Update outputs
         isRunning := FALSE;
         isFaulted := TRUE;
 
-        // Immediately halt all axes (emergency stop)
-		FOR i := MOTIF_CONFIG.MIN_AXIS_INDEX TO MOTIF_CONFIG.MAX_AXIS_INDEX DO
+        FOR i := MOTIF_CONFIG.MIN_AXIS_INDEX TO MOTIF_CONFIG.MAX_AXIS_INDEX DO
             fbHalt[i](
                 Execute := eStopActive,
-				Deceleration := 1,
-				Jerk := 1,
+                Deceleration := 1,
+                Jerk := 1,
                 Axis := AXIF_CONFIG_INDEXES[i]
             );
-		END_FOR
+        END_FOR
 
-        // Can only exit when E-stop is released AND operator resets
         IF NOT eStopActive AND resetButton THEN
             currentState := E_MachineState.RESETTING;
         END_IF;
-    
+
     // ------------------------------------------------------------------------
     E_MachineState.RESETTING:
-        // Clear fault flags
         isFaulted := FALSE;
-        
-        // TODO: Reset axis errors, clear alarm buffers, etc.
-        
-        // Return to IDLE
-        currentState := E_MachineState.IDLE;
+        interruptKinematics := FALSE;
+        continueKinematics  := FALSE;
+        kinematicsPaused    := FALSE;
+        cyclePaused         := FALSE;
+
+        motionSequence(Enable := FALSE);
+        GVL_GCode.bBusy  := FALSE;
+        GVL_GCode.bError := FALSE;
+        // Hold RESETTING until FB_FaultMonitor acknowledges the clear.
+        // FB_FaultMonitor runs BEFORE this FB each scan, reading GVL_HMI.MACHINE_STATE
+        // which is written AFTER this FB runs.  So RESETTING must persist for one full
+        // scan so faultMonitor can see it, fire its Reset block, and drive HasFault FALSE.
+        IF NOT HasFault THEN
+            currentState := E_MachineState.IDLE;
+        END_IF
 
 END_CASE;
 
 // ============================================================================
 // ALWAYS UPDATE AXIS HOMED STATUS
-// FB_AxisHome reads all axis positions to determine if they're at home position.
-// We call it in every scan (even when not in HOMING mode) so the AxisIsHomed
-// status is always up-to-date for HMI display. When Enable=FALSE, only the
-// position reading logic runs (no homing operations are executed).
 // ============================================================================
 IF currentState <> E_MachineState.HOMING THEN
     fbHome(
@@ -250,46 +242,17 @@ IF currentState <> E_MachineState.HOMING THEN
         Jerk := 10.0,
         PositionTolerance := 0.5
     );
-    // Update isHomed based on actual axis positions (always, not just in HOMING mode)
     isHomed := fbHome.AllAxesHomed;
 END_IF
 
-// Copy internal state to output so other code/HMI can see it
+// Copy internal state to outputs
 currentStateOut := currentState;
 
 // Copy motion sequence visualization outputs
-motionStepOut := motionSequence.CurrentStep;
-motionSubStep := motionSequence.CurrentSubStep;
-activeAxesMask := motionSequence.ActiveAxesMask;
+motionStepOut   := motionSequence.CurrentStep;
+motionSubStep   := motionSequence.CurrentSubStep;
+activeAxesMask  := motionSequence.ActiveAxesMask;
 stepDescription := motionSequence.StepDescription;
 
-// ============================================================================
-// CENTRALIZED ERROR HANDLER
-// Collects errors from all subsystems: power, gearing, and motion steps
-// ============================================================================
-
-errorHandler(
-    // Reset errors when entering RESETTING state or when reset button pressed in FAULTED
-    Reset := (currentState = E_MachineState.RESETTING),
-
-    // Motion step errors (from FB_MotionSequence)
-    LoadBlockError := motionSequence.LoadBlockError,
-    LoadBlockErrorAxisID := motionSequence.LoadBlockErrorAxisID,
-    CuttingError := motionSequence.CuttingError,           // G-Code cutting (replaces Studs/Windows/Electrical)
-    CuttingErrorAxisID := motionSequence.CuttingErrorAxisID,
-    UnloadError := motionSequence.UnloadError,
-    UnloadErrorAxisID := motionSequence.UnloadErrorAxisID,
-
-//     // Power errors (from FB_AxisPower via inputs)
-//     PowerError := powerError,
-//     PowerErrorAxisID := powerErrorAxisID,
-
-    // Context for error reporting
-    CurrentStep := motionSequence.CurrentStep,
-    CurrentSubStep := motionSequence.CurrentSubStep
-);
-
-// Copy error handler outputs
-hasError := errorHandler.HasError;
-errorInfo := errorHandler.ErrorInfo;
-errorCount := errorHandler.ErrorCount;
+// Expose cycle paused state to HMI
+cyclePausedOut := cyclePaused;

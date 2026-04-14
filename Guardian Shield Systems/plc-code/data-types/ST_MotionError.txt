@@ -3,7 +3,8 @@ TYPE ST_MotionError :
 STRUCT
     hasError : BOOL;            // TRUE if an error exists
     errorAxisID : UINT;         // Which axis caused the error (0 = none)
-    errorCode : DWORD;          // Error code from motion controller
+    errorCode : DWORD;          // Application error code (1001=Power, 2001=LoadBlock, 2002=Cutting, 2005=Unload)
+    mcErrorID : DWORD;          // Raw PLCopen MC error code from MC_MoveAbsolute (0 = N/A for cutting/power errors)
     errorStep : E_MotionStep;   // Which motion step the error occurred in
     errorSubStep : UINT;         // Which substep the error occurred in
     errorTimestamp : TIME;      // When the error occurred

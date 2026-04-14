@@ -1,0 +1,18 @@
+VAR_GLOBAL
+    // Single active fault — written by any FB via FC_ReportFault, cleared by FB_FaultMonitor
+    // on successful reset. First fault wins: once hasFault is TRUE, subsequent calls to
+    // FC_ReportFault are ignored until the monitor clears it. This captures what
+    // actually triggered the fault without the complexity of a queue.
+    activeFault   : ST_FaultReport;
+    hasFault      : BOOL := FALSE;    // TRUE when activeFault is valid
+
+    // Per-axis fault flags — set (latched) by FC_ReportFault when axisID > 0; cleared on Reset.
+    // Index = axis number (1..36). In the CODESYS debugger, expand this array and immediately
+    // see which axis caused the fault without parsing activeFault.
+    // Example: axisFlags[7] = TRUE means Axis 7 was the source of the fault.
+    axisFlags   : ARRAY[1..36] OF BOOL;
+
+    // Non-axis fault flag — set by FC_ReportFault when axisID = 0 (e.g. cutting pipeline
+    // error, ctrlX diagnosis fault). Cleared on Reset alongside axisFlags.
+    systemFault : BOOL;
+END_VAR

@@ -1,166 +1,132 @@
 PROGRAM PLC_PRG
 VAR
-    // Function blocks
+    // Function blocks — execution order matters: faultMonitor first, then power, then state machine
+    faultMonitor  : FB_FaultMonitor;        // ALWAYS runs first — fault detection before anything else
     buttonManager : FB_ButtonManager;
-    axisPower : FB_AxisPower;
-    stateMachine : FB_MachineStateMachine;
+    axisPower     : FB_AxisPower;
+    kinEnable     : FB_KinematicEnable;     // Runs every scan: 24/7 kin opstate monitor + cutting sequencer
+    stateMachine  : FB_MachineStateMachine;
 
-    // HMI Data Exchange - Called directly from PLC_PRG (not buried in FBs)
-    axisData : FB_AxisData;             // Reads position/velocity for jog axis
-    axisDataHome : FB_AxisData;         // Reads position/velocity for homing axis (separate instance)
-    
-    // Raw button inputs (you toggle these for testing)
-    btn_Start : BOOL := FALSE;
-    btn_Stop : BOOL := FALSE;
-    btn_Home : BOOL := FALSE;
-    btn_Manual : BOOL := FALSE;
-    btn_Reset : BOOL := FALSE;
-    btn_EStop : BOOL := FALSE;
-    btn_DriveOn : BOOL := FALSE;
-
-    // Machine state for HMI
-    MACHINE_STATE : E_MachineState;
-
-    // HMI Status Variables (read by web HMI)
-    isRunning : BOOL;
-    isFaulted : BOOL;
-    isHomed : BOOL;
-
-    // HMI Motion Sequence Visualization Variables
-    HMI_MotionStep : E_MotionStep;          // Current motion step
-    HMI_MotionSubStep : INT;                // Current substep number
-    HMI_ActiveAxesMask : LWORD;             // Bitmask of currently moving axes (64-bit for 36 axes)
-    HMI_StepDescription : STRING[80];       // Human-readable description
-
-    // HMI Error Variables
-    HMI_HasError : BOOL := FALSE;           // TRUE if motion error occurred
-    HMI_ErrorAxisID : UINT := 0;            // Which axis caused the error (0 = none)
-    HMI_DrivesReady : BOOL := FALSE;        // TRUE when all drives are powered
-
-    // HMI Manual Jog Control Variables (written by web HMI)
-    HMI_JogAxis : UINT := 1;                // Selected axis for jogging (1-36, master axes only)
-    HMI_JogDirection : BOOL := FALSE;       // TRUE = positive, FALSE = negative
-    HMI_JogSpeed : LREAL := 10.0;           // Jog velocity in mm/s
-    HMI_JogEnable : BOOL := FALSE;          // TRUE while jog button held down
-
-    // HMI Manual Jog Feedback Variables (read by web HMI)
-    HMI_JogPosition : LREAL := 0.0;         // Current position of selected axis
-    HMI_JogVelocity : LREAL := 0.0;         // Current velocity of selected axis
-    HMI_JogActive : BOOL := FALSE;          // TRUE when jog is actively moving
-    HMI_JogError : BOOL := FALSE;           // TRUE if jog error occurred
-    HMI_JogInvalidAxis : BOOL := FALSE;     // TRUE if selected axis is not a master axis
-
-    // HMI Homing Control Variables (written by web HMI)
-    HMI_HomeAxis : UINT := 1;               // Selected axis for homing (1-36, master axes only)
-    HMI_HomeSingle : BOOL := FALSE;         // Trigger: home selected axis
-    HMI_HomeAll : BOOL := FALSE;            // Trigger: home all master axes
-    HMI_HomeSpeed : LREAL := 10.0;          // Homing velocity in mm/s
-
-    // HMI Homing Feedback Variables (read by web HMI)
-    HMI_HomeBusy : BOOL := FALSE;           // TRUE when homing operation in progress
-    HMI_HomeDone : BOOL := FALSE;           // TRUE when homing operation completed
-    HMI_HomeError : BOOL := FALSE;          // TRUE if homing error occurred
-    HMI_HomeErrorAxisID : UINT := 0;        // Axis that caused homing error
-    HMI_HomeInvalidAxis : BOOL := FALSE;    // TRUE if selected axis is not a master axis
-    HMI_AllAxesHomed : BOOL := FALSE;       // TRUE when all master axes are at position 0
-    HMI_AxisIsHomed : ARRAY[1..36] OF BOOL; // Individual axis homed status
-    HMI_HomePosition : LREAL := 0.0;        // Current position of selected homing axis
-
+    // HMI Data Exchange - Called directly from PLC_PRG
+    axisData     : FB_AxisData;             // Reads position/velocity for jog axis
+    axisDataHome : FB_AxisData;             // Reads position/velocity for homing axis
 END_VAR
 
 /////////////////////////////////////////////////
 
 // ============================================================================
-// BUTTON MANAGEMENT - All logic encapsulated in FB
+// 1. FAULT MONITOR — runs unconditionally, always first
+//    ctrlX diagnosis poll runs 24/7.
 // ============================================================================
-buttonManager(
-    btn_Start_In := btn_Start,
-    btn_Stop_In := btn_Stop,
-    btn_Home_In := btn_Home,
-    btn_Manual_In := btn_Manual,
-    btn_Reset_In := btn_Reset,
-    btn_EStop_In := btn_EStop
+faultMonitor(
+    Reset          := (GVL_HMI.MACHINE_STATE = E_MachineState.RESETTING),
+    CurrentStep    := stateMachine.motionStepOut,
+    CurrentSubStep := stateMachine.motionSubStep
 );
 
 // ============================================================================
-// AXIS POWER
+// 2. BUTTON MANAGEMENT
 // ============================================================================
-// Automatically disable drives on fault/E-stop (user must re-enable manually)
+buttonManager(
+    btn_Start_In  := GVL_HMI.btn_Start,
+    btn_Stop_In   := GVL_HMI.btn_Stop,
+    btn_Home_In   := GVL_HMI.btn_Home,
+    btn_Manual_In := GVL_HMI.btn_Manual,
+    btn_Reset_In  := GVL_HMI.btn_Reset,
+    btn_EStop_In  := GVL_HMI.btn_EStop
+);
+
+// ============================================================================
+// 3. AXIS POWER
+//    Automatically disable drives on fault/E-stop
+// ============================================================================
 IF stateMachine.isFaulted THEN
-    btn_DriveOn := FALSE;
+    GVL_HMI.btn_DriveOn := FALSE;
 END_IF
 
 axisPower(
-    PowerOn := btn_DriveOn,
-    Reset := buttonManager.btn_Reset_Out
+    PowerOn := GVL_HMI.btn_DriveOn
 );
 
 // ============================================================================
-// STATE MACHINE - Handles machine state logic only (no HMI data pass-through)
+// 4. KINEMATIC ENABLE
+//    Runs every scan — two independent roles:
+//      Enable  : enables Wire1-4 and Wire5_6 kins on rising edge of DrivesReady.
+//                Kins stay enabled for the entire session — never disabled between
+//                cutting groups. Re-enables automatically after E-stop drive recovery.
+//      Monitor : polls all 5 kin opstates via DL_ReadNode every ~2 s; reports
+//                ERRORSTOP faults via FC_ReportFault 24/7.
+// ============================================================================
+kinEnable(
+    DrivesReady         := axisPower.DrivesReady,
+    InterruptKinematics := stateMachine.interruptKinematics OR GVL_HMI.HMI_DbgInterruptKins,
+    ContinueKinematics  := stateMachine.continueKinematics  OR GVL_HMI.HMI_DbgContinueKins,
+    DbgKinEnableNum     := GVL_HMI.HMI_DbgKinEnableNum,
+    DbgKinDisableNum    := GVL_HMI.HMI_DbgKinDisableNum
+);
+
+// ============================================================================
+// 5. STATE MACHINE
 // ============================================================================
 stateMachine(
     startButton := buttonManager.btn_Start_Out,
-    stopButton := buttonManager.btn_Stop_Out,
-    homeButton := buttonManager.btn_Home_Out,
-    manualMode := buttonManager.btn_Manual_Out,
+    stopButton  := buttonManager.btn_Stop_Out,
+    homeButton  := buttonManager.btn_Home_Out,
+    manualMode  := buttonManager.btn_Manual_Out,
     eStopActive := buttonManager.btn_EStop_Out,
-    resetButton := buttonManager.btn_Reset_Out
+    resetButton := buttonManager.btn_Reset_Out,
+    HasFault    := faultMonitor.HasFault
 );
 
-MACHINE_STATE := stateMachine.currentStateOut;
+GVL_HMI.MACHINE_STATE := stateMachine.currentStateOut;
 
 // ============================================================================
-// HMI AXIS DATA - Always reads position/velocity for selected axes
-// Called directly from PLC_PRG, independent of machine state
-// Separate instances for Manual (jog) and Homing pages to avoid interference
+// 6. HMI AXIS DATA — always reads position/velocity for selected axes
 // ============================================================================
-axisData(
-    AxisSelect := HMI_JogAxis
-);
-axisDataHome(
-    AxisSelect := HMI_HomeAxis
-);
+axisData(AxisSelect := GVL_HMI.HMI_JogAxis);
+axisDataHome(AxisSelect := GVL_HMI.HMI_HomeAxis);
 
-// Update HMI with real-time axis data (always available)
-HMI_JogPosition := axisData.Position;
-HMI_JogVelocity := axisData.Velocity;
-HMI_HomePosition := axisDataHome.Position;
-
-
-
-// Update HMI with jog feedback
-HMI_JogActive := stateMachine.axisManual.Active;
-HMI_JogError := stateMachine.axisManual.Error;
-HMI_JogInvalidAxis := stateMachine.axisManual.InvalidAxis;
-
-// Update HMI with homing feedback
-HMI_HomeBusy := stateMachine.fbHome.Busy;
-HMI_HomeDone := stateMachine.fbHome.Done;
-HMI_HomeError := stateMachine.fbHome.Error;
-HMI_HomeErrorAxisID := stateMachine.fbHome.ErrorAxisID;
-HMI_HomeInvalidAxis := stateMachine.fbHome.InvalidAxis;
-HMI_AllAxesHomed := stateMachine.fbHome.AllAxesHomed;
-HMI_AxisIsHomed := stateMachine.fbHome.AxisIsHomed;
+GVL_HMI.HMI_JogPosition  := axisData.Position;
+GVL_HMI.HMI_JogVelocity  := axisData.Velocity;
+GVL_HMI.HMI_HomePosition := axisDataHome.Position;
 
 // ============================================================================
-// UPDATE HMI STATUS VARIABLES
+// 7. UPDATE HMI VARIABLES
 // ============================================================================
-// Expose state machine status to web HMI
-isRunning := stateMachine.isRunning;
-isFaulted := stateMachine.isFaulted;
-isHomed := stateMachine.isHomed;
 
-// ============================================================================
-// UPDATE MOTION SEQUENCE HMI VARIABLES
-// ============================================================================
-HMI_MotionStep := stateMachine.motionStepOut;
-HMI_MotionSubStep := stateMachine.motionSubStep;
-HMI_ActiveAxesMask := stateMachine.activeAxesMask;
-HMI_StepDescription := stateMachine.stepDescription;
+// Machine status
+GVL_HMI.isRunning := stateMachine.isRunning;
+GVL_HMI.isFaulted := stateMachine.isFaulted;
+GVL_HMI.isHomed   := stateMachine.isHomed;
 
-// ============================================================================
-// UPDATE ERROR HMI VARIABLES
-// ============================================================================
-HMI_HasError := stateMachine.hasError;
-HMI_ErrorAxisID := stateMachine.errorInfo.errorAxisID;
-HMI_DrivesReady := axisPower.DrivesReady;
+// Motion sequence visualization
+GVL_HMI.HMI_MotionStep      := stateMachine.motionStepOut;
+GVL_HMI.HMI_MotionSubStep   := stateMachine.motionSubStep;
+GVL_HMI.HMI_ActiveAxesMask  := stateMachine.activeAxesMask;
+GVL_HMI.HMI_StepDescription := stateMachine.stepDescription;
+
+// Fault status
+GVL_HMI.HMI_HasFault    := faultMonitor.HasFault;
+GVL_HMI.HMI_ActiveFault := faultMonitor.ActiveFault;
+
+// ctrlX diagnostics (for HMI badge and informational display)
+GVL_HMI.HMI_DiagErrorCount := faultMonitor.DiagErrorCount;
+GVL_HMI.HMI_DiagWarnings   := faultMonitor.DiagWarnCount;
+
+// Drive status
+GVL_HMI.HMI_DrivesReady := axisPower.DrivesReady;
+GVL_HMI.HMI_CyclePaused := stateMachine.cyclePausedOut;
+
+// Jog feedback
+GVL_HMI.HMI_JogActive      := stateMachine.axisManual.Active;
+GVL_HMI.HMI_JogError       := stateMachine.axisManual.Error;
+GVL_HMI.HMI_JogInvalidAxis := stateMachine.axisManual.InvalidAxis;
+
+// Homing feedback
+GVL_HMI.HMI_HomeBusy        := stateMachine.fbHome.Busy;
+GVL_HMI.HMI_HomeDone        := stateMachine.fbHome.Done;
+GVL_HMI.HMI_HomeError       := stateMachine.fbHome.Error;
+GVL_HMI.HMI_HomeErrorAxisID := stateMachine.fbHome.ErrorAxisID;
+GVL_HMI.HMI_HomeInvalidAxis := stateMachine.fbHome.InvalidAxis;
+GVL_HMI.HMI_AllAxesHomed    := stateMachine.fbHome.AllAxesHomed;
+GVL_HMI.HMI_AxisIsHomed     := stateMachine.fbHome.AxisIsHomed;

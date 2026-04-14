@@ -10,6 +10,11 @@ FUNCTION_BLOCK FB_MotionSequence
 
   Position setpoints and motion parameters come from GVL_Machine.
   Cutting path comes from GVL_GCode (written by Python pipeline).
+
+  Error handling: each step FB calls FC_ReportFault directly when an axis
+  error occurs. FB_FaultMonitor (in PLC_PRG) catches these and trips HasFault,
+  which the state machine sees within one scan. No error propagation wiring
+  needed in this FB.
 ==============================================================================
 *)
 
@@ -25,32 +30,12 @@ VAR_OUTPUT
     CurrentSubStep : UINT;              // Current substep within motion step
     ActiveAxesMask : LWORD;             // Bitmask of currently moving axes
     StepDescription : STRING[80];       // Human-readable description
-
-    // Step error outputs (for FB_ErrorHandler in state machine)
-    LoadBlockError : BOOL;
-    LoadBlockErrorAxisID : UINT;
-    CuttingError : BOOL;
-    CuttingErrorAxisID : UINT;
-    UnloadError : BOOL;
-    UnloadErrorAxisID : UINT;
-
-    // G-Code cutting progress
-    CuttingMoveIndex : INT;
-    CuttingTotalMoves : INT;
-
-    // Aggregate error flag
-    HasError : BOOL;
-    ErrorAxisID : UINT;
 END_VAR
 
 VAR
-    // Motion step state machine
-    motionStep : E_MotionStep := E_MotionStep.WAIT_FOR_LOAD;
-
-    // Block loaded flag (set by sensor / HMI trigger)
+    motionStep  : E_MotionStep := E_MotionStep.WAIT_FOR_LOAD;
     blockLoaded : BOOL := TRUE;
 
-    // Motion step function blocks
     stepLoadBlock : FB_MotionStep_LoadBlock;
     stepCutting   : FB_MotionStep_Cutting;
     stepUnload    : FB_MotionStep_Unload;
@@ -66,15 +51,6 @@ IF NOT Enable THEN
     stepLoadBlock(Enable := FALSE);
     stepCutting(Enable := FALSE);
     stepUnload(Enable := FALSE);
-
-    HasError := FALSE;
-    ErrorAxisID := 0;
-    LoadBlockError := FALSE;
-    LoadBlockErrorAxisID := 0;
-    CuttingError := FALSE;
-    CuttingErrorAxisID := 0;
-    UnloadError := FALSE;
-    UnloadErrorAxisID := 0;
     ActiveAxesMask := 0;
     RETURN;
 END_IF
@@ -91,9 +67,6 @@ CASE motionStep OF
         CurrentSubStep := 0;
         ActiveAxesMask := 0;
 
-        HasError := FALSE;
-        ErrorAxisID := 0;
-
         stepLoadBlock(Enable := FALSE);
         stepCutting(Enable := FALSE);
         stepUnload(Enable := FALSE);
@@ -101,8 +74,6 @@ CASE motionStep OF
         // Both conditions must be true before advancing:
         //   blockLoaded    — operator/sensor confirms foam block is on the table
         //   bFilesReady    — Python pipeline has uploaded G-code for THIS block
-        // If the block is loaded but G-code isn't ready yet, hold here and
-        // tell the operator what to do via the status string.
         IF blockLoaded AND GVL_GCode.bFilesReady THEN
             GVL_GCode.sStatus := '';
             motionStep := E_MotionStep.SHIFT_TO_PROCESSING_AREA;
@@ -125,28 +96,20 @@ CASE motionStep OF
         ActiveAxesMask  := stepLoadBlock.ActiveAxesMask;
         StepDescription := stepLoadBlock.StepDescription;
 
-        IF stepLoadBlock.Error THEN
-            // Error details exposed via EXPOSE STEP ERRORS block below
-        ELSIF stepLoadBlock.Done THEN
+        IF stepLoadBlock.Done THEN
             stepLoadBlock(Enable := FALSE);
             motionStep := E_MotionStep.CUTTING;
         END_IF
 
     // ────────────────────────────────────────────────────────────────────────
     E_MotionStep.CUTTING:
-        stepCutting(
-            Enable := TRUE
-        );
+        stepCutting(Enable := TRUE);
 
-        CurrentSubStep    := stepCutting.CurrentSubStep;
-        ActiveAxesMask    := stepCutting.ActiveAxesMask;
-        StepDescription   := stepCutting.StepDescription;
-        CuttingMoveIndex  := stepCutting.CurrentMoveIndex;
-        CuttingTotalMoves := stepCutting.TotalMoves;
+        CurrentSubStep  := stepCutting.CurrentSubStep;
+        ActiveAxesMask  := stepCutting.ActiveAxesMask;
+        StepDescription := stepCutting.StepDescription;
 
-        IF stepCutting.Error THEN
-            // Error details exposed via EXPOSE STEP ERRORS block below
-        ELSIF stepCutting.Done THEN
+        IF stepCutting.Done THEN
             stepCutting(Enable := FALSE);
             motionStep := E_MotionStep.SHIFT_TO_UNLOAD_AREA;
         END_IF
@@ -163,9 +126,7 @@ CASE motionStep OF
         ActiveAxesMask  := stepUnload.ActiveAxesMask;
         StepDescription := stepUnload.StepDescription;
 
-        IF stepUnload.Error THEN
-            // Error details exposed via EXPOSE STEP ERRORS block below
-        ELSIF stepUnload.Done THEN
+        IF stepUnload.Done THEN
             stepUnload(Enable := FALSE);
             SequenceComplete := TRUE;
             motionStep := E_MotionStep.WAIT_FOR_LOAD;
@@ -174,26 +135,3 @@ CASE motionStep OF
 END_CASE
 
 CurrentStep := motionStep;
-
-// ============================================================================
-// EXPOSE STEP ERRORS
-// ============================================================================
-
-LoadBlockError       := stepLoadBlock.Error;
-LoadBlockErrorAxisID := stepLoadBlock.ErrorAxisID;
-CuttingError         := stepCutting.Error;
-CuttingErrorAxisID   := stepCutting.ErrorAxisID;
-UnloadError          := stepUnload.Error;
-UnloadErrorAxisID    := stepUnload.ErrorAxisID;
-
-HasError := LoadBlockError OR CuttingError OR UnloadError;
-
-IF LoadBlockError THEN
-    ErrorAxisID := LoadBlockErrorAxisID;
-ELSIF CuttingError THEN
-    ErrorAxisID := CuttingErrorAxisID;
-ELSIF UnloadError THEN
-    ErrorAxisID := UnloadErrorAxisID;
-ELSE
-    ErrorAxisID := 0;
-END_IF

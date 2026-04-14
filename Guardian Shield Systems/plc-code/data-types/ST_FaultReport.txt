@@ -1,0 +1,12 @@
+TYPE ST_FaultReport :
+// One entry in the fault queue — written by any FB via FC_ReportFault.
+// Replaces ST_MotionError: richer source field, array-based rather than single-latch.
+STRUCT
+    source        : STRING[80];     // Which FB/system reported: 'FB_MotionStep_LoadBlock', 'FB_AxisPower', 'ctrlX_Diagnosis'
+    axisID        : UINT;           // Axis that faulted (0 = N/A or system fault)
+    errorCode     : DWORD;          // Raw PLCopen ErrorID from MC_MoveAbsolute (0 = N/A for ctrlX/power faults)
+    description   : STRING[255];    // Human-readable fault description (255 to fit full ctrlX diag/err-msg)
+    motionStep    : E_MotionStep;   // Motion step active when fault occurred
+    motionSubStep : UINT;           // Substep active when fault occurred
+END_STRUCT
+END_TYPE

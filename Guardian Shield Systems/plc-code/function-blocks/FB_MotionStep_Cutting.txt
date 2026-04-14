@@ -2,20 +2,26 @@
 FUNCTION_BLOCK FB_MotionStep_Cutting
 (*
 ==============================================================================
-  FB_MotionStep_Cutting  v4.0 — PLC monitors, Python dispatches
+  FB_MotionStep_Cutting  v8.0 — Always-Enabled Kinematics
 
-  The PLC controls WHEN cutting runs (by setting bBusy when it reaches the
-  cutting step).  Python (trigger_dispatch) owns HOW: it watches bBusy, fires
-  the REST API cmd/file calls for each wire, monitors kinematic state, then
-  sets bJobDone when all wires are back at STANDBY.
+  Wire1-4 and Wire5_6 kinematic groups are always enabled by FB_KinematicEnable
+  (enabled once on DrivesReady rising edge, never disabled between groups).
+  No KinReady handshake flags — trigger_dispatch.py dispatches immediately.
 
-  PLC role (this FB):
+  Home move is the last line of each G-code cutting script — no separate
+  home dispatch needed after each group completes.
+
+  This FB's only job:
     1. Wait for bFilesReady (Python API has staged G-code)
-    2. Set bBusy = TRUE  →  Python sees this and dispatches wires
-    3. Wait for bJobDone = TRUE  →  Python has confirmed all wires done
-    4. Clear flags, signal Done to FB_MotionSequence
+    2. Set bBusy = TRUE  →  trigger_dispatch.py sees this and dispatches
+    3. Wait for bJobDone = TRUE (Python confirms all groups complete)
+       OR bError = TRUE (Python reports a script fault)
+    4. Clear flags, signal Done to parent
 
-  No Data Layer write calls — dispatch is handled entirely by Python.
+  FB_KinematicEnable is called from PLC_PRG (not here) so its 24/7 opstate
+  monitor runs regardless of machine state.
+
+  Errors are reported directly to GVL_Faults via FC_ReportFault.
 ==============================================================================
 *)
 
@@ -26,39 +32,40 @@ END_VAR
 VAR_OUTPUT
     Done             : BOOL;
     Busy             : BOOL;
-    Error            : BOOL;
-    ErrorAxisID      : UINT;
     CurrentSubStep   : UINT;
     ActiveAxesMask   : LWORD;
     StepDescription  : STRING[80];
-    CurrentMoveIndex : INT;
-    TotalMoves       : INT;
 END_VAR
 
 VAR
-    base    : FB_MotionStepBase;
-    subStep : UINT;
+    subStep     : UINT;
+    stepStarted : BOOL;
+    localError  : BOOL;     // Halts state machine; cleared on next Enable := FALSE
 END_VAR
 
 ///////////////////////////////////////////////////////////////////////////////
 
-base(Enable := Enable);
-
-IF base.ResetSubStep THEN
-    subStep     := 0;
-    Error       := FALSE;
-    ErrorAxisID := 0;
-END_IF
-
-IF NOT base.ShouldRun THEN
-    Done           := base.Done;
-    Busy           := base.Busy;
-    ActiveAxesMask := 0;
-    CurrentSubStep := 0;
+IF NOT Enable THEN
+    Done := FALSE; Busy := FALSE;
+    ActiveAxesMask := 0; CurrentSubStep := 0;
+    subStep := 0; stepStarted := FALSE; localError := FALSE;
     RETURN;
 END_IF
 
+IF NOT stepStarted THEN
+    stepStarted := TRUE;
+    Busy := TRUE;
+    subStep := 0;
+    localError := FALSE;
+END_IF
+
 CurrentSubStep := subStep;
+
+IF localError THEN
+    Busy := FALSE;
+    ActiveAxesMask := 0;
+    RETURN;
+END_IF
 
 CASE subStep OF
 
@@ -69,23 +76,44 @@ CASE subStep OF
         Busy            := TRUE;
 
         IF GVL_GCode.bFilesReady THEN
-            // Signal Python trigger service to dispatch wires
             GVL_GCode.bBusy          := TRUE;
             GVL_GCode.nPipelineStage := 5;
             GVL_GCode.sStatus        := 'Cutting in progress';
             StepDescription          := 'Cutting in progress';
-            ActiveAxesMask           := 16#0000_0000_0FFF_C000;
+            // Mask covers all axes that may move across any group:
+            //   Bits 13-28 = axes 14-29 (studs)
+            //   Bits 29-32 = axes 30-33 (Wire 5)
+            //   Bits 34-35 = axes 35-36 (Wire 6 trough cutters)
+            ActiveAxesMask           := 16#0000_000D_FFFF_E000;
             subStep                  := 10;
         END_IF
 
     // ────────────────────────────────────────────────────────────────────────
-    10: // Wait for Python to confirm all wires complete (bJobDone)
+    10: // Wait for FB_KinematicEnable (in PLC_PRG) to sequence all groups
+        // FB_KinematicEnable watches bGroupX_KinReady / bGroupX_Done with Python.
+        // Monitor its Done flag via GVL — it signals completion when all groups
+        // have cut, homed, and been disabled.
+        //
+        // The Done signal is read from GVL_GCode.bJobDone (set by Python after
+        // the last group) — FB_KinematicEnable.Done is wired through GVL_HMI
+        // by PLC_PRG for HMI visibility, but the real completion signal here is
+        // bJobDone (Python confirmation all wires returned home).
         IF GVL_GCode.bJobDone THEN
             subStep := 20;
         ELSIF GVL_GCode.bError THEN
-            // Python reported an error — log but do not fault machine
-            GVL_GCode.sStatus := 'Wire error reported — check Python logs';
-            subStep := 20;  // Still advance so machine can be reset manually
+            GVL_GCode.sStatus := 'Wire cutting error — check Python logs';
+            GVL_GCode.bBusy   := FALSE;
+            // bFilesReady intentionally preserved — STEP file and cuts unchanged.
+            FC_ReportFault(
+                source        := CONCAT('FB_MotionStep_Cutting/', GVL_GCode.sErrorWire),
+                axisID        := 0,
+                errorCode     := DWORD#0,
+                description   := GVL_GCode.sErrorMessage,
+                motionStep    := E_MotionStep.CUTTING,
+                motionSubStep := subStep
+            );
+            localError := TRUE;
+            Busy       := FALSE;
         END_IF
 
     // ────────────────────────────────────────────────────────────────────────

@@ -111,11 +111,12 @@ CASE activeCommand OF
         btn_Reset_Out := FALSE;
     
     E_ActiveCommand.CMD_RESET:
-        btn_Start_Out := FALSE;
-        btn_Stop_Out := FALSE;
-        btn_Home_Out := FALSE;
+        btn_Start_Out  := FALSE;
+        btn_Stop_Out   := FALSE;
+        btn_Home_Out   := FALSE;
         btn_Manual_Out := FALSE;
-        btn_Reset_Out := TRUE;
+        btn_Reset_Out  := TRUE;
+        activeCommand  := E_ActiveCommand.CMD_NONE;  // Self-clearing: one scan pulse only
     
     E_ActiveCommand.CMD_NONE:
         btn_Start_Out := FALSE;

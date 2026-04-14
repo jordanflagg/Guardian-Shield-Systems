@@ -1,0 +1,329 @@
+{attribute 'no_assign'}
+FUNCTION_BLOCK FB_FaultMonitor
+// ==============================================================================
+// FB_FaultMonitor — centralized fault detection AND recovery.
+// Always runs first in PLC_PRG, unconditionally.
+//
+// FAULT DETECTION (two sources):
+//   1. GVL_Faults.hasFault: any FB calls FC_ReportFault() → latches immediately.
+//   2. ctrlX Data Layer: polls diagnosis/get/actual/list/amount-errors every ~1s.
+//
+// FAULT LATCH:
+//   HasFault goes TRUE the moment any fault is detected and stays TRUE until the
+//   full reset sequence below completes successfully.
+//
+// RESET SEQUENCE (triggered when Reset input goes TRUE, i.e. state = RESETTING):
+//   The sequence owns all hardware recovery operations so the state machine only
+//   needs to watch HasFault. Steps in order:
+//
+//     State 1  — Write diagnosis/confirm/all-errors (clears ctrlX error log)
+//     State 2  — Issue MC_Reset to all 18 slave axes
+//     State 3  — Wait for slave resets to complete
+//     State 4  — Issue MC_Reset to all 18 master axes
+//     State 5  — Wait for master resets to complete
+//     State 6  — ML_KinReset all 6 wire kin groups (clears ERRORSTOP/INTERRUPTED)
+//     State 7  — ML_KinEnable all 6 wire kin groups (back to operational)
+//     State 8  — Write diagnosis/confirm/all-errors again (clears transient kin errors)
+//     State 9  — Wait for one complete poll cycle (0→4) to let confirm-errors propagate
+//     State 10 — Clear GVL_Faults, unlatch HasFault → state machine returns to IDLE
+//               (if real hardware faults remain, 24/7 poll will re-latch HasFault within ~1s)
+//
+// ==============================================================================
+
+VAR_INPUT
+    Reset          : BOOL;          // TRUE while state machine is in RESETTING state
+    CurrentStep    : E_MotionStep;  // Motion step context for ctrlX fault entries
+    CurrentSubStep : UINT;
+END_VAR
+
+VAR_OUTPUT
+    HasFault       : BOOL;          // Latched TRUE when any fault detected; clears on successful reset
+    ActiveFault    : ST_FaultReport; // Snapshot of the fault that triggered the latch (for HMI)
+    DiagErrorCount : DINT;          // Live ctrlX active error count (for HMI badge)
+    DiagWarnCount  : DINT;          // Live ctrlX warning count (informational)
+END_VAR
+
+VAR
+    // ─── Fault latch ───────────────────────────────────────────────────────────
+    faultLatched      : BOOL := FALSE;
+    diagFaultReported : BOOL := FALSE;
+
+    // ─── ctrlX diagnosis polling (runs 24/7) ───────────────────────────────────
+    fbDiagErrRead   : CXA_Datalayer.DL_ReadNode;
+    fbDiagWarnRead  : CXA_Datalayer.DL_ReadNode;
+    fbDiagPollTimer : TON;
+    diagPollState   : UINT := 0;
+    sNodeErrName    : STRING(255) := 'diagnosis/get/actual/list/amount-errors';
+    sNodeWarnName   : STRING(255) := 'diagnosis/get/actual/list/amount-warnings';
+    nDiagErrCount   : DINT := 0;
+    nDiagWarnCount  : DINT := 0;
+
+    // ─── Reset sequence ────────────────────────────────────────────────────────
+    rtrigReset     : R_TRIG;
+    resetSeqState  : UINT := 0;
+    allReset       : BOOL;
+
+    // Global error confirm (used at states 1 and 9)
+    fbDiagConfirm  : CXA_Datalayer.DL_WriteNode;
+
+    // MC_Reset for all 36 axes (slaves first, then masters)
+    fbReset        : ARRAY[MOTIF_CONFIG.MIN_AXIS_INDEX..MOTIF_CONFIG.MAX_AXIS_INDEX] OF MC_Reset;
+
+    // Kinematic recovery — ML_KinReset gets kins out of ERRORSTOP/INTERRUPTED,
+    // then ML_KinEnable brings them back to operational. No interrupt needed here
+    // because kins are not in MOVING state when a drive fault triggers a reset.
+    fbKinReset  : ARRAY[1..6] OF ML_KinResetData;
+    fbKinEnable : ARRAY[1..6] OF ML_KinEnableData;
+    kinsNamed   : BOOL := FALSE;   // Kin struct names filled once on first reset
+
+    i : UINT;
+END_VAR
+
+///////////////////////////////////////////////////////////////////////////////
+
+// ============================================================================
+// RESET SEQUENCE STATE MACHINE
+// Triggered by rising edge of Reset. Runs to completion across multiple scans.
+// ============================================================================
+rtrigReset(CLK := Reset);
+
+IF rtrigReset.Q AND resetSeqState = 0 THEN
+    resetSeqState := 1;
+END_IF
+
+CASE resetSeqState OF
+
+    0: // Idle — nothing to do
+        ;
+
+    1: // Clear ctrlX error log before touching axes
+        fbDiagConfirm(Execute := TRUE, NodeName := 'diagnosis/confirm/all-errors');
+        IF fbDiagConfirm.Done OR fbDiagConfirm.Error THEN
+            IF fbDiagConfirm.Error THEN
+                // Non-fatal: log to system fault but continue reset
+                GVL_Faults.systemFault := TRUE;
+            END_IF
+            fbDiagConfirm(Execute := FALSE);
+            resetSeqState := 2;
+        END_IF
+
+    2: // Issue MC_Reset to all slave axes
+        FOR i := 1 TO GVL_Axes.SLAVE_AXIS_COUNT DO
+            fbReset[GVL_Axes.SLAVE_AXES[i]](
+                Execute := TRUE,
+                Axis    := AXIF_CONFIG_INDEXES[GVL_Axes.SLAVE_AXES[i]]
+            );
+        END_FOR
+        resetSeqState := 3;
+
+    3: // Wait for all slave resets to complete
+        FOR i := 1 TO GVL_Axes.SLAVE_AXIS_COUNT DO
+            fbReset[GVL_Axes.SLAVE_AXES[i]](
+                Execute := TRUE,
+                Axis    := AXIF_CONFIG_INDEXES[GVL_Axes.SLAVE_AXES[i]]
+            );
+        END_FOR
+
+        allReset := TRUE;
+        FOR i := 1 TO GVL_Axes.SLAVE_AXIS_COUNT DO
+            IF fbReset[GVL_Axes.SLAVE_AXES[i]].Error THEN
+                // Treat as done — advance rather than deadlock
+            ELSIF NOT fbReset[GVL_Axes.SLAVE_AXES[i]].Done THEN
+                allReset := FALSE;
+                EXIT;
+            END_IF
+        END_FOR
+
+        IF allReset THEN
+            FOR i := 1 TO GVL_Axes.SLAVE_AXIS_COUNT DO
+                fbReset[GVL_Axes.SLAVE_AXES[i]](Execute := FALSE, Axis := AXIF_CONFIG_INDEXES[GVL_Axes.SLAVE_AXES[i]]);
+            END_FOR
+            resetSeqState := 4;
+        END_IF
+
+    4: // Issue MC_Reset to all master axes (slaves are already clear)
+        FOR i := 1 TO GVL_Axes.MASTER_AXIS_COUNT DO
+            fbReset[GVL_Axes.MASTER_AXES[i]](
+                Execute := TRUE,
+                Axis    := AXIF_CONFIG_INDEXES[GVL_Axes.MASTER_AXES[i]]
+            );
+        END_FOR
+        resetSeqState := 5;
+
+    5: // Wait for all master resets to complete
+        FOR i := 1 TO GVL_Axes.MASTER_AXIS_COUNT DO
+            fbReset[GVL_Axes.MASTER_AXES[i]](
+                Execute := TRUE,
+                Axis    := AXIF_CONFIG_INDEXES[GVL_Axes.MASTER_AXES[i]]
+            );
+        END_FOR
+
+        allReset := TRUE;
+        FOR i := 1 TO GVL_Axes.MASTER_AXIS_COUNT DO
+            IF fbReset[GVL_Axes.MASTER_AXES[i]].Error THEN
+                // Treat as done — advance rather than deadlock
+            ELSIF NOT fbReset[GVL_Axes.MASTER_AXES[i]].Done THEN
+                allReset := FALSE;
+                EXIT;
+            END_IF
+        END_FOR
+
+        IF allReset THEN
+            FOR i := 1 TO GVL_Axes.MASTER_AXIS_COUNT DO
+                fbReset[GVL_Axes.MASTER_AXES[i]](Execute := FALSE, Axis := AXIF_CONFIG_INDEXES[GVL_Axes.MASTER_AXES[i]]);
+            END_FOR
+            resetSeqState := 6;
+        END_IF
+
+    6: // Reset all 6 wire kin groups.
+       // ML_KinReset clears ERRORSTOP or INTERRUPTED state → kin returns to STANDBY.
+       // If already in STANDBY, this is a no-op or minor error we skip (treat as done).
+       // Interrupt is intentionally omitted — kins are not in MOVING state when a
+       // drive fault triggers a reset. ML_KinInterrupt2 on an idle kin causes
+       // "Invalid state" errors in the ctrlX logbook and puts axes into ERRORSTOP.
+        IF NOT kinsNamed THEN
+            fbKinReset[1].In.KinName := 'Wire1';  fbKinReset[1].In.Source := 'FB_FaultMonitor';
+            fbKinReset[2].In.KinName := 'Wire2';  fbKinReset[2].In.Source := 'FB_FaultMonitor';
+            fbKinReset[3].In.KinName := 'Wire3';  fbKinReset[3].In.Source := 'FB_FaultMonitor';
+            fbKinReset[4].In.KinName := 'Wire4';  fbKinReset[4].In.Source := 'FB_FaultMonitor';
+            fbKinReset[5].In.KinName := 'Wire5_6';  fbKinReset[5].In.Source := 'FB_FaultMonitor';
+            fbKinEnable[1].In.KinName := 'Wire1';  fbKinEnable[1].In.Source := 'FB_FaultMonitor';
+            fbKinEnable[2].In.KinName := 'Wire2';  fbKinEnable[2].In.Source := 'FB_FaultMonitor';
+            fbKinEnable[3].In.KinName := 'Wire3';  fbKinEnable[3].In.Source := 'FB_FaultMonitor';
+            fbKinEnable[4].In.KinName := 'Wire4';  fbKinEnable[4].In.Source := 'FB_FaultMonitor';
+            fbKinEnable[5].In.KinName := 'Wire5_6';  fbKinEnable[5].In.Source := 'FB_FaultMonitor';
+            kinsNamed := TRUE;
+        END_IF
+        CXA_MOTION.ML_KinReset(Data := fbKinReset[1]);
+        CXA_MOTION.ML_KinReset(Data := fbKinReset[2]);
+        CXA_MOTION.ML_KinReset(Data := fbKinReset[3]);
+        CXA_MOTION.ML_KinReset(Data := fbKinReset[4]);
+        CXA_MOTION.ML_KinReset(Data := fbKinReset[5]);
+        resetSeqState := 7;
+
+    7: // Re-enable all 6 wire kin groups
+        CXA_MOTION.ML_KinEnable(Data := fbKinEnable[1]);
+        CXA_MOTION.ML_KinEnable(Data := fbKinEnable[2]);
+        CXA_MOTION.ML_KinEnable(Data := fbKinEnable[3]);
+        CXA_MOTION.ML_KinEnable(Data := fbKinEnable[4]);
+        CXA_MOTION.ML_KinEnable(Data := fbKinEnable[5]);
+        resetSeqState := 8;
+
+    8: // Confirm errors — clears any transient errors left by the kin re-enable sequence
+        fbDiagConfirm(Execute := TRUE, NodeName := 'diagnosis/confirm/all-errors');
+        IF fbDiagConfirm.Done OR fbDiagConfirm.Error THEN
+            fbDiagConfirm(Execute := FALSE);
+            // Kick off a fresh diagnosis poll immediately to verify hardware is clean
+            diagPollState := 0;
+            resetSeqState := 9;
+        END_IF
+
+    9: // Wait for one complete poll cycle to finish (diagPollState 0→4) so that
+        // the confirm/all-errors from state 8 has had time to propagate through
+        // the ctrlX Data Layer before we declare reset done.
+        // Do NOT loop on nDiagErrCount > 0 — the 24/7 poll is the validator.
+        // If real hardware faults remain after reset, HasFault will re-latch within
+        // ~1s on the next normal poll cycle. The reset sequence is not a verifier.
+        IF diagPollState = 4 THEN
+            resetSeqState := 10;
+        END_IF
+
+    10: // Hardware is confirmed clean — clear fault state and unlatch.
+        GVL_Faults.activeFault.source        := '';
+        GVL_Faults.activeFault.axisID        := 0;
+        GVL_Faults.activeFault.errorCode     := 0;
+        GVL_Faults.activeFault.description   := '';
+        GVL_Faults.activeFault.motionStep    := E_MotionStep.WAIT_FOR_LOAD;
+        GVL_Faults.activeFault.motionSubStep := 0;
+        GVL_Faults.hasFault   := FALSE;
+
+        FOR i := 1 TO 36 DO
+            GVL_Faults.axisFlags[i] := FALSE;
+        END_FOR
+        GVL_Faults.systemFault := FALSE;
+
+        faultLatched      := FALSE;
+        HasFault          := FALSE;
+        diagFaultReported := FALSE;
+        nDiagErrCount     := 0;
+        nDiagWarnCount    := 0;
+        resetSeqState     := 0;
+
+END_CASE
+
+// ============================================================================
+// DIAGNOSIS POLLING — reads ctrlX error/warning counts every ~1 second.
+// Runs unconditionally — 24/7. diagPollState is also reset to 0 by the
+// reset sequence (state 8) to force an immediate re-read after kin enable.
+// ============================================================================
+fbDiagPollTimer(IN := (diagPollState = 4), PT := T#1s);
+
+CASE diagPollState OF
+
+    0: // Start reading error count
+        fbDiagErrRead(Execute := TRUE, NodeName := sNodeErrName, Value := nDiagErrCount);
+        diagPollState := 1;
+
+    1: // Wait for error count read to complete
+        fbDiagErrRead(Execute := TRUE, NodeName := sNodeErrName, Value := nDiagErrCount);
+        IF fbDiagErrRead.Done THEN
+            fbDiagErrRead(Execute := FALSE, NodeName := sNodeErrName, Value := nDiagErrCount);
+            diagPollState := 2;
+        ELSIF fbDiagErrRead.Error THEN
+            fbDiagErrRead(Execute := FALSE, NodeName := sNodeErrName, Value := nDiagErrCount);
+            diagPollState := 2;
+        END_IF
+
+    2: // Start reading warning count
+        fbDiagWarnRead(Execute := TRUE, NodeName := sNodeWarnName, Value := nDiagWarnCount);
+        diagPollState := 3;
+
+    3: // Wait for warning count read to complete
+        fbDiagWarnRead(Execute := TRUE, NodeName := sNodeWarnName, Value := nDiagWarnCount);
+        IF fbDiagWarnRead.Done THEN
+            fbDiagWarnRead(Execute := FALSE, NodeName := sNodeWarnName, Value := nDiagWarnCount);
+            diagPollState := 4;
+        ELSIF fbDiagWarnRead.Error THEN
+            fbDiagWarnRead(Execute := FALSE, NodeName := sNodeWarnName, Value := nDiagWarnCount);
+            diagPollState := 4;
+        END_IF
+
+    4: // Idle — wait 1s, then allow diagFaultReported to clear if errors are gone
+        IF fbDiagPollTimer.Q THEN
+            IF nDiagErrCount = 0 THEN
+                diagFaultReported := FALSE;
+            END_IF
+            diagPollState := 0;
+        END_IF
+
+END_CASE
+
+// If ctrlX has active errors and we haven't logged them yet → capture via FC_ReportFault
+IF nDiagErrCount > 0 AND NOT diagFaultReported THEN
+    FC_ReportFault(
+        source        := 'ctrlX_Diagnosis',
+        axisID        := 0,
+        errorCode     := DINT_TO_DWORD(nDiagErrCount),
+        description   := 'ctrlX system error — check Logbook',
+        motionStep    := CurrentStep,
+        motionSubStep := CurrentSubStep
+    );
+    diagFaultReported := TRUE;
+END_IF
+
+// ============================================================================
+// FAULT LATCH
+// HasFault goes TRUE the moment GVL_Faults.hasFault is set by any FB.
+// Stays TRUE until the reset sequence completes and unlatches at state 11.
+// ============================================================================
+IF GVL_Faults.hasFault AND NOT faultLatched THEN
+    faultLatched := TRUE;
+    HasFault := TRUE;
+END_IF
+
+// ============================================================================
+// UPDATE OUTPUTS
+// ============================================================================
+ActiveFault    := GVL_Faults.activeFault;
+DiagErrorCount := nDiagErrCount;
+DiagWarnCount  := nDiagWarnCount;

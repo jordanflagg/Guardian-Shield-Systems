@@ -8,6 +8,9 @@ VAR_INPUT
     manualMode : BOOL;
     eStopActive : BOOL;
     resetButton : BOOL;
+    DrivesReady : BOOL;
+    BlockLoaded : BOOL;
+    FilesReady : BOOL;
     HasFault : BOOL;    // From FB_FaultMonitor — any fault in queue (power, motion, or ctrlX)
 END_VAR
 
@@ -23,13 +26,31 @@ VAR_OUTPUT
     motionSubStep : UINT;               // Current substep
     activeAxesMask : LWORD;             // Bitmask of moving axes
     stepDescription : STRING[80];       // Human-readable step description
+    activeMotionStepOut : E_MotionStep; // Only valid while the motion sequence is actively executing
+    activeMotionSubStep : UINT;         // Only valid while the motion sequence is actively executing
+    resumeMotionStepOut : E_MotionStep; // Last resumable step when the cycle is paused
+    resumeMotionSubStep : UINT;         // Last resumable substep when the cycle is paused
 
-    // Kinematic interrupt/continue — wired to FB_AxisPower
+    // Kinematic interrupt/continue — consumed by FB_KinematicEnable in PLC_PRG
     interruptKinematics : BOOL;         // TRUE while wire kins should be held interrupted
     continueKinematics  : BOOL;         // Pulse TRUE for one scan to resume interrupted kins
 
     // Cycle paused state — TRUE when Stop was pressed mid-cycle
     cyclePausedOut : BOOL;
+
+    // Public jog feedback for HMI
+    jogActiveOut : BOOL;
+    jogErrorOut : BOOL;
+    jogInvalidAxisOut : BOOL;
+
+    // Public homing feedback for HMI
+    homeBusyOut : BOOL;
+    homeDoneOut : BOOL;
+    homeErrorOut : BOOL;
+    homeErrorAxisIDOut : UINT;
+    homeInvalidAxisOut : BOOL;
+    allAxesHomedOut : BOOL;
+    axisIsHomedOut : ARRAY[1..36] OF BOOL;
 END_VAR
 
 VAR
@@ -46,18 +67,33 @@ VAR
     // Resume tracking
     kinematicsPaused : BOOL;
     cyclePaused : BOOL;
+    resumeStep : E_MotionStep := E_MotionStep.WAIT_FOR_LOAD;
+    resumeSubStep : UINT;
+    resumeDescription : STRING[80];
 END_VAR
 
 /////////////////////////////////////////////////////////////////////
+
+// Default outputs every scan; active states set what they need explicitly.
+isRunning := FALSE;
+isFaulted := FALSE;
+isManualMode := FALSE;
+activeMotionStepOut := E_MotionStep.WAIT_FOR_LOAD;
+activeMotionSubStep := 0;
+activeAxesMask := 0;
+interruptKinematics := FALSE;
+continueKinematics := FALSE;
 
 // Check for E-stop - can interrupt any state except E_STOPPED itself
 IF eStopActive AND (currentState <> E_MachineState.E_STOPPED) THEN
     IF currentState = E_MachineState.RUNNING AND
        motionSequence.CurrentStep = E_MotionStep.CUTTING THEN
         interruptKinematics := TRUE;
+        GVL_GCode.bPauseRequested := FALSE;
+        GVL_GCode.bAbortRequested := TRUE;
         GVL_GCode.bBusy := FALSE;
         kinematicsPaused := FALSE;
-        motionSequence(Enable := FALSE);
+        motionSequence(Enable := FALSE, ResetSequence := FALSE, BlockLoaded := BlockLoaded, FilesReady := FilesReady);
     END_IF
     currentState := E_MachineState.E_STOPPED;
 END_IF;
@@ -73,6 +109,8 @@ IF HasFault
     IF currentState = E_MachineState.RUNNING AND
        motionSequence.CurrentStep = E_MotionStep.CUTTING THEN
         interruptKinematics := TRUE;
+        GVL_GCode.bPauseRequested := FALSE;
+        GVL_GCode.bAbortRequested := TRUE;
         GVL_GCode.bBusy     := FALSE;
     END_IF
     currentState := E_MachineState.FAULTED;
@@ -89,30 +127,53 @@ CASE currentState OF
 
     // ------------------------------------------------------------------------
     E_MachineState.IDLE:
-        isRunning := FALSE;
-
         IF homeButton THEN
-            currentState := E_MachineState.HOMING;
+            IF DrivesReady THEN
+                currentState := E_MachineState.HOMING;
+            END_IF
 
         ELSIF manualMode THEN
-            currentState := E_MachineState.MANUAL;
+            IF DrivesReady THEN
+                currentState := E_MachineState.MANUAL;
+            END_IF
 
         ELSIF startButton THEN
-            IF kinematicsPaused THEN
+            IF NOT DrivesReady THEN
+                GVL_GCode.sStatus := 'Not ready - enable drives first';
+            ELSIF kinematicsPaused THEN
                 continueKinematics  := TRUE;
-                interruptKinematics := FALSE;
+                GVL_GCode.bPauseRequested := FALSE;
+                GVL_GCode.bAbortRequested := FALSE;
                 kinematicsPaused    := FALSE;
                 cyclePaused         := FALSE;
                 currentState := E_MachineState.RUNNING;
             ELSIF cyclePaused THEN
+                GVL_GCode.bPauseRequested := FALSE;
+                GVL_GCode.bAbortRequested := FALSE;
                 cyclePaused := FALSE;
                 currentState := E_MachineState.RUNNING;
-            ELSIF GVL_GCode.bFilesReady THEN
+            ELSIF FilesReady THEN
+                GVL_GCode.bPauseRequested := FALSE;
+                GVL_GCode.bAbortRequested := FALSE;
                 currentState := E_MachineState.RUNNING;
             ELSE
                 GVL_GCode.sStatus := 'Not ready - upload G-code via pipeline first';
             END_IF;
 
+        END_IF;
+
+        motionStepOut := E_MotionStep.WAIT_FOR_LOAD;
+        motionSubStep := 0;
+        IF cyclePaused OR kinematicsPaused THEN
+            motionStepOut := resumeStep;
+            motionSubStep := resumeSubStep;
+            stepDescription := resumeDescription;
+        ELSE
+            IF DrivesReady THEN
+                stepDescription := 'Idle';
+            ELSE
+                stepDescription := 'Idle - drives off';
+            END_IF
         END_IF;
 
     // ------------------------------------------------------------------------
@@ -131,12 +192,15 @@ CASE currentState OF
         );
 
         isHomed := fbHome.AllAxesHomed;
+        motionStepOut := E_MotionStep.WAIT_FOR_LOAD;
+        motionSubStep := 0;
+        stepDescription := 'Homing';
 
         IF fbHome.Error THEN
             currentState := E_MachineState.FAULTED;
         END_IF
 
-        IF NOT homeButton OR stopButton THEN
+        IF stopButton THEN
             fbHome(Enable := FALSE, Abort := stopButton);
             currentState := E_MachineState.IDLE;
         END_IF
@@ -153,17 +217,31 @@ CASE currentState OF
             JogVelocity := GVL_HMI.HMI_JogSpeed
         );
 
-        IF NOT manualMode THEN
-            isManualMode := FALSE;
+        motionStepOut := E_MotionStep.WAIT_FOR_LOAD;
+        motionSubStep := 0;
+        stepDescription := 'Manual jog mode';
+
+        IF manualMode OR stopButton THEN
             currentState := E_MachineState.IDLE;
         END_IF;
 
     // ------------------------------------------------------------------------
     E_MachineState.RUNNING:
         isRunning := TRUE;
-        continueKinematics := FALSE;  // Clear one-shot pulse
+        continueKinematics := FALSE;
 
-        motionSequence(Enable := TRUE);
+        motionSequence(Enable := TRUE, ResetSequence := FALSE, BlockLoaded := BlockLoaded, FilesReady := FilesReady);
+        activeMotionStepOut := motionSequence.CurrentStep;
+        activeMotionSubStep := motionSequence.CurrentSubStep;
+        resumeStep := motionSequence.CurrentStep;
+        resumeSubStep := motionSequence.CurrentSubStep;
+        resumeDescription := motionSequence.StepDescription;
+        resumeMotionStepOut := resumeStep;
+        resumeMotionSubStep := resumeSubStep;
+        motionStepOut := motionSequence.CurrentStep;
+        motionSubStep := motionSequence.CurrentSubStep;
+        activeAxesMask := motionSequence.ActiveAxesMask;
+        stepDescription := motionSequence.StepDescription;
 
         IF stopButton THEN
             currentState := E_MachineState.STOPPING;
@@ -171,18 +249,23 @@ CASE currentState OF
 
     // ------------------------------------------------------------------------
     E_MachineState.STOPPING:
-        isRunning := FALSE;
         IF motionSequence.CurrentStep = E_MotionStep.CUTTING THEN
             interruptKinematics := TRUE;
             kinematicsPaused    := TRUE;
+            GVL_GCode.bPauseRequested := TRUE;
+            GVL_GCode.bAbortRequested := FALSE;
         END_IF
         cyclePaused := TRUE;
         currentState := E_MachineState.IDLE;
 
     // ------------------------------------------------------------------------
     E_MachineState.FAULTED:
-        isRunning := FALSE;
         isFaulted := TRUE;
+        GVL_GCode.bPauseRequested := FALSE;
+        GVL_GCode.bAbortRequested := TRUE;
+        motionStepOut := resumeStep;
+        motionSubStep := resumeSubStep;
+        stepDescription := resumeDescription;
 
         IF resetButton THEN
             currentState := E_MachineState.RESETTING;
@@ -190,8 +273,12 @@ CASE currentState OF
 
     // ------------------------------------------------------------------------
     E_MachineState.E_STOPPED:
-        isRunning := FALSE;
         isFaulted := TRUE;
+        GVL_GCode.bPauseRequested := FALSE;
+        GVL_GCode.bAbortRequested := TRUE;
+        motionStepOut := resumeStep;
+        motionSubStep := resumeSubStep;
+        stepDescription := resumeDescription;
 
         FOR i := MOTIF_CONFIG.MIN_AXIS_INDEX TO MOTIF_CONFIG.MAX_AXIS_INDEX DO
             fbHalt[i](
@@ -208,13 +295,20 @@ CASE currentState OF
 
     // ------------------------------------------------------------------------
     E_MachineState.RESETTING:
-        isFaulted := FALSE;
         interruptKinematics := FALSE;
-        continueKinematics  := FALSE;
+        continueKinematics := FALSE;
         kinematicsPaused    := FALSE;
         cyclePaused         := FALSE;
+        GVL_GCode.bPauseRequested := FALSE;
+        GVL_GCode.bAbortRequested := TRUE;
+        motionStepOut := E_MotionStep.WAIT_FOR_LOAD;
+        motionSubStep := 0;
+        resumeStep := E_MotionStep.WAIT_FOR_LOAD;
+        resumeSubStep := 0;
+        resumeDescription := 'Idle';
+        stepDescription := 'Resetting faults';
 
-        motionSequence(Enable := FALSE);
+        motionSequence(Enable := FALSE, ResetSequence := TRUE, BlockLoaded := BlockLoaded, FilesReady := FilesReady);
         GVL_GCode.bBusy  := FALSE;
         GVL_GCode.bError := FALSE;
         // Hold RESETTING until FB_FaultMonitor acknowledges the clear.
@@ -245,14 +339,35 @@ IF currentState <> E_MachineState.HOMING THEN
     isHomed := fbHome.AllAxesHomed;
 END_IF
 
+// ============================================================================
+// Ensure jog is disabled outside MANUAL mode.
+// ============================================================================
+IF currentState <> E_MachineState.MANUAL THEN
+    axisManual(
+        Enable := FALSE,
+        AxisSelect := GVL_HMI.HMI_JogAxis,
+        JogPositive := FALSE,
+        JogNegative := FALSE,
+        JogVelocity := GVL_HMI.HMI_JogSpeed
+    );
+END_IF
+
 // Copy internal state to outputs
 currentStateOut := currentState;
-
-// Copy motion sequence visualization outputs
-motionStepOut   := motionSequence.CurrentStep;
-motionSubStep   := motionSequence.CurrentSubStep;
-activeAxesMask  := motionSequence.ActiveAxesMask;
-stepDescription := motionSequence.StepDescription;
+resumeMotionStepOut := resumeStep;
+resumeMotionSubStep := resumeSubStep;
 
 // Expose cycle paused state to HMI
 cyclePausedOut := cyclePaused;
+jogActiveOut := axisManual.Active;
+jogErrorOut := axisManual.Error;
+jogInvalidAxisOut := axisManual.InvalidAxis;
+homeBusyOut := fbHome.Busy;
+homeDoneOut := fbHome.Done;
+homeErrorOut := fbHome.Error;
+homeErrorAxisIDOut := fbHome.ErrorAxisID;
+homeInvalidAxisOut := fbHome.InvalidAxis;
+allAxesHomedOut := fbHome.AllAxesHomed;
+FOR i := 1 TO 36 DO
+    axisIsHomedOut[i] := fbHome.AxisIsHomed[i];
+END_FOR

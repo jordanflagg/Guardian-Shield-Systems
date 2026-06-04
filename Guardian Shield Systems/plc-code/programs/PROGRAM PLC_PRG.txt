@@ -4,12 +4,13 @@ VAR
     faultMonitor  : FB_FaultMonitor;        // ALWAYS runs first — fault detection before anything else
     buttonManager : FB_ButtonManager;
     axisPower     : FB_AxisPower;
-    kinEnable     : FB_KinematicEnable;     // Runs every scan: 24/7 kin opstate monitor + cutting sequencer
+    kinEnable     : FB_KinematicEnable;     // Runs every scan: 24/7 kin opstate monitor + command handling
     stateMachine  : FB_MachineStateMachine;
 
     // HMI Data Exchange - Called directly from PLC_PRG
     axisData     : FB_AxisData;             // Reads position/velocity for jog axis
     axisDataHome : FB_AxisData;             // Reads position/velocity for homing axis
+    i : UINT;
 END_VAR
 
 /////////////////////////////////////////////////
@@ -20,8 +21,8 @@ END_VAR
 // ============================================================================
 faultMonitor(
     Reset          := (GVL_HMI.MACHINE_STATE = E_MachineState.RESETTING),
-    CurrentStep    := stateMachine.motionStepOut,
-    CurrentSubStep := stateMachine.motionSubStep
+    CurrentStep    := stateMachine.activeMotionStepOut,
+    CurrentSubStep := stateMachine.activeMotionSubStep
 );
 
 // ============================================================================
@@ -49,24 +50,7 @@ axisPower(
 );
 
 // ============================================================================
-// 4. KINEMATIC ENABLE
-//    Runs every scan — two independent roles:
-//      Enable  : enables Wire1-4 and Wire5_6 kins on rising edge of DrivesReady.
-//                Kins stay enabled for the entire session — never disabled between
-//                cutting groups. Re-enables automatically after E-stop drive recovery.
-//      Monitor : polls all 5 kin opstates via DL_ReadNode every ~2 s; reports
-//                ERRORSTOP faults via FC_ReportFault 24/7.
-// ============================================================================
-kinEnable(
-    DrivesReady         := axisPower.DrivesReady,
-    InterruptKinematics := stateMachine.interruptKinematics OR GVL_HMI.HMI_DbgInterruptKins,
-    ContinueKinematics  := stateMachine.continueKinematics  OR GVL_HMI.HMI_DbgContinueKins,
-    DbgKinEnableNum     := GVL_HMI.HMI_DbgKinEnableNum,
-    DbgKinDisableNum    := GVL_HMI.HMI_DbgKinDisableNum
-);
-
-// ============================================================================
-// 5. STATE MACHINE
+// 4. STATE MACHINE
 // ============================================================================
 stateMachine(
     startButton := buttonManager.btn_Start_Out,
@@ -75,10 +59,26 @@ stateMachine(
     manualMode  := buttonManager.btn_Manual_Out,
     eStopActive := buttonManager.btn_EStop_Out,
     resetButton := buttonManager.btn_Reset_Out,
+    DrivesReady := axisPower.DrivesReady,
+    BlockLoaded := GVL_HMI.HMI_BlockLoaded,
+    FilesReady  := GVL_GCode.bFilesReady,
     HasFault    := faultMonitor.HasFault
 );
 
 GVL_HMI.MACHINE_STATE := stateMachine.currentStateOut;
+
+// ============================================================================
+// 5. KINEMATIC ENABLE
+//    Called after the state machine so same-scan interrupt/continue pulses
+//    are visible to the kin handler.
+// ============================================================================
+kinEnable(
+    DrivesReady         := axisPower.DrivesReady,
+    InterruptKinematics := stateMachine.interruptKinematics OR GVL_HMI.HMI_DbgInterruptKins,
+    ContinueKinematics  := stateMachine.continueKinematics  OR GVL_HMI.HMI_DbgContinueKins,
+    DbgKinEnableNum     := GVL_HMI.HMI_DbgKinEnableNum,
+    DbgKinDisableNum    := GVL_HMI.HMI_DbgKinDisableNum
+);
 
 // ============================================================================
 // 6. HMI AXIS DATA — always reads position/velocity for selected axes
@@ -97,7 +97,7 @@ GVL_HMI.HMI_HomePosition := axisDataHome.Position;
 // Machine status
 GVL_HMI.isRunning := stateMachine.isRunning;
 GVL_HMI.isFaulted := stateMachine.isFaulted;
-GVL_HMI.isHomed   := stateMachine.isHomed;
+GVL_HMI.isHomed   := stateMachine.isHomed;8i
 
 // Motion sequence visualization
 GVL_HMI.HMI_MotionStep      := stateMachine.motionStepOut;
@@ -118,15 +118,17 @@ GVL_HMI.HMI_DrivesReady := axisPower.DrivesReady;
 GVL_HMI.HMI_CyclePaused := stateMachine.cyclePausedOut;
 
 // Jog feedback
-GVL_HMI.HMI_JogActive      := stateMachine.axisManual.Active;
-GVL_HMI.HMI_JogError       := stateMachine.axisManual.Error;
-GVL_HMI.HMI_JogInvalidAxis := stateMachine.axisManual.InvalidAxis;
+GVL_HMI.HMI_JogActive      := stateMachine.jogActiveOut;
+GVL_HMI.HMI_JogError       := stateMachine.jogErrorOut;
+GVL_HMI.HMI_JogInvalidAxis := stateMachine.jogInvalidAxisOut;
 
 // Homing feedback
-GVL_HMI.HMI_HomeBusy        := stateMachine.fbHome.Busy;
-GVL_HMI.HMI_HomeDone        := stateMachine.fbHome.Done;
-GVL_HMI.HMI_HomeError       := stateMachine.fbHome.Error;
-GVL_HMI.HMI_HomeErrorAxisID := stateMachine.fbHome.ErrorAxisID;
-GVL_HMI.HMI_HomeInvalidAxis := stateMachine.fbHome.InvalidAxis;
-GVL_HMI.HMI_AllAxesHomed    := stateMachine.fbHome.AllAxesHomed;
-GVL_HMI.HMI_AxisIsHomed     := stateMachine.fbHome.AxisIsHomed;
+GVL_HMI.HMI_HomeBusy        := stateMachine.homeBusyOut;
+GVL_HMI.HMI_HomeDone        := stateMachine.homeDoneOut;
+GVL_HMI.HMI_HomeError       := stateMachine.homeErrorOut;
+GVL_HMI.HMI_HomeErrorAxisID := stateMachine.homeErrorAxisIDOut;
+GVL_HMI.HMI_HomeInvalidAxis := stateMachine.homeInvalidAxisOut;
+GVL_HMI.HMI_AllAxesHomed    := stateMachine.allAxesHomedOut;
+FOR i := 1 TO 36 DO
+    GVL_HMI.HMI_AxisIsHomed[i] := stateMachine.axisIsHomedOut[i];
+END_FOR

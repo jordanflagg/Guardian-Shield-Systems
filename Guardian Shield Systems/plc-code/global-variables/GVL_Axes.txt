@@ -43,6 +43,30 @@ VAR_GLOBAL CONSTANT
         36      // Hot wire independent 2
     ];
 
+    NON_KIN_MASTER_AXES : ARRAY[1..6] OF UINT := [
+        1,
+        2,
+        6,
+        8,
+        10,
+        34
+    ];
+
+    KIN_MASTER_AXES : ARRAY[1..12] OF UINT := [
+        14,
+        15,
+        18,
+        19,
+        22,
+        23,
+        26,
+        27,
+        30,
+        31,
+        35,
+        36
+    ];
+
     // Slave axes MUST be reset before their masters.
     // Resetting simultaneously leaves the master's gantry error uncleared
     // because the ctrlX requires the slave to be error-free first.
@@ -67,8 +91,85 @@ VAR_GLOBAL CONSTANT
         33      // Follows Axis 31 (large station Y)
     ];
 
+    GANTRY_MASTER_AXES : ARRAY[1..18] OF UINT := [
+        2,
+        2,
+        2,
+        6,
+        8,
+        10,
+        10,
+        10,
+        14,
+        15,
+        18,
+        19,
+        22,
+        23,
+        26,
+        27,
+        30,
+        31
+    ];
+
+    GANTRY_MASTER_NAMES : ARRAY[1..18] OF STRING[8] := [
+        'Axis_2',
+        'Axis_2',
+        'Axis_2',
+        'Axis_6',
+        'Axis_8',
+        'Axis_10',
+        'Axis_10',
+        'Axis_10',
+        'Axis_14',
+        'Axis_15',
+        'Axis_18',
+        'Axis_19',
+        'Axis_22',
+        'Axis_23',
+        'Axis_26',
+        'Axis_27',
+        'Axis_30',
+        'Axis_31'
+    ];
+
+    GANTRY_SLAVE_NAMES : ARRAY[1..18] OF STRING[8] := [
+        'Axis_3',
+        'Axis_4',
+        'Axis_5',
+        'Axis_7',
+        'Axis_9',
+        'Axis_11',
+        'Axis_12',
+        'Axis_13',
+        'Axis_16',
+        'Axis_17',
+        'Axis_20',
+        'Axis_21',
+        'Axis_24',
+        'Axis_25',
+        'Axis_28',
+        'Axis_29',
+        'Axis_32',
+        'Axis_33'
+    ];
+
+    KIN_GROUP_NAMES : ARRAY[1..5] OF STRING[16] := [
+        'Wire1',
+        'Wire2',
+        'Wire3',
+        'Wire4',
+        'Wire5_6'
+    ];
+
     MASTER_AXIS_COUNT : UINT := 18;
+    NON_KIN_MASTER_COUNT : UINT := 6;
+    KIN_MASTER_COUNT : UINT := 12;
     SLAVE_AXIS_COUNT  : UINT := 18;
+    GANTRY_PAIR_COUNT : UINT := 18;
+    KIN_GROUP_COUNT : UINT := 5;
     TOTAL_AXIS_COUNT  : UINT := 36;
+
+    CUTTING_ACTIVE_AXES_MASK : LWORD := 16#0000_000D_FFFF_E000;
 
 END_VAR

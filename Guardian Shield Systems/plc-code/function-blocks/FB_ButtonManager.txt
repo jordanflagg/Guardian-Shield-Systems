@@ -1,7 +1,7 @@
 FUNCTION_BLOCK FB_ButtonManager
-// Button input processing with debouncing and edge detection
-// Outputs STAY LATCHED until another button is pressed (no auto-clear)
-// This allows state machines to complete their full sequences
+// Button input processing with edge detection.
+// Outputs are one-scan pulses except E-stop, which remains level-sensitive.
+// The state machine owns mode persistence and command latching.
 
 VAR_INPUT
     btn_Start_In : BOOL;
@@ -10,7 +10,7 @@ VAR_INPUT
     btn_Manual_In : BOOL;
     btn_Reset_In : BOOL;
     btn_EStop_In : BOOL;
-    ClearCommand : BOOL;                // External clear (from state machine when command processed)
+    ClearCommand : BOOL;                // Optional external clear for activeCommand diagnostics
 END_VAR
 
 VAR_OUTPUT
@@ -44,23 +44,13 @@ trig_Manual(CLK := btn_Manual_In);
 trig_Reset(CLK := btn_Reset_In);
 
 // ============================================================================
-// Clear command only if explicitly requested
-// ============================================================================
-IF ClearCommand THEN
-    activeCommand := E_ActiveCommand.CMD_NONE;
-END_IF
-
-// ============================================================================
 // Determine active command based on button presses
 // Priority: E-Stop > Stop > Start > Home > Manual > Reset
-// Command stays latched until another button is pressed
 // ============================================================================
 IF btn_EStop_In THEN
-    // E-stop overrides everything
     activeCommand := E_ActiveCommand.CMD_NONE;
 
 ELSIF trig_Stop.Q THEN
-    // Stop has priority over start
     activeCommand := E_ActiveCommand.CMD_STOP;
 
 ELSIF trig_Start.Q THEN
@@ -75,18 +65,25 @@ ELSIF trig_Manual.Q THEN
 ELSIF trig_Reset.Q THEN
     activeCommand := E_ActiveCommand.CMD_RESET;
 
+ELSIF ClearCommand THEN
+    activeCommand := E_ActiveCommand.CMD_NONE;
+
 END_IF
 
 // ============================================================================
-// EXPLICIT: Set outputs based on active command (clear all, set one)
+// Pulse outputs: clear every scan, then emit the selected command once.
 // ============================================================================
+btn_Start_Out  := FALSE;
+btn_Stop_Out   := FALSE;
+btn_Home_Out   := FALSE;
+btn_Manual_Out := FALSE;
+btn_Reset_Out  := FALSE;
+
 CASE activeCommand OF
     
     E_ActiveCommand.CMD_START:
         btn_Start_Out := TRUE;
-        btn_Stop_Out := FALSE;   
-        btn_Home_Out := FALSE;   
-        btn_Manual_Out := FALSE; 
+        activeCommand := E_ActiveCommand.CMD_NONE;
         btn_Reset_Out := FALSE;  // ← Explicitly FALSE
     
     E_ActiveCommand.CMD_STOP:
@@ -95,6 +92,7 @@ CASE activeCommand OF
         btn_Home_Out := FALSE;
         btn_Manual_Out := FALSE;
         btn_Reset_Out := FALSE;
+        activeCommand := E_ActiveCommand.CMD_NONE;
     
     E_ActiveCommand.CMD_HOME:
         btn_Start_Out := FALSE;
@@ -102,6 +100,7 @@ CASE activeCommand OF
         btn_Home_Out := TRUE;
         btn_Manual_Out := FALSE;
         btn_Reset_Out := FALSE;
+        activeCommand := E_ActiveCommand.CMD_NONE;
     
     E_ActiveCommand.CMD_MANUAL:
         btn_Start_Out := FALSE;
@@ -109,6 +108,7 @@ CASE activeCommand OF
         btn_Home_Out := FALSE;
         btn_Manual_Out := TRUE;
         btn_Reset_Out := FALSE;
+        activeCommand := E_ActiveCommand.CMD_NONE;
     
     E_ActiveCommand.CMD_RESET:
         btn_Start_Out  := FALSE;
@@ -119,11 +119,7 @@ CASE activeCommand OF
         activeCommand  := E_ActiveCommand.CMD_NONE;  // Self-clearing: one scan pulse only
     
     E_ActiveCommand.CMD_NONE:
-        btn_Start_Out := FALSE;
-        btn_Stop_Out := FALSE;
-        btn_Home_Out := FALSE;
-        btn_Manual_Out := FALSE;
-        btn_Reset_Out := FALSE;
+        ;
 
 END_CASE
 

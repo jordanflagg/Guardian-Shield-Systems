@@ -21,8 +21,8 @@ FUNCTION_BLOCK FB_FaultMonitor
 //     State 3  — Wait for slave resets to complete
 //     State 4  — Issue MC_Reset to all 18 master axes
 //     State 5  — Wait for master resets to complete
-//     State 6  — ML_KinReset all 6 wire kin groups (clears ERRORSTOP/INTERRUPTED)
-//     State 7  — ML_KinEnable all 6 wire kin groups (back to operational)
+//     State 6  — ML_KinReset all 5 wire kin groups (clears ERRORSTOP/INTERRUPTED)
+//     State 7  — ML_KinEnable all 5 wire kin groups (back to operational)
 //     State 8  — Write diagnosis/confirm/all-errors again (clears transient kin errors)
 //     State 9  — Wait for one complete poll cycle (0→4) to let confirm-errors propagate
 //     State 10 — Clear GVL_Faults, unlatch HasFault → state machine returns to IDLE
@@ -72,8 +72,8 @@ VAR
     // Kinematic recovery — ML_KinReset gets kins out of ERRORSTOP/INTERRUPTED,
     // then ML_KinEnable brings them back to operational. No interrupt needed here
     // because kins are not in MOVING state when a drive fault triggers a reset.
-    fbKinReset  : ARRAY[1..6] OF ML_KinResetData;
-    fbKinEnable : ARRAY[1..6] OF ML_KinEnableData;
+    fbKinReset  : ARRAY[1..5] OF ML_KinResetData;
+    fbKinEnable : ARRAY[1..5] OF ML_KinEnableData;
     kinsNamed   : BOOL := FALSE;   // Kin struct names filled once on first reset
 
     i : UINT;
@@ -175,38 +175,30 @@ CASE resetSeqState OF
             resetSeqState := 6;
         END_IF
 
-    6: // Reset all 6 wire kin groups.
+    6: // Reset all 5 wire kin groups.
        // ML_KinReset clears ERRORSTOP or INTERRUPTED state → kin returns to STANDBY.
        // If already in STANDBY, this is a no-op or minor error we skip (treat as done).
-       // Interrupt is intentionally omitted — kins are not in MOVING state when a
-       // drive fault triggers a reset. ML_KinInterrupt2 on an idle kin causes
-       // "Invalid state" errors in the ctrlX logbook and puts axes into ERRORSTOP.
+        // Interrupt is intentionally omitted — kins are not in MOVING state when a
+        // drive fault triggers a reset. ML_KinInterrupt2 on an idle kin causes
+        // "Invalid state" errors in the ctrlX logbook and puts axes into ERRORSTOP.
         IF NOT kinsNamed THEN
-            fbKinReset[1].In.KinName := 'Wire1';  fbKinReset[1].In.Source := 'FB_FaultMonitor';
-            fbKinReset[2].In.KinName := 'Wire2';  fbKinReset[2].In.Source := 'FB_FaultMonitor';
-            fbKinReset[3].In.KinName := 'Wire3';  fbKinReset[3].In.Source := 'FB_FaultMonitor';
-            fbKinReset[4].In.KinName := 'Wire4';  fbKinReset[4].In.Source := 'FB_FaultMonitor';
-            fbKinReset[5].In.KinName := 'Wire5_6';  fbKinReset[5].In.Source := 'FB_FaultMonitor';
-            fbKinEnable[1].In.KinName := 'Wire1';  fbKinEnable[1].In.Source := 'FB_FaultMonitor';
-            fbKinEnable[2].In.KinName := 'Wire2';  fbKinEnable[2].In.Source := 'FB_FaultMonitor';
-            fbKinEnable[3].In.KinName := 'Wire3';  fbKinEnable[3].In.Source := 'FB_FaultMonitor';
-            fbKinEnable[4].In.KinName := 'Wire4';  fbKinEnable[4].In.Source := 'FB_FaultMonitor';
-            fbKinEnable[5].In.KinName := 'Wire5_6';  fbKinEnable[5].In.Source := 'FB_FaultMonitor';
+            FOR i := 1 TO GVL_Axes.KIN_GROUP_COUNT DO
+                fbKinReset[i].In.KinName := GVL_Axes.KIN_GROUP_NAMES[i];
+                fbKinReset[i].In.Source := 'FB_FaultMonitor';
+                fbKinEnable[i].In.KinName := GVL_Axes.KIN_GROUP_NAMES[i];
+                fbKinEnable[i].In.Source := 'FB_FaultMonitor';
+            END_FOR
             kinsNamed := TRUE;
         END_IF
-        CXA_MOTION.ML_KinReset(Data := fbKinReset[1]);
-        CXA_MOTION.ML_KinReset(Data := fbKinReset[2]);
-        CXA_MOTION.ML_KinReset(Data := fbKinReset[3]);
-        CXA_MOTION.ML_KinReset(Data := fbKinReset[4]);
-        CXA_MOTION.ML_KinReset(Data := fbKinReset[5]);
+        FOR i := 1 TO GVL_Axes.KIN_GROUP_COUNT DO
+            CXA_MOTION.ML_KinReset(Data := fbKinReset[i]);
+        END_FOR
         resetSeqState := 7;
 
-    7: // Re-enable all 6 wire kin groups
-        CXA_MOTION.ML_KinEnable(Data := fbKinEnable[1]);
-        CXA_MOTION.ML_KinEnable(Data := fbKinEnable[2]);
-        CXA_MOTION.ML_KinEnable(Data := fbKinEnable[3]);
-        CXA_MOTION.ML_KinEnable(Data := fbKinEnable[4]);
-        CXA_MOTION.ML_KinEnable(Data := fbKinEnable[5]);
+    7: // Re-enable all 5 wire kin groups
+        FOR i := 1 TO GVL_Axes.KIN_GROUP_COUNT DO
+            CXA_MOTION.ML_KinEnable(Data := fbKinEnable[i]);
+        END_FOR
         resetSeqState := 8;
 
     8: // Confirm errors — clears any transient errors left by the kin re-enable sequence

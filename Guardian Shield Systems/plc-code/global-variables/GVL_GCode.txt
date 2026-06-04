@@ -38,6 +38,8 @@
     bBusy        — written by PLC, cleared by PLC
     bJobDone     — written by trigger_dispatch.py, cleared by trigger_dispatch.py
     bError       — written by trigger_dispatch.py, cleared by trigger_dispatch.py
+    bPauseRequested — written by PLC, read by trigger_dispatch.py during planned pauses
+    bAbortRequested — written by PLC, read by trigger_dispatch.py on fault/E-stop/reset
     bHomeRequest — written by PLC (FB_AxisHome), cleared by trigger_dispatch.py
     bHomeDone    — written by trigger_dispatch.py, cleared by trigger_dispatch.py
 
@@ -122,6 +124,10 @@ VAR_GLOBAL
 
     {attribute 'symbol' := 'readwrite'}
     bError   : BOOL;    // TRUE when a dispatch or kinematic error occurred
+    {attribute 'symbol' := 'readwrite'}
+    bPauseRequested : BOOL;    // PLC → Python: planned stop/resume while preserving the active cut
+    {attribute 'symbol' := 'readwrite'}
+    bAbortRequested : BOOL;    // PLC → Python: abandon the active cut immediately
 
     // ═══════════════════════════════════════════════════════════════════════
     // KINEMATIC HOME HANDSHAKE
@@ -156,5 +162,43 @@ VAR_GLOBAL
     sErrorWire    : STRING[20];
     {attribute 'symbol' := 'readwrite'}
     sErrorMessage : STRING[255];
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // CUTTING PARAMETERS  (all written by the Python API at staging time,
+    //                      before bFilesReady is set)
+    //
+    // rWireTemp     — PWM duty cycle setpoint per wire (0.0–100.0 %)
+    //                 Index: [1]=Wire1 .. [6]=Wire6
+    //                 NOTE: rWireTemp is written by the PLC (recipe / operator).
+    // rWireFeedrate — Cutting feedrate in mm/min (same for all wires).
+    //
+    // rWireCutY     — Programmed Y-axis cut height per wire (mm from block bottom).
+    //                 Wires 1–4: stud cut height at that station.
+    //                 Wire 5:    window/door wire Y position.
+    //                 Wire 6:    electrical trough wire Y position.
+    //                 Read by HMI to draw wire positions on the block cross-section.
+    //
+    // Window / door opening extents (written only when bWire5Active = TRUE):
+    //   rWinY1 — bottom edge of opening, mm from block bottom
+    //   rWinY2 — top edge of opening, mm from block bottom
+    //
+    // Electrical trough extents (written only when bWire6Active = TRUE):
+    //   rTroughY1 — upper wire Y position (mm from block bottom)
+    //   rTroughY2 — lower wire Y position (mm from block bottom)
+    // ═══════════════════════════════════════════════════════════════════════
+    {attribute 'symbol' := 'readwrite'}
+    rWireTemp     : ARRAY[1..6] OF REAL := [0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+    {attribute 'symbol' := 'readwrite'}
+    rWireFeedrate : REAL := 0.0;
+    {attribute 'symbol' := 'readwrite'}
+    rWireCutY     : ARRAY[1..6] OF REAL := [0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+    {attribute 'symbol' := 'readwrite'}
+    rWinY1        : REAL := 0.0;
+    {attribute 'symbol' := 'readwrite'}
+    rWinY2        : REAL := 0.0;
+    {attribute 'symbol' := 'readwrite'}
+    rTroughY1     : REAL := 0.0;
+    {attribute 'symbol' := 'readwrite'}
+    rTroughY2     : REAL := 0.0;
 
 END_VAR

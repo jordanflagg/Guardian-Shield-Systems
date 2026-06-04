@@ -20,6 +20,9 @@ FUNCTION_BLOCK FB_MotionSequence
 
 VAR_INPUT
     Enable : BOOL;                      // TRUE when machine in RUNNING state
+    ResetSequence : BOOL;               // TRUE only when the supervisor wants a hard reset
+    BlockLoaded : BOOL;                 // TRUE when the next foam block is physically in place
+    FilesReady : BOOL;                  // TRUE when the Python pipeline staged G-code for the block
 END_VAR
 
 VAR_OUTPUT
@@ -34,7 +37,6 @@ END_VAR
 
 VAR
     motionStep  : E_MotionStep := E_MotionStep.WAIT_FOR_LOAD;
-    blockLoaded : BOOL := TRUE;
 
     stepLoadBlock : FB_MotionStep_LoadBlock;
     stepCutting   : FB_MotionStep_Cutting;
@@ -44,14 +46,24 @@ END_VAR
 ///////////////////////////////////////////////////////////////////////////////
 
 // ============================================================================
-// HANDLE DISABLE
+// HANDLE RESET / DISABLE
 // ============================================================================
 
-IF NOT Enable THEN
+IF ResetSequence THEN
     stepLoadBlock(Enable := FALSE);
     stepCutting(Enable := FALSE);
     stepUnload(Enable := FALSE);
+    motionStep := E_MotionStep.WAIT_FOR_LOAD;
+    SequenceComplete := FALSE;
+    CurrentStep := motionStep;
+    CurrentSubStep := 0;
     ActiveAxesMask := 0;
+    StepDescription := 'Waiting for block to load';
+    RETURN;
+END_IF
+
+IF NOT Enable THEN
+    CurrentStep := motionStep;
     RETURN;
 END_IF
 
@@ -74,10 +86,10 @@ CASE motionStep OF
         // Both conditions must be true before advancing:
         //   blockLoaded    — operator/sensor confirms foam block is on the table
         //   bFilesReady    — Python pipeline has uploaded G-code for THIS block
-        IF blockLoaded AND GVL_GCode.bFilesReady THEN
+        IF BlockLoaded AND FilesReady THEN
             GVL_GCode.sStatus := '';
             motionStep := E_MotionStep.SHIFT_TO_PROCESSING_AREA;
-        ELSIF blockLoaded AND NOT GVL_GCode.bFilesReady THEN
+        ELSIF BlockLoaded AND NOT FilesReady THEN
             StepDescription := 'Waiting for G-code upload';
             GVL_GCode.sStatus := 'Block loaded - upload G-code for next block via pipeline';
         ELSE

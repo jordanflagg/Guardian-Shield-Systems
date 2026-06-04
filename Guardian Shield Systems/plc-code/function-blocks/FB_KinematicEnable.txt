@@ -22,7 +22,7 @@ FUNCTION_BLOCK FB_KinematicEnable
        ~2 seconds via DL_ReadNode. Reports ERRORSTOP via FC_ReportFault.
        Self-clears when kin leaves ERRORSTOP.
 
-  INTERRUPT / CONTINUE (only during active cutting — GVL_GCode.bBusy = TRUE):
+  INTERRUPT / CONTINUE:
     InterruptKinematics — ML_KinInterrupt2 on all active kins.
                           Called by E-stop or Stop during cutting step.
                           When drives come back (DrivesReady rises), kins
@@ -31,7 +31,7 @@ FUNCTION_BLOCK FB_KinematicEnable
                           button is pressed again (FB_MachineStateMachine
                           pulses ContinueKinematics when resuming).
     ContinueKinematics  — ML_KinContinue on all kins. Only fires when
-                          GVL_GCode.bBusy = TRUE (active cutting).
+                          the cutting job is still owned by the PLC/Python handshake.
 ==============================================================================
 *)
 
@@ -48,6 +48,10 @@ END_VAR
 VAR
     // ─── Kin enable on DrivesReady rising edge ────────────────────────────
     drivesReadyPrev    : BOOL;
+    interruptPrev      : BOOL;
+    continuePrev       : BOOL;
+    interruptRising    : BOOL;
+    continueRising     : BOOL;
 
     fbKinEn      : ARRAY[1..5] OF ML_KinEnableData;
     fbKinDis     : ARRAY[1..5] OF ML_KinDisableData;
@@ -73,41 +77,37 @@ END_VAR
 // FILL NAMES (once)
 // ============================================================================
 IF NOT namesSet THEN
-    fbKinEn[1].In.KinName := 'Wire1';    fbKinEn[1].In.Source := 'FB_KinematicEnable';
-    fbKinEn[2].In.KinName := 'Wire2';    fbKinEn[2].In.Source := 'FB_KinematicEnable';
-    fbKinEn[3].In.KinName := 'Wire3';    fbKinEn[3].In.Source := 'FB_KinematicEnable';
-    fbKinEn[4].In.KinName := 'Wire4';    fbKinEn[4].In.Source := 'FB_KinematicEnable';
-    fbKinEn[5].In.KinName := 'Wire5_6';  fbKinEn[5].In.Source := 'FB_KinematicEnable';
+    FOR i := 1 TO GVL_Axes.KIN_GROUP_COUNT DO
+        fbKinEn[i].In.KinName := GVL_Axes.KIN_GROUP_NAMES[i];
+        fbKinEn[i].In.Source := 'FB_KinematicEnable';
 
-    fbKinDis[1].In.KinName := 'Wire1';    fbKinDis[1].In.Source := 'FB_KinematicEnable';
-    fbKinDis[2].In.KinName := 'Wire2';    fbKinDis[2].In.Source := 'FB_KinematicEnable';
-    fbKinDis[3].In.KinName := 'Wire3';    fbKinDis[3].In.Source := 'FB_KinematicEnable';
-    fbKinDis[4].In.KinName := 'Wire4';    fbKinDis[4].In.Source := 'FB_KinematicEnable';
-    fbKinDis[5].In.KinName := 'Wire5_6';  fbKinDis[5].In.Source := 'FB_KinematicEnable';
+        fbKinDis[i].In.KinName := GVL_Axes.KIN_GROUP_NAMES[i];
+        fbKinDis[i].In.Source := 'FB_KinematicEnable';
 
-    fbKinInt[1].In.KinName := 'Wire1';    fbKinInt[1].In.Source := 'FB_KinematicEnable';
-    fbKinInt[2].In.KinName := 'Wire2';    fbKinInt[2].In.Source := 'FB_KinematicEnable';
-    fbKinInt[3].In.KinName := 'Wire3';    fbKinInt[3].In.Source := 'FB_KinematicEnable';
-    fbKinInt[4].In.KinName := 'Wire4';    fbKinInt[4].In.Source := 'FB_KinematicEnable';
-    fbKinInt[5].In.KinName := 'Wire5_6';  fbKinInt[5].In.Source := 'FB_KinematicEnable';
+        fbKinInt[i].In.KinName := GVL_Axes.KIN_GROUP_NAMES[i];
+        fbKinInt[i].In.Source := 'FB_KinematicEnable';
 
-    fbKinCont[1].In.KinName := 'Wire1';    fbKinCont[1].In.Source := 'FB_KinematicEnable';
-    fbKinCont[2].In.KinName := 'Wire2';    fbKinCont[2].In.Source := 'FB_KinematicEnable';
-    fbKinCont[3].In.KinName := 'Wire3';    fbKinCont[3].In.Source := 'FB_KinematicEnable';
-    fbKinCont[4].In.KinName := 'Wire4';    fbKinCont[4].In.Source := 'FB_KinematicEnable';
-    fbKinCont[5].In.KinName := 'Wire5_6';  fbKinCont[5].In.Source := 'FB_KinematicEnable';
+        fbKinCont[i].In.KinName := GVL_Axes.KIN_GROUP_NAMES[i];
+        fbKinCont[i].In.Source := 'FB_KinematicEnable';
+    END_FOR
 
     namesSet := TRUE;
 END_IF
 
 IF NOT nodeNamesSet THEN
-    sNodeOp[1] := 'motion/kin/Wire1/state/opstate/plcopen';
-    sNodeOp[2] := 'motion/kin/Wire2/state/opstate/plcopen';
-    sNodeOp[3] := 'motion/kin/Wire3/state/opstate/plcopen';
-    sNodeOp[4] := 'motion/kin/Wire4/state/opstate/plcopen';
-    sNodeOp[5] := 'motion/kin/Wire5_6/state/opstate/plcopen';
+    FOR i := 1 TO GVL_Axes.KIN_GROUP_COUNT DO
+        sNodeOp[i] := CONCAT(
+            CONCAT('motion/kin/', GVL_Axes.KIN_GROUP_NAMES[i]),
+            '/state/opstate/plcopen'
+        );
+    END_FOR
     nodeNamesSet := TRUE;
 END_IF
+
+interruptRising := InterruptKinematics AND NOT interruptPrev;
+interruptPrev := InterruptKinematics;
+continueRising := ContinueKinematics AND NOT continuePrev;
+continuePrev := ContinueKinematics;
 
 // ============================================================================
 // SECTION 1 — KIN ENABLE ON DRIVES READY
@@ -115,33 +115,29 @@ END_IF
 // or drives cycle off and back on after E-stop/fault recovery).
 // ============================================================================
 IF DrivesReady AND NOT drivesReadyPrev THEN
-    CXA_MOTION.ML_KinEnable(Data := fbKinEn[1]);   // Wire1
-    CXA_MOTION.ML_KinEnable(Data := fbKinEn[2]);   // Wire2
-    CXA_MOTION.ML_KinEnable(Data := fbKinEn[3]);   // Wire3
-    CXA_MOTION.ML_KinEnable(Data := fbKinEn[4]);   // Wire4
-    CXA_MOTION.ML_KinEnable(Data := fbKinEn[5]);   // Wire5_6
+    FOR i := 1 TO GVL_Axes.KIN_GROUP_COUNT DO
+        CXA_MOTION.ML_KinEnable(Data := fbKinEn[i]);
+    END_FOR
 END_IF
 drivesReadyPrev := DrivesReady;
 
 // ============================================================================
 // SECTION 2 — INTERRUPT / CONTINUE
-// Only fires during active cutting (bBusy = TRUE).
-// ML_KinInterrupt2 is only valid in MOVING state — the bBusy guard prevents
-// calling it on STANDBY kins (which would cause "Invalid state" logbook errors).
-// ML_KinContinue is gated the same way: no-op if kins are not interrupted.
+// ML_KinInterrupt2 is only valid while the cut still belongs to the
+// PLC/Python handshake. Allow pause/abort requests as valid interrupt windows
+// so a same-scan fault or E-stop can still reach the kin handler after the
+// supervisor has already dropped bBusy.
 // ============================================================================
-IF GVL_GCode.bBusy THEN
-    IF InterruptKinematics THEN
-        FOR i := 1 TO 5 DO
-            CXA_MOTION.ML_KinInterrupt2(Data := fbKinInt[i]);
-        END_FOR
-    END_IF
+IF interruptRising AND (GVL_GCode.bBusy OR GVL_GCode.bPauseRequested OR GVL_GCode.bAbortRequested) THEN
+    FOR i := 1 TO GVL_Axes.KIN_GROUP_COUNT DO
+        CXA_MOTION.ML_KinInterrupt2(Data := fbKinInt[i]);
+    END_FOR
+END_IF
 
-    IF ContinueKinematics THEN
-        FOR i := 1 TO 5 DO
-            CXA_MOTION.ML_KinContinue(Data := fbKinCont[i]);
-        END_FOR
-    END_IF
+IF continueRising AND GVL_GCode.bBusy THEN
+    FOR i := 1 TO GVL_Axes.KIN_GROUP_COUNT DO
+        CXA_MOTION.ML_KinContinue(Data := fbKinCont[i]);
+    END_FOR
 END_IF
 
 // ============================================================================
@@ -149,10 +145,10 @@ END_IF
 // HMI pulses DbgKinEnableNum / DbgKinDisableNum with a wire number (1-5)
 // for ~500 ms; we call ML_KinEnable / ML_KinDisable each scan it is set.
 // ============================================================================
-IF DbgKinEnableNum >= 1 AND DbgKinEnableNum <= 5 THEN
+IF DbgKinEnableNum >= 1 AND DbgKinEnableNum <= GVL_Axes.KIN_GROUP_COUNT THEN
     CXA_MOTION.ML_KinEnable(Data := fbKinEn[DbgKinEnableNum]);
 END_IF
-IF DbgKinDisableNum >= 1 AND DbgKinDisableNum <= 5 THEN
+IF DbgKinDisableNum >= 1 AND DbgKinDisableNum <= GVL_Axes.KIN_GROUP_COUNT THEN
     CXA_MOTION.ML_KinDisable(Data := fbKinDis[DbgKinDisableNum]);
 END_IF
 
@@ -164,13 +160,13 @@ END_IF
 CASE monState OF
 
     0: // Kick off all 5 reads simultaneously
-        FOR i := 1 TO 5 DO
+        FOR i := 1 TO GVL_Axes.KIN_GROUP_COUNT DO
             fbOp[i](Execute := TRUE, NodeName := sNodeOp[i], Value := sOpstate[i]);
         END_FOR
         monState := 1;
 
     1: // Wait for all reads to finish (Done or Error)
-        FOR i := 1 TO 5 DO
+        FOR i := 1 TO GVL_Axes.KIN_GROUP_COUNT DO
             fbOp[i](Execute := TRUE, NodeName := sNodeOp[i], Value := sOpstate[i]);
         END_FOR
         IF fbOp[1].Done OR fbOp[1].Error THEN
@@ -178,14 +174,14 @@ CASE monState OF
         IF fbOp[3].Done OR fbOp[3].Error THEN
         IF fbOp[4].Done OR fbOp[4].Error THEN
         IF fbOp[5].Done OR fbOp[5].Error THEN
-            FOR i := 1 TO 5 DO
+            FOR i := 1 TO GVL_Axes.KIN_GROUP_COUNT DO
                 fbOp[i](Execute := FALSE, NodeName := sNodeOp[i], Value := sOpstate[i]);
             END_FOR
             monState := 2;
         END_IF END_IF END_IF END_IF END_IF
 
     2: // Check results — report ERRORSTOP, self-clear on recovery
-        FOR i := 1 TO 5 DO
+        FOR i := 1 TO GVL_Axes.KIN_GROUP_COUNT DO
             IF sOpstate[i] <> 'ERRORSTOP' THEN
                 kinErrRep[i] := FALSE;   // Recovered — allow re-reporting if it faults again
             ELSIF NOT kinErrRep[i] THEN

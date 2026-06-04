@@ -12,6 +12,7 @@ VAR_GLOBAL
     btn_Reset   : BOOL := FALSE;
     btn_EStop   : BOOL := FALSE;
     btn_DriveOn : BOOL := FALSE;
+    HMI_BlockLoaded : BOOL := FALSE;
 
     // ═══════════════════════════════════════════════════════════════════════
     // MACHINE STATUS  (read by HMI)

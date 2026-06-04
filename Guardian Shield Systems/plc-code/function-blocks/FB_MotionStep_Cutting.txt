@@ -77,6 +77,8 @@ CASE subStep OF
 
         IF GVL_GCode.bFilesReady THEN
             GVL_GCode.bBusy          := TRUE;
+            GVL_GCode.bPauseRequested := FALSE;
+            GVL_GCode.bAbortRequested := FALSE;
             GVL_GCode.nPipelineStage := 5;
             GVL_GCode.sStatus        := 'Cutting in progress';
             StepDescription          := 'Cutting in progress';
@@ -84,20 +86,12 @@ CASE subStep OF
             //   Bits 13-28 = axes 14-29 (studs)
             //   Bits 29-32 = axes 30-33 (Wire 5)
             //   Bits 34-35 = axes 35-36 (Wire 6 trough cutters)
-            ActiveAxesMask           := 16#0000_000D_FFFF_E000;
+            ActiveAxesMask           := GVL_Axes.CUTTING_ACTIVE_AXES_MASK;
             subStep                  := 10;
         END_IF
 
     // ────────────────────────────────────────────────────────────────────────
-    10: // Wait for FB_KinematicEnable (in PLC_PRG) to sequence all groups
-        // FB_KinematicEnable watches bGroupX_KinReady / bGroupX_Done with Python.
-        // Monitor its Done flag via GVL — it signals completion when all groups
-        // have cut, homed, and been disabled.
-        //
-        // The Done signal is read from GVL_GCode.bJobDone (set by Python after
-        // the last group) — FB_KinematicEnable.Done is wired through GVL_HMI
-        // by PLC_PRG for HMI visibility, but the real completion signal here is
-        // bJobDone (Python confirmation all wires returned home).
+    10: // Wait for the Python dispatcher to finish the active job.
         IF GVL_GCode.bJobDone THEN
             subStep := 20;
         ELSIF GVL_GCode.bError THEN
@@ -121,6 +115,8 @@ CASE subStep OF
         StepDescription          := 'Cutting complete';
         ActiveAxesMask           := 0;
         GVL_GCode.bBusy          := FALSE;
+        GVL_GCode.bPauseRequested := FALSE;
+        GVL_GCode.bAbortRequested := FALSE;
         GVL_GCode.bFilesReady    := FALSE;
         GVL_GCode.nPipelineStage := 6;
         GVL_GCode.sStatus        := 'Cutting complete — ready for next block';

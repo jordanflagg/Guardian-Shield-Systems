@@ -3,9 +3,8 @@ FUNCTION_BLOCK FB_AxisPower
 // Centralized power management for all 36 axes.
 // Handles MC_Power enable and gantry slave connections.
 //
-// Kinematics are NOT managed here — FB_KinematicEnable (called from
-// FB_MotionStep_Cutting) enables/disables wire kin groups per cutting group
-// so that axes are free for jogging and homing before the cycle starts.
+// Kinematics are NOT managed here — FB_KinematicEnable (called from PLC_PRG)
+// owns wire kinematic enable/interrupt/monitor behavior.
 //
 // Fault recovery (MC_Reset, ML_KinReset, diagnosis/confirm/all-errors) lives in
 // FB_FaultMonitor. This FB only manages power-on setup.
@@ -92,59 +91,22 @@ END_VAR
         CASE gantryState OF
 
             0: // Fill all 18 structs (AxisName = slave, MasterName = master)
-                // Load table lift: master Axis_2, slaves Axis_3/4/5
-                fbGantry[1].In.AxisName := 'Axis_3';  fbGantry[1].In.MasterName := 'Axis_2';  fbGantry[1].In.Source := 'FB_AxisPower';
-                fbGantry[2].In.AxisName := 'Axis_4';  fbGantry[2].In.MasterName := 'Axis_2';  fbGantry[2].In.Source := 'FB_AxisPower';
-                fbGantry[3].In.AxisName := 'Axis_5';  fbGantry[3].In.MasterName := 'Axis_2';  fbGantry[3].In.Source := 'FB_AxisPower';
-                // Load pusher: master Axis_6, slave Axis_7
-                fbGantry[4].In.AxisName := 'Axis_7';  fbGantry[4].In.MasterName := 'Axis_6';  fbGantry[4].In.Source := 'FB_AxisPower';
-                // Process pusher: master Axis_8, slave Axis_9
-                fbGantry[5].In.AxisName := 'Axis_9';  fbGantry[5].In.MasterName := 'Axis_8';  fbGantry[5].In.Source := 'FB_AxisPower';
-                // Process lift: master Axis_10, slaves Axis_11/12/13
-                fbGantry[6].In.AxisName := 'Axis_11'; fbGantry[6].In.MasterName := 'Axis_10'; fbGantry[6].In.Source := 'FB_AxisPower';
-                fbGantry[7].In.AxisName := 'Axis_12'; fbGantry[7].In.MasterName := 'Axis_10'; fbGantry[7].In.Source := 'FB_AxisPower';
-                fbGantry[8].In.AxisName := 'Axis_13'; fbGantry[8].In.MasterName := 'Axis_10'; fbGantry[8].In.Source := 'FB_AxisPower';
-                // Hot wire station 1: masters Axis_14/15, slaves Axis_16/17
-                fbGantry[9].In.AxisName  := 'Axis_16'; fbGantry[9].In.MasterName  := 'Axis_14'; fbGantry[9].In.Source  := 'FB_AxisPower';
-                fbGantry[10].In.AxisName := 'Axis_17'; fbGantry[10].In.MasterName := 'Axis_15'; fbGantry[10].In.Source := 'FB_AxisPower';
-                // Hot wire station 2: masters Axis_18/19, slaves Axis_20/21
-                fbGantry[11].In.AxisName := 'Axis_20'; fbGantry[11].In.MasterName := 'Axis_18'; fbGantry[11].In.Source := 'FB_AxisPower';
-                fbGantry[12].In.AxisName := 'Axis_21'; fbGantry[12].In.MasterName := 'Axis_19'; fbGantry[12].In.Source := 'FB_AxisPower';
-                // Hot wire station 3: masters Axis_22/23, slaves Axis_24/25
-                fbGantry[13].In.AxisName := 'Axis_24'; fbGantry[13].In.MasterName := 'Axis_22'; fbGantry[13].In.Source := 'FB_AxisPower';
-                fbGantry[14].In.AxisName := 'Axis_25'; fbGantry[14].In.MasterName := 'Axis_23'; fbGantry[14].In.Source := 'FB_AxisPower';
-                // Hot wire station 4: masters Axis_26/27, slaves Axis_28/29
-                fbGantry[15].In.AxisName := 'Axis_28'; fbGantry[15].In.MasterName := 'Axis_26'; fbGantry[15].In.Source := 'FB_AxisPower';
-                fbGantry[16].In.AxisName := 'Axis_29'; fbGantry[16].In.MasterName := 'Axis_27'; fbGantry[16].In.Source := 'FB_AxisPower';
-                // Window/door large station: masters Axis_30/31, slaves Axis_32/33
-                fbGantry[17].In.AxisName := 'Axis_32'; fbGantry[17].In.MasterName := 'Axis_30'; fbGantry[17].In.Source := 'FB_AxisPower';
-                fbGantry[18].In.AxisName := 'Axis_33'; fbGantry[18].In.MasterName := 'Axis_31'; fbGantry[18].In.Source := 'FB_AxisPower';
+                FOR i := 1 TO GVL_Axes.GANTRY_PAIR_COUNT DO
+                    fbGantry[i].In.AxisName := GVL_Axes.GANTRY_SLAVE_NAMES[i];
+                    fbGantry[i].In.MasterName := GVL_Axes.GANTRY_MASTER_NAMES[i];
+                    fbGantry[i].In.Source := 'FB_AxisPower';
+                END_FOR
                 gantryState := 1;
 
             1: // Call ML_AxsAddToGantry for all 18 slave axes
-                CXA_MOTION.ML_AxsAddToGantry(Data := fbGantry[1]);
-                CXA_MOTION.ML_AxsAddToGantry(Data := fbGantry[2]);
-                CXA_MOTION.ML_AxsAddToGantry(Data := fbGantry[3]);
-                CXA_MOTION.ML_AxsAddToGantry(Data := fbGantry[4]);
-                CXA_MOTION.ML_AxsAddToGantry(Data := fbGantry[5]);
-                CXA_MOTION.ML_AxsAddToGantry(Data := fbGantry[6]);
-                CXA_MOTION.ML_AxsAddToGantry(Data := fbGantry[7]);
-                CXA_MOTION.ML_AxsAddToGantry(Data := fbGantry[8]);
-                CXA_MOTION.ML_AxsAddToGantry(Data := fbGantry[9]);
-                CXA_MOTION.ML_AxsAddToGantry(Data := fbGantry[10]);
-                CXA_MOTION.ML_AxsAddToGantry(Data := fbGantry[11]);
-                CXA_MOTION.ML_AxsAddToGantry(Data := fbGantry[12]);
-                CXA_MOTION.ML_AxsAddToGantry(Data := fbGantry[13]);
-                CXA_MOTION.ML_AxsAddToGantry(Data := fbGantry[14]);
-                CXA_MOTION.ML_AxsAddToGantry(Data := fbGantry[15]);
-                CXA_MOTION.ML_AxsAddToGantry(Data := fbGantry[16]);
-                CXA_MOTION.ML_AxsAddToGantry(Data := fbGantry[17]);
-                CXA_MOTION.ML_AxsAddToGantry(Data := fbGantry[18]);
+                FOR i := 1 TO GVL_Axes.GANTRY_PAIR_COUNT DO
+                    CXA_MOTION.ML_AxsAddToGantry(Data := fbGantry[i]);
+                END_FOR
                 gantryState := 2;
 
             2: // Connections established — monitor each for errors, set GantryConnected
                 GantryConnected := TRUE;
-                FOR i := 1 TO 18 DO
+                FOR i := 1 TO GVL_Axes.GANTRY_PAIR_COUNT DO
                     // Self-clearing error flag
                     IF NOT fbGantry[i].Out.Error THEN
                         gantryErrorReported[i] := FALSE;

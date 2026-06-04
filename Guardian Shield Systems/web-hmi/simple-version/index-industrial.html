@@ -1311,6 +1311,70 @@
         .gcode-text-box.active { color: #c8e6c9; border-color: #333; }
         .gcode-text-box.error  { color: #ef9a9a; border-color: #333; }
 
+        /* ── Cutting tab ─────────────────────────────────────────────── */
+        .cut-wire-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+        .cut-wire-card {
+            background: #f0f0f0; border: 1px solid #d0d0d0; border-radius: 4px;
+            padding: 12px 14px; transition: border-color 0.2s, background 0.2s;
+        }
+        .cut-wire-card.cw-active   { background: #e8f0e8; border-color: #a0b8a0; }
+        .cut-wire-card.cw-inactive { /* no dim — kin badge conveys state */ }
+        .cut-wire-header {
+            display: flex; align-items: flex-start; gap: 9px; margin-bottom: 10px;
+        }
+        .cut-wire-dot  { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; margin-top: 3px; }
+        .cut-wire-name { font-size: 13px; font-weight: 600; color: #2a2a2a; line-height: 1.2; }
+        .cut-wire-role { font-size: 10px; color: #777; margin-top: 2px; }
+        .cut-wire-kin  { margin-left: auto; }
+        .cut-stat-row  {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-top: 5px; font-size: 11px;
+        }
+        .cut-stat-label { color: #666; }
+        .cut-stat-val   { color: #444; font-family: 'Consolas', monospace; }
+        .cut-stat-val.live { color: #2e7d32; font-weight: 600; }
+
+        .cut-svg-wrap {
+            width: 100%; background: #1a1a1a;
+            border: 1px solid #c0c0c0; border-radius: 3px; overflow: hidden;
+            min-height: 180px;
+        }
+        .cut-viz-sublabel {
+            font-size: 10px; font-weight: 600; color: #666;
+            text-transform: uppercase; letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+        .cut-viz-title-row {
+            display: flex; align-items: center; gap: 10px;
+        }
+        .cut-viz-label {
+            font-size: 11px; font-weight: 600; color: #fff;
+            text-transform: uppercase; letter-spacing: 0.5px;
+        }
+        .cut-viz-badge {
+            font-size: 10px; padding: 2px 9px; border-radius: 10px;
+            background: #e0e0e0; color: #333; border: 1px solid #bbb;
+        }
+        .cut-viz-badge.viz-cutting {
+            background: #e8f5e9; color: #2e7d32; border-color: #a5d6a7;
+            animation: gcode-pulse 1.2s ease-in-out infinite;
+        }
+        .cut-cfg-inputs { margin-left: auto; font-size: 10px; color: #aaa; display: flex; align-items: center; gap: 4px; }
+        .cut-cfg-val { color: #fff; font-family: 'Consolas', monospace; font-weight: 600; }
+        .cut-cfg-sep { color: #555; margin: 0 6px; }
+        .cut-progress-section { margin-top: 14px; }
+        .cut-view-tabs { display:flex; gap:4px; margin-bottom:8px; }
+        .cut-view-tab { padding:4px 12px; background:#e8e8e8; color:#666; border:1px solid #ccc; border-radius:3px; font-size:10px; font-family:'Consolas',monospace; cursor:pointer; text-transform:uppercase; letter-spacing:0.05em; transition:all 0.15s; }
+        .cut-view-tab:hover { background:#ddd; color:#333; }
+        .cut-view-tab.active { background:#1b5e20; color:#c8e6c9; border-color:#2e7d32; }
+        .cut-pbar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+        .cut-pbar-lbl { width: 52px; font-size: 10px; text-align: right; flex-shrink: 0; }
+        .cut-pbar-speed { width: 80px; font-size: 10px; color: #555; text-align: right; flex-shrink: 0; font-family: 'Consolas', monospace; }
+
         /* Sequence context bar */
         .context-bar { display: flex; border-radius: 4px; overflow: hidden; }
         .context-cell {
@@ -1567,12 +1631,13 @@
         .kin-wire-row:last-child { border-bottom:none; }
         .kin-wire-name { font-family:monospace; font-weight:700; color:#ddd; }
         .kin-badge { display:inline-block; padding:1px 7px; border-radius:2px; font-family:monospace; font-size:10px; font-weight:700; text-transform:uppercase; min-width:70px; text-align:center; }
-        .kos-standby  { background:#1b3a1b; color:#4caf50; }
+        .kos-standby  { background:#2a2a2a; color:#ccc; border:1px solid #383838; }
         .kos-moving   { background:#1a237e; color:#90caf9; }
         .kos-errorstop, .kos-error { background:#4a0000; color:#ef9a9a; }
         .kos-running  { background:#1a237e; color:#90caf9; }
-        .kos-disabled { background:#2a2a2a; color:#555; }
-        .kos-unknown, .kos-init { background:#2a2a2a; color:#777; }
+        .kos-disabled { background:#ddd; color:#444; border:1px solid #bbb; }
+        .kos-unknown, .kos-init { background:#e8e8e8; color:#555; border:1px solid #ccc; }
+        .kos-busy     { background:#1b3a1b; color:#4caf50; }
         .kos-err      { background:#333; color:#f44336; }
         .kin-btns { display:flex; gap:4px; flex-wrap:wrap; }
         .kin-btn { padding:3px 9px; border:none; border-radius:2px; font-size:11px; font-weight:600; cursor:pointer; transition:opacity .15s; }
@@ -1611,6 +1676,7 @@
                     <button class="nav-tab" onclick="switchPage('homing')">Homing</button>
                     <button class="nav-tab" onclick="switchPage('manual')">Manual</button>
                     <button class="nav-tab" onclick="switchPage('program')">GCode</button>
+                    <button class="nav-tab" onclick="switchPage('cutting')">Cutting</button>
                     <button class="nav-tab" onclick="switchPage('debug')" style="border-color:#f44336; color:#ffcdd2;">Debug</button>
                 </div>
                 <div class="header-item">
@@ -2068,6 +2134,223 @@
             </div>
         </div>
 
+        <!-- CUTTING PAGE -->
+        <!-- ================================================================== -->
+        <div id="page-cutting" class="page-content">
+            <div class="main-content" style="grid-template-columns: 1fr; max-width: 1040px; margin: 0 auto;">
+
+                <!-- Wire Status Grid -->
+                <div class="panel">
+                    <div class="panel-title">Wire Status</div>
+                    <div class="panel-body">
+                        <div class="cut-wire-grid">
+
+                            <!-- Wire 1 -->
+                            <div class="cut-wire-card" id="cwCard1">
+                                <div class="cut-wire-header">
+                                    <div class="cut-wire-dot" style="background:#F44336;"></div>
+                                    <div>
+                                        <div class="cut-wire-name">Wire 1</div>
+                                        <div class="cut-wire-role">Stud — Face B ↓</div>
+                                    </div>
+                                    <div class="cut-wire-kin" id="cwKin1">—</div>
+                                </div>
+                                <div class="cut-stat-row">
+                                    <span class="cut-stat-label">Temp Setpoint</span>
+                                    <span class="cut-stat-val" id="cwTemp1">—</span>
+                                </div>
+                                <div class="cut-stat-row">
+                                    <span class="cut-stat-label">Feedrate</span>
+                                    <span class="cut-stat-val" id="cwFeed1">—</span>
+                                </div>
+                                <div class="cut-stat-row">
+                                    <span class="cut-stat-label">IPO Pos (X/Z)</span>
+                                    <span class="cut-stat-val" id="cwPos1" style="font-family:'Consolas',monospace;font-size:9px;color:#888;">—</span>
+                                </div>
+                            </div>
+
+                            <!-- Wire 2 -->
+                            <div class="cut-wire-card" id="cwCard2">
+                                <div class="cut-wire-header">
+                                    <div class="cut-wire-dot" style="background:#FF8F00;"></div>
+                                    <div>
+                                        <div class="cut-wire-name">Wire 2</div>
+                                        <div class="cut-wire-role">Stud — Face B ↑</div>
+                                    </div>
+                                    <div class="cut-wire-kin" id="cwKin2">—</div>
+                                </div>
+                                <div class="cut-stat-row">
+                                    <span class="cut-stat-label">Temp Setpoint</span>
+                                    <span class="cut-stat-val" id="cwTemp2">—</span>
+                                </div>
+                                <div class="cut-stat-row">
+                                    <span class="cut-stat-label">Feedrate</span>
+                                    <span class="cut-stat-val" id="cwFeed2">—</span>
+                                </div>
+                                <div class="cut-stat-row">
+                                    <span class="cut-stat-label">IPO Pos (X/Z)</span>
+                                    <span class="cut-stat-val" id="cwPos2" style="font-family:'Consolas',monospace;font-size:9px;color:#888;">—</span>
+                                </div>
+                            </div>
+
+                            <!-- Wire 3 -->
+                            <div class="cut-wire-card" id="cwCard3">
+                                <div class="cut-wire-header">
+                                    <div class="cut-wire-dot" style="background:#2196F3;"></div>
+                                    <div>
+                                        <div class="cut-wire-name">Wire 3</div>
+                                        <div class="cut-wire-role">Stud — Face A ↓</div>
+                                    </div>
+                                    <div class="cut-wire-kin" id="cwKin3">—</div>
+                                </div>
+                                <div class="cut-stat-row">
+                                    <span class="cut-stat-label">Temp Setpoint</span>
+                                    <span class="cut-stat-val" id="cwTemp3">—</span>
+                                </div>
+                                <div class="cut-stat-row">
+                                    <span class="cut-stat-label">Feedrate</span>
+                                    <span class="cut-stat-val" id="cwFeed3">—</span>
+                                </div>
+                                <div class="cut-stat-row">
+                                    <span class="cut-stat-label">IPO Pos (X/Z)</span>
+                                    <span class="cut-stat-val" id="cwPos3" style="font-family:'Consolas',monospace;font-size:9px;color:#888;">—</span>
+                                </div>
+                            </div>
+
+                            <!-- Wire 4 -->
+                            <div class="cut-wire-card" id="cwCard4">
+                                <div class="cut-wire-header">
+                                    <div class="cut-wire-dot" style="background:#4CAF50;"></div>
+                                    <div>
+                                        <div class="cut-wire-name">Wire 4</div>
+                                        <div class="cut-wire-role">Stud — Face A ↑</div>
+                                    </div>
+                                    <div class="cut-wire-kin" id="cwKin4">—</div>
+                                </div>
+                                <div class="cut-stat-row">
+                                    <span class="cut-stat-label">Temp Setpoint</span>
+                                    <span class="cut-stat-val" id="cwTemp4">—</span>
+                                </div>
+                                <div class="cut-stat-row">
+                                    <span class="cut-stat-label">Feedrate</span>
+                                    <span class="cut-stat-val" id="cwFeed4">—</span>
+                                </div>
+                                <div class="cut-stat-row">
+                                    <span class="cut-stat-label">IPO Pos (X/Z)</span>
+                                    <span class="cut-stat-val" id="cwPos4" style="font-family:'Consolas',monospace;font-size:9px;color:#888;">—</span>
+                                </div>
+                            </div>
+
+                            <!-- Wire 5 -->
+                            <div class="cut-wire-card" id="cwCard5">
+                                <div class="cut-wire-header">
+                                    <div class="cut-wire-dot" style="background:#9C27B0;"></div>
+                                    <div>
+                                        <div class="cut-wire-name">Wire 5</div>
+                                        <div class="cut-wire-role">Window / Door</div>
+                                    </div>
+                                    <div class="cut-wire-kin" id="cwKin5">—</div>
+                                </div>
+                                <div class="cut-stat-row">
+                                    <span class="cut-stat-label">Temp Setpoint</span>
+                                    <span class="cut-stat-val" id="cwTemp5">—</span>
+                                </div>
+                                <div class="cut-stat-row">
+                                    <span class="cut-stat-label">Feedrate</span>
+                                    <span class="cut-stat-val" id="cwFeed5">—</span>
+                                </div>
+                                <div class="cut-stat-row">
+                                    <span class="cut-stat-label">IPO Pos (Y/Z)</span>
+                                    <span class="cut-stat-val" id="cwPos5" style="font-family:'Consolas',monospace;font-size:9px;color:#888;">—</span>
+                                </div>
+                            </div>
+
+                            <!-- Wire 6 -->
+                            <div class="cut-wire-card" id="cwCard6">
+                                <div class="cut-wire-header">
+                                    <div class="cut-wire-dot" style="background:#CE93D8;"></div>
+                                    <div>
+                                        <div class="cut-wire-name">Wire 6</div>
+                                        <div class="cut-wire-role">Elec. Trough</div>
+                                    </div>
+                                    <div class="cut-wire-kin" id="cwKin6">—</div>
+                                </div>
+                                <div class="cut-stat-row">
+                                    <span class="cut-stat-label">Temp Setpoint</span>
+                                    <span class="cut-stat-val" id="cwTemp6">—</span>
+                                </div>
+                                <div class="cut-stat-row">
+                                    <span class="cut-stat-label">Feedrate</span>
+                                    <span class="cut-stat-val" id="cwFeed6">—</span>
+                                </div>
+                                <div class="cut-stat-row">
+                                    <span class="cut-stat-label">IPO Pos (X/Y)</span>
+                                    <span class="cut-stat-val" id="cwPos6" style="font-family:'Consolas',monospace;font-size:9px;color:#888;">—</span>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Block Visualization -->
+                <div class="panel">
+                    <div class="panel-title">
+                        <div class="cut-viz-title-row">
+                            <span class="cut-viz-label" id="cutVizLabel">Block Visualization</span>
+                            <span class="cut-viz-badge" id="cutVizBadge">IDLE</span>
+                            <div class="cut-cfg-inputs">
+                                Height&nbsp;<span id="cutCfgHeight" class="cut-cfg-val">—</span>mm
+                                <span class="cut-cfg-sep">|</span>
+                                Length&nbsp;<span id="cutCfgLength" class="cut-cfg-val">—</span>mm
+                                <span class="cut-cfg-sep">|</span>
+                                Depth&nbsp;<span id="cutCfgDepth" class="cut-cfg-val">—</span>mm
+                            </div>
+                        </div>
+                    </div>
+                    <div class="panel-body">
+                        <div class="cut-view-tabs">
+                            <button class="cut-view-tab active" data-view="end"    onclick="switchCutView('end')">End View</button>
+                            <button class="cut-view-tab" id="cutViewTabW5" data-view="window" onclick="switchCutView('window')">Window / Door</button>
+                            <button class="cut-view-tab" id="cutViewTabW6" data-view="trough" onclick="switchCutView('trough')">Elec. Trough</button>
+                        </div>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start;">
+                            <div>
+                                <div id="cutViewEnd">
+                                    <div class="cut-viz-sublabel">Cross-Section (End View) — Wires 1–4</div>
+                                    <div id="cutVizCrossSection" class="cut-svg-wrap"></div>
+                                </div>
+                                <div id="cutViewWindow" style="display:none;">
+                                    <div class="cut-viz-sublabel">Window / Door — Wire 5 (Face View)</div>
+                                    <div id="cutVizWindow" class="cut-svg-wrap"></div>
+                                </div>
+                                <div id="cutViewTrough" style="display:none;">
+                                    <div class="cut-viz-sublabel">Electrical Trough — Wire 6 (Top View)</div>
+                                    <div id="cutVizTrough" class="cut-svg-wrap"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="cut-viz-sublabel">Cut Progress</div>
+                                <div class="cut-progress-section" id="cutProgressSection"></div>
+                            </div>
+                        </div>
+
+                        <!-- NPG parse debug panel -->
+                        <div style="margin-top:16px;padding:10px 14px;background:#0a0a0a;border:1px solid #2a1a00;border-radius:4px;">
+                            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+                                <span style="font-size:10px;font-family:Consolas,monospace;color:#d4841a;text-transform:uppercase;letter-spacing:0.08em;">NPG Debug</span>
+                                <span style="font-size:9px;font-family:Consolas,monospace;color:#444;">— parsed cut geometry from WebDAV G-code files</span>
+                            </div>
+                            <div id="cutDebugW1" style="font-family:Consolas,monospace;font-size:11px;color:#888;line-height:1.8;">
+                                Waiting for first poll…
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
         <!-- Fault Detail Panel — shown whenever machine is FAULTED -->
         <div id="faultDetailPanel" class="fault-detail-panel">
             <div class="fdp-title">&#9888; Fault Details</div>
@@ -2292,6 +2575,13 @@
                     await writePLCVariable('GVL_HMI.HMI_JogAxis', selectedAxis, 'UINT');
                 } else if (pageName === 'homing' && selectedHomingAxis) {
                     await writePLCVariable('GVL_HMI.HMI_HomeAxis', selectedHomingAxis, 'UINT');
+                } else if (pageName === 'cutting') {
+                    // Render placeholder immediately so the panel is never blank
+                    const cfg = getCutCfg();
+                    const emptyNpg = { wireSlots:[[], [], [], []], blockThickness: cfg.depthMm, blockHeight: cfg.heightMm, w5: null, w6: [] };
+                    const emptyCuts = { wireY:[0,0,0,0,0,0], winY1:0, winY2:0, troughY1:0, troughY2:0 };
+                    renderCrossSection(cfg, emptyNpg, false, false, false);
+                    renderWireInfoPanel(emptyCuts, 0, false, false, false, {});
                 }
             } catch (e) {
                 console.error('Failed to sync axis selection on page switch:', e);
@@ -2711,6 +3001,11 @@
                 // Update GCode pipeline variables (only read when on gcode tab to reduce load)
                 if (currentPage === 'program') {
                     await updateGCodeTab();
+                }
+
+                // Update cutting tab (only when visible — reads axis positions + kin states)
+                if (currentPage === 'cutting') {
+                    await updateCuttingTab();
                 }
 
                 // Update debug page (only when visible)
@@ -3633,6 +3928,693 @@
             } else {
                 warnBadge.style.display = 'none';
             }
+        }
+
+        // ── Cutting tab ───────────────────────────────────────────────────
+        let _activeCutView = 'end';  // tracks which SVG panel is shown
+        let _npgDataCache  = null;   // cached NPG parse result — reused while busy, cleared on idle
+
+        const CUT_WIRES = [
+            { num:1, label:'Wire 1', color:'#F44336', kinGroup:'Wire1',   axisY:'Axis_14', axisX:'Axis_15' },
+            { num:2, label:'Wire 2', color:'#FF8F00', kinGroup:'Wire2',   axisY:'Axis_18', axisX:'Axis_19' },
+            { num:3, label:'Wire 3', color:'#2196F3', kinGroup:'Wire3',   axisY:'Axis_22', axisX:'Axis_23' },
+            { num:4, label:'Wire 4', color:'#4CAF50', kinGroup:'Wire4',   axisY:'Axis_26', axisX:'Axis_27' },
+            { num:5, label:'Wire 5', color:'#9C27B0', kinGroup:'Wire5_6', axisY:'Axis_31', axisX:'Axis_30' },
+            { num:6, label:'Wire 6', color:'#CE93D8', kinGroup:'Wire5_6', axisY:'Axis_35', axisX:'Axis_36' },
+        ];
+
+        const SVG_VW = 560, SVG_VH = 220;
+        const BLK_X = 78, BLK_Y = 18, BLK_W = 430, BLK_H = 182;
+
+        function getCutCfg() {
+            return {
+                heightMm: parseFloat(document.getElementById('cutCfgHeight')?.textContent) || 1219,
+                lengthMm: parseFloat(document.getElementById('cutCfgLength')?.textContent) || 4877,
+                depthMm:  parseFloat(document.getElementById('cutCfgDepth')?.textContent)  || 610,
+            };
+        }
+
+        function cwKinBadge(state) {
+            const s = String(state || '--').toUpperCase().trim();
+            const cls = s === 'STANDBY'                         ? 'kos-standby'
+                      : (s === 'BUSY' || s === 'MOVING')        ? 'kos-busy'
+                      : (s === 'ERROR' || s === 'ERRORSTOP')    ? 'kos-err'
+                      : (s === 'DISABLED' || s === 'NOT_READY') ? 'kos-disabled'
+                      : s === 'INIT'                            ? 'kos-init'
+                      : 'kos-unknown';
+            return `<span class="kin-badge ${cls}">${s}</span>`;
+        }
+
+        async function readAxisPos(axisName) {
+            try {
+                // ctrlX Data Layer uses kebab-case: actual-position (not camelCase)
+                const v = await readDatalayerNode(`motion/axs/${axisName}/state/values/actual-position`);
+                return parseFloat(v) || 0;
+            } catch { return 0; }
+        }
+
+        function toPx(posMm, maxMm, svgLen, svgStart, invert = false) {
+            const t = Math.max(0, Math.min(1, maxMm > 0 ? posMm / maxMm : 0));
+            return svgStart + (invert ? (1 - t) : t) * svgLen;
+        }
+
+        // ── Fetch Wire*.npg from ctrlX WebDAV and parse cut positions ────────
+        // Wire 1-4: stud cuts — Z coordinate = height from block bottom (mm)
+        // Parse NPG G-code files and return full slot geometry for visualization.
+        // Parses comment lines written by channel_gcode_generator.py (always present).
+        async function fetchNpgPositions(w5Active, w6Active) {
+            const base = `https://${config.plcAddress}/solutions/webdav/appdata/scripts/gcode/`;
+            const hdrs = authToken ? { 'Authorization': `Bearer ${authToken}` } : {};
+
+            async function fetchNpg(name) {
+                try {
+                    const r = await fetch(`${base}${name}.npg`, { headers: hdrs });
+                    if (!r.ok) return { ok: false, text: null, status: `HTTP ${r.status}` };
+                    return { ok: true, text: await r.text(), status: 'OK' };
+                } catch (e) {
+                    return { ok: false, text: null, status: String(e) };
+                }
+            }
+
+            // Parse stud slots from comment lines: // Slot N: Z zBot-zTop mm  depth X=xDepth
+            function parseStudSlots(text) {
+                if (!text) return { slots: [], face: null, blockThickness: null, blockHeight: null };
+                const thickM  = text.match(/Machine X:.*?([\d.]+)=face B/i);
+                const heightM = text.match(/Machine Z:.*?([\d.]+)=block top/i);
+                const faceM   = text.match(/WIRE\s+\d+\s+-\s+FACE\s+([AB])/i);
+                const blockThickness = thickM  ? parseFloat(thickM[1])  : null;
+                const blockHeight    = heightM ? parseFloat(heightM[1]) : null;
+                const face           = faceM   ? faceM[1].toUpperCase() : null;
+                const slots = [];
+                for (const line of text.split('\n')) {
+                    const m = line.match(/\/\/\s*Slot\s+\d+:\s*Z\s*([\d.]+)-([\d.]+)\s*mm\s+depth\s+X=([\d.]+)/i);
+                    if (m) {
+                        const zBot   = parseFloat(m[1]);
+                        const zTop   = parseFloat(m[2]);
+                        const xDepth = parseFloat(m[3]);
+                        const xEntry = (face === 'B' && blockThickness != null) ? blockThickness : 0;
+                        slots.push({ zBot, zTop, xEntry, xDepth });
+                    }
+                }
+                return { slots, face, blockThickness, blockHeight };
+            }
+
+            // Parse Wire 5 opening: // Opening: Y yLeft-yRight mm  Z zSill-zHeader mm
+            function parseWire5(text) {
+                if (!text) return null;
+                const m   = text.match(/\/\/\s*Opening:\s*Y\s*([\d.]+)-([\d.]+)\s*mm\s+Z\s*([\d.]+)-([\d.]+)/i);
+                if (!m) return null;
+                const lenM = text.match(/Machine Y:.*?([\d.]+)=panel right end/i);
+                const htM  = text.match(/Machine Z:.*?([\d.]+)=block top/i);
+                return {
+                    yLeft: parseFloat(m[1]), yRight: parseFloat(m[2]),
+                    zSill: parseFloat(m[3]), zHeader: parseFloat(m[4]),
+                    blockLength: lenM ? parseFloat(lenM[1]) : null,
+                    blockHeight: htM  ? parseFloat(htM[1])  : null,
+                };
+            }
+
+            // Parse Wire 6 troughs: // Trough N: X xLeft-xRight mm  depth Y=yDepth mm
+            function parseWire6(text) {
+                if (!text) return [];
+                const lenM = text.match(/Machine X:.*?([\d.]+)=panel right end/i);
+                const blockLength = lenM ? parseFloat(lenM[1]) : null;
+                const troughs = [];
+                for (const line of text.split('\n')) {
+                    const m = line.match(/\/\/\s*Trough\s+\d+:\s*X\s*([\d.]+)-([\d.]+)\s*mm\s+depth\s+Y=([\d.]+)/i);
+                    if (m) troughs.push({ xLeft: parseFloat(m[1]), xRight: parseFloat(m[2]), yDepth: parseFloat(m[3]), blockLength });
+                }
+                return troughs;
+            }
+
+            const fetches = [fetchNpg('Wire1'), fetchNpg('Wire2'), fetchNpg('Wire3'), fetchNpg('Wire4')];
+            fetches.push(w5Active ? fetchNpg('Wire5') : Promise.resolve({ ok: false, text: null, status: 'inactive' }));
+            fetches.push(w6Active ? fetchNpg('Wire6') : Promise.resolve({ ok: false, text: null, status: 'inactive' }));
+            const [r1, r2, r3, r4, r5, r6] = await Promise.all(fetches);
+
+            const w1d = parseStudSlots(r1.text);
+            const w2d = parseStudSlots(r2.text);
+            const w3d = parseStudSlots(r3.text);
+            const w4d = parseStudSlots(r4.text);
+            const w5d = parseWire5(r5.text);
+            const w6d = parseWire6(r6.text);
+
+            const blockThickness = w1d.blockThickness ?? w3d.blockThickness ?? null;
+            const blockHeight    = w1d.blockHeight    ?? w3d.blockHeight    ?? null;
+
+            // Legacy wireY: median slot-bottom Z per wire (for info panel)
+            const repZ = (d) => {
+                if (!d.slots.length) return 0;
+                const zb = d.slots.map(s => s.zBot).sort((a,b)=>a-b);
+                return zb[Math.floor(zb.length / 2)];
+            };
+            const wireY = [repZ(w1d), repZ(w2d), repZ(w3d), repZ(w4d), 0, 0];
+
+            return {
+                wireSlots:      [w1d.slots, w2d.slots, w3d.slots, w4d.slots],
+                wireFaces:      [w1d.face,  w2d.face,  w3d.face,  w4d.face],
+                blockThickness, blockHeight,
+                w5: w5d,
+                w6: w6d,
+                positions: {
+                    wireY,
+                    winY1:    w5d ? w5d.zSill   : 0,
+                    winY2:    w5d ? w5d.zHeader  : 0,
+                    troughY1: 0,
+                    troughY2: 0,
+                },
+                w1ok:    r1.ok,
+                w1status: r1.status,
+                w1slots: w1d.slots,
+            };
+        }
+
+        async function updateCuttingTab() {
+            try {
+                // Pipeline flags
+                const [busyR, wiresR, w5R, w6R] = await Promise.all([
+                    readPLCVariable('GVL_GCode.bBusy').catch(() => false),
+                    readPLCVariable('GVL_GCode.nActiveWires').catch(() => 4),
+                    readPLCVariable('GVL_GCode.bWire5Active').catch(() => false),
+                    readPLCVariable('GVL_GCode.bWire6Active').catch(() => false),
+                ]);
+                const isBusy   = Boolean(busyR);
+                const nWires   = parseInt(wiresR) || 4;
+                const w5Active = Boolean(w5R);
+                const w6Active = Boolean(w6R);
+
+                // Wire temp array (1-indexed, written by PLC) + single shared feedrate (written by Python)
+                // ctrlX Data Layer: read the whole array, not individual elements (brackets cause 400)
+                const [wireTempArr, feedrateR] = await Promise.all([
+                    readPLCVariable('GVL_GCode.rWireTemp').catch(() => null),
+                    readPLCVariable('GVL_GCode.rWireFeedrate').catch(() => 0),
+                ]);
+                // rWireTemp is 1-indexed in PLC; ctrlX returns it as a 0-indexed JSON array
+                const tempArray = Array.isArray(wireTempArr) ? wireTempArr : [];
+                const temps = CUT_WIRES.map(w => tempArray[w.num - 1] ?? 0);
+                const feeds = CUT_WIRES.map(() => parseFloat(feedrateR) || 0);
+
+                // Kinematic opstates + commanded cartesian positions + Wire5_6 active script — single parallel batch
+                const kinGroups = ['Wire1', 'Wire2', 'Wire3', 'Wire4', 'Wire5_6'];
+                const [kinStates, posReads, w56ScriptRaw] = await Promise.all([
+                    Promise.all(kinGroups.map(g =>
+                        readDatalayerNode(`motion/kin/${g}/state/opstate/plcopen`).catch(() => '--'))),
+                    Promise.all(kinGroups.map(g =>
+                        readDatalayerNode(`motion/kin/${g}/state/values/ipo/pos`).catch(() => null))),
+                    readDatalayerNode('script/instances/Wire5_6/state/script').catch(() => null),
+                ]);
+                // Extract stem from path like ".../Wire6.npg" → 'Wire5' | 'Wire6' | null
+                const w56ScriptStem = (() => {
+                    const val = typeof w56ScriptRaw === 'string' ? w56ScriptRaw
+                              : (w56ScriptRaw && typeof w56ScriptRaw.value === 'string') ? w56ScriptRaw.value
+                              : null;
+                    if (!val) return null;
+                    const base = val.split('/').pop().replace(/\.[^.]+$/, '');  // e.g. "Wire6"
+                    return (base === 'Wire5' || base === 'Wire6') ? base : null;
+                })();
+                const kinMap = {};
+                // posMap[kinGroup] = [coord0, coord1, ...] — axis order matches ctrlX kinematic definition
+                // Wire1-4: [X (depth into block), Z (height from bottom)]
+                // Wire5_6: [Y (length position), Z (height)] for Wire5; [X (length pos), Y (depth)] for Wire6
+                const posMap = {};
+                kinGroups.forEach((g, i) => {
+                    kinMap[g] = kinStates[i];
+                    const p = posReads[i];
+                    // ctrlX returns { pos: [16 floats], units: [...] } — extract the pos array
+                    const arr = p && Array.isArray(p.pos) ? p.pos
+                              : Array.isArray(p)          ? p
+                              : null;
+                    posMap[g] = arr ? arr.map(Number) : null;
+                });
+
+                // Update wire cards
+                CUT_WIRES.forEach((w, i) => {
+                    const card   = document.getElementById(`cwCard${w.num}`);
+                    const kinEl  = document.getElementById(`cwKin${w.num}`);
+                    const tempEl = document.getElementById(`cwTemp${w.num}`);
+                    const feedEl = document.getElementById(`cwFeed${w.num}`);
+                    if (!card) return;
+
+                    // Wire5/6 share the Wire5_6 kinematic — only the one whose script
+                    // is currently loaded is "active". w56ScriptStem disambiguates.
+                    const isActive = w.num <= 4 ? isBusy
+                                   : w.num === 5 ? (w5Active && w56ScriptStem === 'Wire5')
+                                   : (w6Active && w56ScriptStem === 'Wire6');
+
+                    card.className = 'cut-wire-card' + (isActive ? ' cw-active' : '');
+
+                    // Wire5/6 share Wire5_6 kin — show real state only for the script currently loaded
+                    const kinState = (w.num === 5 || w.num === 6)
+                        ? (w56ScriptStem === `Wire${w.num}` ? kinMap['Wire5_6'] : 'STANDBY')
+                        : kinMap[w.kinGroup];
+                    if (kinEl) kinEl.innerHTML = cwKinBadge(kinState);
+
+                    const t = parseFloat(temps[i]);
+                    if (tempEl) {
+                        tempEl.textContent = t > 0 ? `${t.toFixed(1)} %` : '—';
+                        tempEl.className = 'cut-stat-val' + (t > 0 && isActive ? ' live' : '');
+                    }
+                    const f = parseFloat(feeds[i]);
+                    if (feedEl) {
+                        feedEl.textContent = f > 0 ? `${Math.round(f)} mm/min` : '—';
+                        feedEl.className = 'cut-stat-val' + (f > 0 && isActive ? ' live' : '');
+                    }
+
+                    // Live IPO position — labeled by confirmed axis mapping
+                    const posEl = document.getElementById(`cwPos${w.num}`);
+                    if (posEl) {
+                        const pos = posMap[w.kinGroup];
+                        if (Array.isArray(pos) && pos.length > 0) {
+                            let txt;
+                            if (w.num <= 4) {
+                                // Stud wires: pos[0]=X(depth), pos[1]=Z(height)
+                                txt = `X:${pos[0].toFixed(1)}  Z:${pos[1].toFixed(1)}`;
+                            } else if (w.num === 5) {
+                                // Wire 5 window/door: pos[1]=Y(length), pos[2]=Z(height)
+                                txt = `Y:${(pos[1]??0).toFixed(1)}  Z:${(pos[2]??0).toFixed(1)}`;
+                            } else {
+                                // Wire 6 trough: pos[0]=X(length), pos[1]=Y(depth)
+                                txt = `X:${pos[0].toFixed(1)}  Y:${(pos[1]??0).toFixed(1)}`;
+                            }
+                            posEl.textContent = txt;
+                            posEl.style.color = isActive ? '#1a1a1a' : '#555';
+                        } else {
+                            posEl.textContent = '—';
+                            posEl.style.color = '#888';
+                        }
+                    }
+                });
+
+                // Determine which visualization to show.
+                // Priority: if any stud kin group is BUSY → stud view.
+                // Else if Wire5_6 is BUSY and w5Active → window view.
+                // Else if Wire5_6 is BUSY and w6Active → electrical view.
+                // Else idle.
+                // Badge
+                const badge = document.getElementById('cutVizBadge');
+                if (badge) {
+                    badge.textContent = isBusy ? 'CUTTING' : 'IDLE';
+                    badge.className   = 'cut-viz-badge' + (isBusy ? ' viz-cutting' : '');
+                }
+                const label = document.getElementById('cutVizLabel');
+                if (label) label.textContent = 'Block Visualization';
+
+                // Read cut positions by fetching the staged NPG files from the ctrlX WebDAV.
+                // While busy, reuse the cached result — files don't change mid-cut and
+                // re-fetching all 6 WebDAV files every 500 ms would dominate the cycle time.
+                if (!isBusy || !_npgDataCache) {
+                    _npgDataCache = await fetchNpgPositions(w5Active, w6Active);
+                }
+                const npgData      = _npgDataCache;
+                const cutPositions = npgData.positions;
+
+                // Update block dimension readouts from parsed NPG geometry
+                const _hEl = document.getElementById('cutCfgHeight');
+                const _lEl = document.getElementById('cutCfgLength');
+                const _dEl = document.getElementById('cutCfgDepth');
+                if (_hEl) _hEl.textContent = npgData.blockHeight     ? Math.round(npgData.blockHeight)     : '—';
+                if (_dEl) _dEl.textContent = npgData.blockThickness   ? Math.round(npgData.blockThickness)  : '—';
+                if (_lEl) {
+                    const bl = npgData.w5?.blockLength ?? npgData.w6?.[0]?.blockLength ?? null;
+                    _lEl.textContent = bl ? Math.round(bl) : '—';
+                }
+
+                // Tabs always visible — no show/hide needed
+
+                // ── NPG debug panel ───────────────────────────────────────
+                const dbg = document.getElementById('cutDebugW1');
+                if (dbg) {
+                    const ts = new Date().toLocaleTimeString();
+                    const slotSummary = (npgData.wireSlots ?? []).map((slots, wi) =>
+                        `W${wi+1}(${npgData.wireFaces?.[wi]??'?'}): ${slots.length ? slots.map(s=>`${s.zBot.toFixed(0)}–${s.zTop.toFixed(0)}`).join(', ') : 'no slots'}`
+                    ).join(' | ');
+                    const w5str = npgData.w5
+                        ? `Y${npgData.w5.yLeft.toFixed(0)}–${npgData.w5.yRight.toFixed(0)} Z${npgData.w5.zSill.toFixed(0)}–${npgData.w5.zHeader.toFixed(0)}`
+                        : 'none';
+                    const w6str = npgData.w6?.length
+                        ? npgData.w6.map(t=>`${t.xLeft.toFixed(0)}–${t.xRight.toFixed(0)}`).join(', ')
+                        : 'none';
+                    dbg.innerHTML = `<span style="color:#555;">[${ts}]</span>
+<table style="width:100%;border-collapse:collapse;margin-top:4px;">
+  <tr><td style="color:#666;padding:1px 8px 1px 0;white-space:nowrap;">W1 fetch</td>
+      <td style="color:${npgData.w1ok?'#a0d090':'#e07070'};">${npgData.w1status}</td></tr>
+  <tr><td style="color:#666;padding:1px 8px 1px 0;">Block geometry</td>
+      <td style="color:#c8b87a;">${(npgData.blockThickness??'?')} mm thick × ${(npgData.blockHeight??'?')} mm tall</td></tr>
+  <tr><td style="color:#666;padding:1px 8px 1px 0;">Stud slots (Z ranges)</td>
+      <td style="color:#a0d090;">${slotSummary}</td></tr>
+  <tr><td style="color:#666;padding:1px 8px 1px 0;">W5 opening</td>
+      <td style="color:#c8b87a;">${w5str}</td></tr>
+  <tr><td style="color:#666;padding:1px 8px 1px 0;">W6 troughs (X pos)</td>
+      <td style="color:#c8b87a;">${w6str}</td></tr>
+</table>`;
+                }
+
+                const cfg = getCutCfg();
+                renderCrossSection(cfg, npgData, isBusy, w5Active, w6Active, posMap);
+                renderWindowView(cfg, npgData, isBusy, w5Active, posMap);
+                renderTroughView(cfg, npgData, isBusy, w6Active, posMap);
+                renderWireInfoPanel(cutPositions, feeds[0], isBusy, w5Active, w6Active, kinMap);
+
+            } catch (e) {
+                console.error('Cutting tab update failed:', e);
+            }
+        }
+
+        // ── Cross-section (end view) — shows slot rectangles from all 4 stud wires ──
+        // npgData: result from fetchNpgPositions; cfg: {heightMm, depthMm, lengthMm}
+        function renderCrossSection(cfg, npgData, isBusy, w5Active, w6Active, posMap) {
+            const wrapper = document.getElementById('cutVizCrossSection');
+            if (!wrapper) return;
+
+            const vw = 400, vh = 300;
+            const pad = { left: 46, right: 14, top: 22, bottom: 22 };
+            const drawW = vw - pad.left - pad.right;
+            const drawH = vh - pad.top  - pad.bottom;
+
+            // Geometry from parsed NPG data (prefer) or cfg inputs (fallback)
+            const blockThick  = npgData?.blockThickness ?? cfg.depthMm;
+            const blockHeight = npgData?.blockHeight    ?? cfg.heightMm;
+            const wireSlots   = npgData?.wireSlots      ?? [[], [], [], []];
+
+            // Coordinate mappers: X = thickness axis, Y = height axis
+            const toX = (mx) => pad.left + (mx / blockThick) * drawW;
+            const toY = (mz) => pad.top  + (1 - mz / blockHeight) * drawH;
+
+            const L = [];
+            L.push(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${vw} ${vh}" style="width:100%;display:block;">`);
+            L.push(`<rect width="${vw}" height="${vh}" fill="#0f0f0f"/>`);
+
+            // Foam block rectangle
+            const bx0 = toX(0), bx1 = toX(blockThick);
+            const by0 = toY(blockHeight), by1 = toY(0);
+            L.push(`<rect x="${bx0.toFixed(1)}" y="${by0.toFixed(1)}" width="${(bx1-bx0).toFixed(1)}" height="${(by1-by0).toFixed(1)}" fill="#3d2b10" stroke="#d4841a" stroke-width="2"/>`);
+
+            // Horizontal grid lines + Z tick labels
+            const zStep = blockHeight > 1000 ? 200 : 100;
+            for (let z = 0; z <= blockHeight; z += zStep) {
+                const sy = toY(z);
+                L.push(`<line x1="${bx0.toFixed(1)}" y1="${sy.toFixed(1)}" x2="${bx1.toFixed(1)}" y2="${sy.toFixed(1)}" stroke="#5a4020" stroke-width="0.5" stroke-dasharray="3 4"/>`);
+                L.push(`<line x1="${(bx0-4).toFixed(1)}" y1="${sy.toFixed(1)}" x2="${bx0.toFixed(1)}" y2="${sy.toFixed(1)}" stroke="#7a6040" stroke-width="1"/>`);
+                L.push(`<text x="${(bx0-6).toFixed(1)}" y="${(sy+3.5).toFixed(1)}" text-anchor="end" fill="#c09060" font-size="9" font-family="Consolas,monospace">${z}</text>`);
+            }
+
+            // Face labels (Face A = left/X=0, Face B = right/X=blockThick)
+            L.push(`<text x="${bx0.toFixed(1)}" y="${(pad.top-6).toFixed(1)}" text-anchor="middle" fill="#9a8060" font-size="9" font-family="Consolas,monospace">A</text>`);
+            L.push(`<text x="${bx1.toFixed(1)}" y="${(pad.top-6).toFixed(1)}" text-anchor="middle" fill="#9a8060" font-size="9" font-family="Consolas,monospace">B</text>`);
+
+            const hasSlots = wireSlots.some(ws => ws.length > 0);
+
+            // Draw slot rectangles for each wire
+            // W1(red)=Face B lower, W2(orange)=Face B upper, W3(blue)=Face A lower, W4(cyan)=Face A upper
+            wireSlots.forEach((slots, wi) => {
+                const color = CUT_WIRES[wi].color;
+                const op    = hasSlots ? (isBusy ? 1 : 0.85) : 0.15;
+                slots.forEach(slot => {
+                    const sx0 = toX(Math.min(slot.xEntry, slot.xDepth));
+                    const sx1 = toX(Math.max(slot.xEntry, slot.xDepth));
+                    const sy0 = toY(slot.zTop);
+                    const sy1 = toY(slot.zBot);
+                    const rw  = sx1 - sx0, rh = sy1 - sy0;
+                    // Filled pocket + border
+                    L.push(`<rect x="${sx0.toFixed(1)}" y="${sy0.toFixed(1)}" width="${rw.toFixed(1)}" height="${rh.toFixed(1)}" fill="${color}" opacity="${(op * 0.2).toFixed(2)}" rx="1"/>`);
+                    L.push(`<rect x="${sx0.toFixed(1)}" y="${sy0.toFixed(1)}" width="${rw.toFixed(1)}" height="${rh.toFixed(1)}" fill="none" stroke="${color}" stroke-width="${isBusy ? 2 : 1.5}" opacity="${op.toFixed(2)}" rx="1"/>`);
+                });
+            });
+
+            // Wire 5 opening band in the end view (spans full thickness)
+            if (w5Active && npgData?.w5) {
+                const w5  = npgData.w5;
+                const sy0 = toY(w5.zHeader), sy1 = toY(w5.zSill);
+                const c5  = CUT_WIRES[4].color;
+                const op5 = isBusy ? 1 : 0.75;
+                L.push(`<rect x="${bx0.toFixed(1)}" y="${sy0.toFixed(1)}" width="${(bx1-bx0).toFixed(1)}" height="${(sy1-sy0).toFixed(1)}" fill="${c5}" opacity="0.12" rx="1"/>`);
+                L.push(`<line x1="${bx0.toFixed(1)}" y1="${sy0.toFixed(1)}" x2="${bx1.toFixed(1)}" y2="${sy0.toFixed(1)}" stroke="${c5}" stroke-width="1.5" opacity="${op5}" stroke-dasharray="5 3"/>`);
+                L.push(`<line x1="${bx0.toFixed(1)}" y1="${sy1.toFixed(1)}" x2="${bx1.toFixed(1)}" y2="${sy1.toFixed(1)}" stroke="${c5}" stroke-width="1.5" opacity="${op5}" stroke-dasharray="5 3"/>`);
+            }
+
+            // No-data overlay
+            if (!hasSlots) {
+                const mx = (bx0 + bx1) / 2, my = pad.top + drawH / 2;
+                L.push(`<text x="${mx.toFixed(1)}" y="${(my - 6).toFixed(1)}" text-anchor="middle" fill="#d4a060" font-size="11" font-family="Consolas,monospace">Waiting for job</text>`);
+                L.push(`<text x="${mx.toFixed(1)}" y="${(my + 10).toFixed(1)}" text-anchor="middle" fill="#8a6840" font-size="9" font-family="Consolas,monospace">Upload G-code to see cut positions</text>`);
+            }
+
+            // Live wire position dots (end view: ipo/pos = [X_depth, Z_height])
+            // Render whenever posMap has data so position can be verified even when idle
+            if (posMap) {
+                CUT_WIRES.slice(0, 4).forEach((w) => {
+                    const pos = posMap[w.kinGroup];
+                    if (!pos || pos.length < 2) return;
+                    const cx = toX(pos[0]);
+                    const cy = toY(pos[1]);
+                    const c  = w.color;
+                    L.push(`<line x1="${(cx-10).toFixed(1)}" y1="${cy.toFixed(1)}" x2="${(cx+10).toFixed(1)}" y2="${cy.toFixed(1)}" stroke="${c}" stroke-width="1" opacity="0.65"/>`);
+                    L.push(`<line x1="${cx.toFixed(1)}" y1="${(cy-10).toFixed(1)}" x2="${cx.toFixed(1)}" y2="${(cy+10).toFixed(1)}" stroke="${c}" stroke-width="1" opacity="0.65"/>`);
+                    L.push(`<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="5.5" fill="none" stroke="${c}" stroke-width="1.5" opacity="0.7"/>`);
+                    L.push(`<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="2.5" fill="${c}" opacity="1"><animate attributeName="opacity" values="1;0.25;1" dur="0.9s" repeatCount="indefinite"/></circle>`);
+                });
+            }
+
+            // Caption
+            L.push(`<text x="${((bx0+bx1)/2).toFixed(1)}" y="${(vh - 4).toFixed(1)}" text-anchor="middle" fill="#806040" font-size="8" font-family="Consolas,monospace">End view — ${blockHeight.toFixed(0)} mm tall × ${blockThick.toFixed(0)} mm deep</text>`);
+            L.push(`</svg>`);
+            wrapper.innerHTML = L.join('');
+        }
+
+        // ── Window / Door face view — Wire 5 ────────────────────────────────
+        function renderWindowView(cfg, npgData, isBusy, w5Active, posMap) {
+            const wrapper = document.getElementById('cutVizWindow');
+            if (!wrapper) return;
+            if (!npgData?.w5) {
+                wrapper.innerHTML = '<div style="padding:20px;text-align:center;color:#555;font-family:Consolas,monospace;font-size:11px;">No window / door G-code found</div>';
+                return;
+            }
+            const w5 = npgData.w5;
+            const blockLen = w5.blockLength ?? cfg.lengthMm;
+            const blockHt  = w5.blockHeight ?? npgData.blockHeight ?? cfg.heightMm;
+
+            const vw = 400, vh = 260;
+            const pad = { left: 46, right: 12, top: 22, bottom: 22 };
+            const drawW = vw - pad.left - pad.right, drawH = vh - pad.top - pad.bottom;
+
+            const toX = (y) => pad.left + (y / blockLen)  * drawW;
+            const toY = (z) => pad.top  + (1 - z / blockHt) * drawH;
+            const c5  = CUT_WIRES[4].color;
+
+            const L = [];
+            L.push(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${vw} ${vh}" style="width:100%;display:block;">`);
+            L.push(`<rect width="${vw}" height="${vh}" fill="#0f0f0f"/>`);
+            // Block face
+            L.push(`<rect x="${pad.left}" y="${pad.top}" width="${drawW}" height="${drawH}" fill="#3d2b10" stroke="#d4841a" stroke-width="2"/>`);
+            // Grid
+            const zStep = blockHt > 1000 ? 200 : 100;
+            for (let z = 0; z <= blockHt; z += zStep) {
+                const sy = toY(z);
+                L.push(`<line x1="${pad.left}" y1="${sy.toFixed(1)}" x2="${(pad.left+drawW).toFixed(1)}" y2="${sy.toFixed(1)}" stroke="#5a4020" stroke-width="0.5" stroke-dasharray="3 4"/>`);
+                L.push(`<text x="${(pad.left-6).toFixed(1)}" y="${(sy+3.5).toFixed(1)}" text-anchor="end" fill="#c09060" font-size="9" font-family="Consolas,monospace">${z}</text>`);
+            }
+            // Opening rectangle
+            const ox0 = toX(w5.yLeft), ox1 = toX(w5.yRight);
+            const oy0 = toY(w5.zHeader), oy1 = toY(w5.zSill);
+            const openW = ox1 - ox0, openH = oy1 - oy0;
+            L.push(`<rect x="${ox0.toFixed(1)}" y="${oy0.toFixed(1)}" width="${openW.toFixed(1)}" height="${openH.toFixed(1)}" fill="${c5}" opacity="0.25" rx="2"/>`);
+            L.push(`<rect x="${ox0.toFixed(1)}" y="${oy0.toFixed(1)}" width="${openW.toFixed(1)}" height="${openH.toFixed(1)}" fill="none" stroke="${c5}" stroke-width="2" opacity="${isBusy?1:0.85}" rx="2"/>`);
+            // Corner dots
+            [[ox0,oy0],[ox1,oy0],[ox1,oy1],[ox0,oy1]].forEach(([cx,cy]) =>
+                L.push(`<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="3.5" fill="${c5}" opacity="0.9"/>`)
+            );
+            // Dimension label
+            const midX = (ox0+ox1)/2, midY = (oy0+oy1)/2;
+            L.push(`<text x="${midX.toFixed(1)}" y="${(midY+3.5).toFixed(1)}" text-anchor="middle" fill="${c5}" font-size="9" font-family="Consolas,monospace">${(w5.yRight-w5.yLeft).toFixed(0)} × ${(w5.zHeader-w5.zSill).toFixed(0)} mm</text>`);
+            // Z-height annotations (header + sill) aligned with left tick column
+            L.push(`<line x1="${(pad.left-4).toFixed(1)}" y1="${oy0.toFixed(1)}" x2="${pad.left}" y2="${oy0.toFixed(1)}" stroke="${c5}" stroke-width="1"/>`);
+            L.push(`<text x="${(pad.left-6).toFixed(1)}" y="${(oy0+3.5).toFixed(1)}" text-anchor="end" fill="${c5}" font-size="8" font-family="Consolas,monospace">${w5.zHeader.toFixed(0)}</text>`);
+            L.push(`<line x1="${(pad.left-4).toFixed(1)}" y1="${oy1.toFixed(1)}" x2="${pad.left}" y2="${oy1.toFixed(1)}" stroke="${c5}" stroke-width="1"/>`);
+            L.push(`<text x="${(pad.left-6).toFixed(1)}" y="${(oy1+3.5).toFixed(1)}" text-anchor="end" fill="${c5}" font-size="8" font-family="Consolas,monospace">${w5.zSill.toFixed(0)}</text>`);
+            // Live wire 5 position dot (face view: Wire5_6 ipo/pos = [..., Y_length(idx1), Z_height(idx2)])
+            if (posMap) {
+                const pos = posMap['Wire5_6'];
+                if (pos && pos.length >= 3) {
+                    const cx = toX(pos[1]);
+                    const cy = toY(pos[2]);
+                    const c  = CUT_WIRES[4].color;
+                    L.push(`<line x1="${(cx-10).toFixed(1)}" y1="${cy.toFixed(1)}" x2="${(cx+10).toFixed(1)}" y2="${cy.toFixed(1)}" stroke="${c}" stroke-width="1" opacity="0.65"/>`);
+                    L.push(`<line x1="${cx.toFixed(1)}" y1="${(cy-10).toFixed(1)}" x2="${cx.toFixed(1)}" y2="${(cy+10).toFixed(1)}" stroke="${c}" stroke-width="1" opacity="0.65"/>`);
+                    L.push(`<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="5.5" fill="none" stroke="${c}" stroke-width="1.5" opacity="0.7"/>`);
+                    L.push(`<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="2.5" fill="${c}" opacity="1"><animate attributeName="opacity" values="1;0.25;1" dur="0.9s" repeatCount="indefinite"/></circle>`);
+                }
+            }
+
+            // Caption
+            L.push(`<text x="${(pad.left+drawW/2).toFixed(1)}" y="${(vh-4).toFixed(1)}" text-anchor="middle" fill="#806040" font-size="8" font-family="Consolas,monospace">Face view — ${blockLen.toFixed(0)} mm long × ${blockHt.toFixed(0)} mm tall</text>`);
+            L.push(`</svg>`);
+            wrapper.innerHTML = L.join('');
+        }
+
+        // ── Electrical trough top view — Wire 6 ─────────────────────────────
+        function renderTroughView(cfg, npgData, isBusy, w6Active, posMap) {
+            const wrapper = document.getElementById('cutVizTrough');
+            if (!wrapper) return;
+            if (!npgData?.w6?.length) {
+                wrapper.innerHTML = '<div style="padding:20px;text-align:center;color:#555;font-family:Consolas,monospace;font-size:11px;">No electrical trough G-code found</div>';
+                return;
+            }
+            const troughs   = npgData.w6;
+            const blockLen  = troughs[0].blockLength ?? cfg.lengthMm;
+            const maxDepth  = Math.max(...troughs.map(t => t.yDepth)) * 1.5;
+            const c6 = CUT_WIRES[5].color;
+
+            const vw = 400, vh = 200;
+            const pad = { left: 46, right: 12, top: 28, bottom: 22 };
+            const drawW = vw - pad.left - pad.right, drawH = vh - pad.top - pad.bottom;
+
+            const toX = (x) => pad.left + (x / blockLen) * drawW;
+            const toY = (y) => pad.top  + (y / maxDepth)  * drawH;  // 0=surface (top), +=into block
+
+            const L = [];
+            L.push(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${vw} ${vh}" style="width:100%;display:block;">`);
+            L.push(`<rect width="${vw}" height="${vh}" fill="#0f0f0f"/>`);
+            L.push(`<text x="${(pad.left+drawW/2).toFixed(1)}" y="14" text-anchor="middle" fill="#666" font-size="9" font-family="Consolas,monospace">Front Face — depth view (looking inward)</text>`);
+            // Face surface (top edge)
+            const surfY = toY(0);
+            L.push(`<rect x="${pad.left}" y="${surfY.toFixed(1)}" width="${drawW}" height="${(drawH - (surfY - pad.top)).toFixed(1)}" fill="#3d2b10" stroke="#d4841a" stroke-width="2"/>`);
+            L.push(`<text x="${(pad.left-6).toFixed(1)}" y="${(surfY+3.5).toFixed(1)}" text-anchor="end" fill="#c09060" font-size="8" font-family="Consolas,monospace">0</text>`);
+            // Troughs
+            troughs.forEach(t => {
+                const tx0 = toX(t.xLeft), tx1 = toX(t.xRight);
+                const ty0 = surfY, ty1 = toY(t.yDepth);
+                L.push(`<rect x="${tx0.toFixed(1)}" y="${ty0.toFixed(1)}" width="${(tx1-tx0).toFixed(1)}" height="${(ty1-ty0).toFixed(1)}" fill="${c6}" opacity="0.3" rx="1"/>`);
+                L.push(`<rect x="${tx0.toFixed(1)}" y="${ty0.toFixed(1)}" width="${(tx1-tx0).toFixed(1)}" height="${(ty1-ty0).toFixed(1)}" fill="none" stroke="${c6}" stroke-width="1.5" opacity="${isBusy?1:0.85}" rx="1"/>`);
+                const midX = (tx0+tx1)/2;
+                L.push(`<text x="${midX.toFixed(1)}" y="${(ty1+11).toFixed(1)}" text-anchor="middle" fill="${c6}" font-size="8" font-family="Consolas,monospace">${t.yDepth.toFixed(1)} mm</text>`);
+            });
+            // Depth label on left
+            L.push(`<text x="${(pad.left-6).toFixed(1)}" y="${(pad.top+drawH+3.5).toFixed(1)}" text-anchor="end" fill="#c09060" font-size="8" font-family="Consolas,monospace">${maxDepth.toFixed(0)}</text>`);
+            // Live wire 6 position dot (trough view: ipo/pos = [X_length, Y_depth])
+            // Wire5_6 shares the kin group; pos[0]/pos[1] ordering may need swap based on axis config
+            if (posMap) {
+                const pos = posMap['Wire5_6'];
+                if (pos && pos.length >= 2) {
+                    const cx = toX(pos[0]);
+                    const cy = toY(pos[1]);
+                    const c  = CUT_WIRES[5].color;
+                    L.push(`<line x1="${(cx-10).toFixed(1)}" y1="${cy.toFixed(1)}" x2="${(cx+10).toFixed(1)}" y2="${cy.toFixed(1)}" stroke="${c}" stroke-width="1" opacity="0.65"/>`);
+                    L.push(`<line x1="${cx.toFixed(1)}" y1="${(cy-10).toFixed(1)}" x2="${cx.toFixed(1)}" y2="${(cy+10).toFixed(1)}" stroke="${c}" stroke-width="1" opacity="0.65"/>`);
+                    L.push(`<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="5.5" fill="none" stroke="${c}" stroke-width="1.5" opacity="0.7"/>`);
+                    L.push(`<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="2.5" fill="${c}" opacity="1"><animate attributeName="opacity" values="1;0.25;1" dur="0.9s" repeatCount="indefinite"/></circle>`);
+                }
+            }
+
+            // Caption
+            L.push(`<text x="${(pad.left+drawW/2).toFixed(1)}" y="${(vh-4).toFixed(1)}" text-anchor="middle" fill="#806040" font-size="8" font-family="Consolas,monospace">${blockLen.toFixed(0)} mm panel length — depth from face surface</text>`);
+            L.push(`</svg>`);
+            wrapper.innerHTML = L.join('');
+        }
+
+        // ── View tab switcher ────────────────────────────────────────────────
+        function switchCutView(v) {
+            _activeCutView = v;
+            ['End', 'Window', 'Trough'].forEach(id => {
+                const el = document.getElementById('cutView' + id);
+                if (el) el.style.display = (id.toLowerCase() === v) ? '' : 'none';
+            });
+            document.querySelectorAll('.cut-view-tab').forEach(btn =>
+                btn.classList.toggle('active', btn.dataset.view === v)
+            );
+        }
+
+        // ── Wire info panel (programmed Y positions + feedrate) ──────────
+        // cutPositions: { wireY:[6], winY1, winY2, troughY1, troughY2 }
+        // kinMap: { Wire1, Wire2, Wire3, Wire4, Wire5_6 } → kin opstate strings
+        function renderWireInfoPanel(cutPositions, feedrate, isBusy, w5Active, w6Active, kinMap) {
+            const container = document.getElementById('cutProgressSection');
+            if (!container) return;
+
+            const wireY  = cutPositions.wireY  || [0,0,0,0,0,0];
+            const winY1  = cutPositions.winY1  || 0;
+            const winY2  = cutPositions.winY2  || 0;
+            const trY1   = cutPositions.troughY1 || 0;
+            const trY2   = cutPositions.troughY2 || 0;
+            const fStr   = feedrate > 0 ? `${Math.round(feedrate)} mm/min` : '—';
+            const noData = !isBusy && wireY.every(v => v === 0);
+
+            const kinBadge = (grp) => cwKinBadge(kinMap && kinMap[grp]);
+
+            const yRow = (label, color, yMm, kinGrp, active = true) => {
+                const yStr = (active && yMm > 0) ? `${yMm.toFixed(1)} mm` : (active ? '—' : 'inactive');
+                const valColor = active && yMm > 0 ? '#1a1a1a' : '#999';
+                return `<div class="cut-pbar-row">
+                    <div class="cut-pbar-lbl" style="color:${color};min-width:56px;font-weight:600;">${label}</div>
+                    <div style="flex:1;display:flex;align-items:center;gap:6px;">
+                        <span style="font-size:10px;color:#555;font-family:Consolas,monospace;">Cut&nbsp;Y:</span>
+                        <span style="font-family:Consolas,monospace;font-size:12px;color:${valColor};min-width:72px;">${yStr}</span>
+                        ${kinBadge(kinGrp)}
+                    </div>
+                </div>`;
+            };
+
+            let html = `<div style="font-size:10px;color:#333;font-weight:600;font-family:Consolas,monospace;margin-bottom:6px;letter-spacing:0.04em;">
+                PROGRAMMED CUT POSITIONS
+            </div>`;
+
+            // Stud wires W1-W4
+            html += `<div style="margin-bottom:4px;font-size:9px;color:#444;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;">Stud Carving</div>`;
+            CUT_WIRES.slice(0, 4).forEach((w, i) => {
+                html += yRow(w.label, w.color, wireY[i], w.kinGroup);
+            });
+
+            // Divider
+            html += `<div style="border-top:1px solid #ccc;margin:8px 0 4px;"></div>`;
+            html += `<div style="font-size:9px;color:#444;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">Window / Door / Trough</div>`;
+
+            // Wire 5 (window/door)
+            const w5Lbl = 'Wire 5';
+            const w5Color = CUT_WIRES[4].color;
+            if (w5Active) {
+                html += `<div class="cut-pbar-row">
+                    <div class="cut-pbar-lbl" style="color:${w5Color};min-width:56px;font-weight:600;">${w5Lbl}</div>
+                    <div style="flex:1;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                        <span style="font-size:10px;color:#555;font-family:Consolas,monospace;">Y1:</span>
+                        <span style="font-family:Consolas,monospace;font-size:12px;color:${winY1>0?'#1a1a1a':'#999'};">${winY1 > 0 ? winY1.toFixed(1)+' mm' : '—'}</span>
+                        <span style="font-size:10px;color:#555;font-family:Consolas,monospace;">Y2:</span>
+                        <span style="font-family:Consolas,monospace;font-size:12px;color:${winY2>0?'#1a1a1a':'#999'};">${winY2 > 0 ? winY2.toFixed(1)+' mm' : '—'}</span>
+                        ${kinBadge('Wire5_6')}
+                    </div>
+                </div>`;
+            } else {
+                html += yRow(w5Lbl, w5Color, 0, 'Wire5_6', false);
+            }
+
+            // Wire 6 (electrical trough)
+            const w6Color = CUT_WIRES[5].color;
+            if (w6Active) {
+                html += `<div class="cut-pbar-row" style="margin-top:2px;">
+                    <div class="cut-pbar-lbl" style="color:${w6Color};min-width:56px;font-weight:600;">Wire 6</div>
+                    <div style="flex:1;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                        <span style="font-size:10px;color:#555;font-family:Consolas,monospace;">Y1:</span>
+                        <span style="font-family:Consolas,monospace;font-size:12px;color:${trY1>0?'#1a1a1a':'#999'};">${trY1 > 0 ? trY1.toFixed(1)+' mm' : '—'}</span>
+                        <span style="font-size:10px;color:#555;font-family:Consolas,monospace;">Y2:</span>
+                        <span style="font-family:Consolas,monospace;font-size:12px;color:${trY2>0?'#1a1a1a':'#999'};">${trY2 > 0 ? trY2.toFixed(1)+' mm' : '—'}</span>
+                        ${kinBadge('Wire5_6')}
+                    </div>
+                </div>`;
+            } else {
+                html += yRow('Wire 6', w6Color, 0, 'Wire5_6', false);
+            }
+
+            // Feedrate footer
+            html += `<div style="border-top:1px solid #ccc;margin:8px 0 0;padding-top:6px;display:flex;align-items:center;gap:8px;">
+                <span style="font-size:10px;color:#444;font-weight:600;font-family:Consolas,monospace;text-transform:uppercase;letter-spacing:0.04em;">Feedrate</span>
+                <span style="font-family:Consolas,monospace;font-size:13px;font-weight:600;color:${feedrate > 0 ? '#1a1a1a' : '#999'};">${fStr}</span>
+            </div>`;
+
+            if (noData) {
+                html += `<div style="margin-top:10px;padding:8px;background:#f5f5f5;border:1px solid #ccc;border-radius:4px;font-size:10px;color:#555;font-family:Consolas,monospace;text-align:center;">
+                    Upload G-code to see cut positions
+                </div>`;
+            }
+
+            container.innerHTML = html;
         }
 
         // ── GCode tab update ─────────────────────────────────────────────

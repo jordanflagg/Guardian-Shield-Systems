@@ -72,6 +72,17 @@ CASE state OF
         Error := FALSE;
         ActiveAxesMask := 0;
 
+        // PHANTOM-FAULT GUARD: hold every child mover at Execute := FALSE while idle.
+        // FB_AxisMover only clears its DONE/ERROR state when it sees Execute := FALSE.
+        // States 1 and 3 below stop calling the movers, so a mover left latched in its
+        // own ERROR state from the previous run would never get that falling edge — and
+        // would re-report the SAME stale ErrorID the instant the next move starts, with
+        // no real drive fault behind it. Flushing here guarantees each mover gets a clean
+        // FALSE->TRUE edge on the next Execute, exactly like MC_MoveAbsolute requires.
+        FOR i := 1 TO 8 DO
+            mover[i](Execute := FALSE);
+        END_FOR
+
         IF executeRising THEN
             state := 1;
             Busy := TRUE;

@@ -97,7 +97,7 @@ GVL_HMI.HMI_HomePosition := axisDataHome.Position;
 // Machine status
 GVL_HMI.isRunning := stateMachine.isRunning;
 GVL_HMI.isFaulted := stateMachine.isFaulted;
-GVL_HMI.isHomed   := stateMachine.isHomed;8i
+GVL_HMI.isHomed   := stateMachine.isHomed;
 
 // Motion sequence visualization
 GVL_HMI.HMI_MotionStep      := stateMachine.motionStepOut;
@@ -106,8 +106,9 @@ GVL_HMI.HMI_ActiveAxesMask  := stateMachine.activeAxesMask;
 GVL_HMI.HMI_StepDescription := stateMachine.stepDescription;
 
 // Fault status
-GVL_HMI.HMI_HasFault    := faultMonitor.HasFault;
-GVL_HMI.HMI_ActiveFault := faultMonitor.ActiveFault;
+GVL_HMI.HMI_HasFault           := faultMonitor.HasFault;
+GVL_HMI.HMI_ActiveFault        := faultMonitor.ActiveFault;
+GVL_HMI.HMI_LogicFaultSuspected := faultMonitor.LogicFaultSuspected;
 
 // ctrlX diagnostics (for HMI badge and informational display)
 GVL_HMI.HMI_DiagErrorCount := faultMonitor.DiagErrorCount;

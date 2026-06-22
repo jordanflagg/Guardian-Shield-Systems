@@ -1,7 +1,26 @@
 FUNCTION_BLOCK FB_AxisMover
-// Generic axis movement handler with built-in error handling
-// Wraps MC_MoveAbsolute with cleaner state machine interface
-// Reduces repetitive execute/done/error pattern throughout code
+// Generic axis movement handler with built-in error handling.
+// Wraps MC_MoveAbsolute with a cleaner state machine interface and
+// reduces the repetitive execute/done/error pattern throughout the code.
+//
+// ┌─────────────────────────────────────────────────────────────────────────┐
+// │ RESET CONTRACT — READ THIS BEFORE USING THIS FB                           │
+// │                                                                           │
+// │ This FB latches Done (state 2) and Error (state 3). It clears them ONLY  │
+// │ when it is called with Execute := FALSE. The underlying MC_MoveAbsolute   │
+// │ likewise needs a FALSE→TRUE edge on Execute to start a fresh move.        │
+// │                                                                           │
+// │ Therefore the OWNER MUST call this FB with Execute := FALSE whenever it    │
+// │ disables/aborts/resets — even on the same scan it tears its own state     │
+// │ down. If the owner simply stops calling this FB (freezes it), a latched   │
+// │ Error stays latched forever, and the NEXT Execute := TRUE re-reports that  │
+// │ stale ErrorID as a PHANTOM FAULT with no real drive error behind it.      │
+// │                                                                           │
+// │ Correct owners flush on disable, e.g.:                                     │
+// │     IF NOT Enable THEN  moverAxisN(Execute := FALSE, AxisRef := Axis_N);  │
+// │ See FB_MotionStep_LoadBlock / _Unload reset blocks and FB_MultiAxisMover   │
+// │ state 0 for the pattern.                                                   │
+// └─────────────────────────────────────────────────────────────────────────┘
 
 VAR_INPUT
     Execute : BOOL;             // TRUE to command move, FALSE to stop

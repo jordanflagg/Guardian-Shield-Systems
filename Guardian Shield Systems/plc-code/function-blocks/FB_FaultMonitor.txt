@@ -41,6 +41,14 @@ VAR_OUTPUT
     ActiveFault    : ST_FaultReport; // Snapshot of the fault that triggered the latch (for HMI)
     DiagErrorCount : DINT;          // Live ctrlX active error count (for HMI badge)
     DiagWarnCount  : DINT;          // Live ctrlX warning count (informational)
+
+    // TROUBLESHOOTING HINT for the HMI/operator. TRUE when a PLCopen mover/home FB
+    // reported an axis ErrorID, but ctrlX reports ZERO active drive errors. That
+    // combination means the drive hardware is fine and the fault is almost certainly
+    // a stale/logic ("phantom") fault inside a function block — e.g. an FB_AxisMover
+    // left latched in its ERROR state and re-reporting on re-enable. When this is TRUE,
+    // look at the PLC logic / reset path, NOT the drive or the ctrlX Logbook.
+    LogicFaultSuspected : BOOL;
 END_VAR
 
 VAR
@@ -319,3 +327,15 @@ END_IF
 ActiveFault    := GVL_Faults.activeFault;
 DiagErrorCount := nDiagErrCount;
 DiagWarnCount  := nDiagWarnCount;
+
+// Phantom-fault hint: an axis-sourced fault that carries a PLCopen ErrorID
+// (axisID > 0 AND errorCode <> 0) while ctrlX sees no active drive error
+// (nDiagErrCount = 0) is almost certainly a stale FB-logic fault, not hardware.
+// Note: the ctrlX poll runs ~1 s, so for the first ~1 s after a REAL drive fault
+// this may briefly read TRUE before the poll catches the drive error — treat it
+// as a hint, not a verdict. Faults from FB_AxisPower/kins/ctrlX carry errorCode 0
+// or axisID 0 and are correctly excluded.
+LogicFaultSuspected := faultLatched
+                       AND (GVL_Faults.activeFault.axisID > 0)
+                       AND (GVL_Faults.activeFault.errorCode <> 0)
+                       AND (nDiagErrCount = 0);

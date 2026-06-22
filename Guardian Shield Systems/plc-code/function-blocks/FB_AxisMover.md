@@ -87,7 +87,9 @@ The FB is actively commanding `MC_MoveAbsolute`. It monitors for either `Done` o
 Success! The axis reached its target. The FB signals `Done := TRUE` and waits for `Execute` to go FALSE before returning to IDLE for the next command.
 
 ### State 3: ERROR
-Something went wrong. The FB captures the `ErrorID` and waits for `Execute` to go FALSE. Fault clearing happens via `FB_AxisPower` - this FB just reports the problem.
+Something went wrong. The FB captures the `ErrorID` and waits for `Execute` to go FALSE before returning to IDLE. Drive-level fault clearing (MC_Reset, ctrlX confirm-errors, kin recovery) happens centrally in `FB_FaultMonitor` during the RESETTING state — this FB just reports the problem and clears its own latch.
+
+> ⚠️ **This is the single most important thing to understand about this FB.** State 2 (DONE) and State 3 (ERROR) are *latches* — they only clear when the FB is called with `Execute := FALSE`. If an owner stops calling this FB while it is latched in ERROR (instead of explicitly driving `Execute := FALSE`), the latch survives. The next time the owner sets `Execute := TRUE`, this FB is *still sitting in State 3* and immediately re-reports the **same stale `ErrorID`** — a "phantom fault" with no real drive error behind it. See *Lessons Learned → The Phantom Fault* below.
 
 ## Why This Design?
 
@@ -146,15 +148,20 @@ FB_AxisMover is a **Layer 1** component - the foundation that everything else bu
 ├─────────────────────────────────────────────────────────────────────┤
 │ Layer 4: FB_MotionSequence                                          │
 ├─────────────────────────────────────────────────────────────────────┤
-│ Layer 3: FB_MotionStep_LoadBlock, FB_MotionStep_Studs, etc.         │
+│ Layer 3: FB_MotionStep_LoadBlock, FB_MotionStep_Cutting, _Unload    │
 ├─────────────────────────────────────────────────────────────────────┤
-│ Layer 2: FB_MultiAxisMover, FB_AxisGearing, FB_AxisHome             │
+│ Layer 2: FB_MultiAxisMover, FB_AxisHome                             │
 ├─────────────────────────────────────────────────────────────────────┤
 │ Layer 1: FB_AxisMover, FB_AxisData, FB_AxisManual ◀── YOU ARE HERE  │
 ├─────────────────────────────────────────────────────────────────────┤
 │ Layer 0: PLCopen MC_MoveAbsolute, MC_Power, etc.                    │
 └─────────────────────────────────────────────────────────────────────┘
 ```
+
+> Note: `FB_AxisGearing` and `FB_MotionStep_Studs/_WindowsDoors/_Electrical` from earlier
+> versions were removed in v3.0 — gantry slaving moved to the Bosch ctrlX web config, and all
+> cutting is now G-code driven through `FB_MotionStep_Cutting`. If you see them referenced in
+> older notes, they no longer exist.
 
 Higher-level FBs like `FB_MultiAxisMover` create arrays of `FB_AxisMover` instances. Motion step FBs instantiate individual movers for each axis they control.
 
@@ -181,18 +188,48 @@ CASE subStep OF
         );
 
         IF moverAxis1.Error THEN
-            Error := TRUE;
-            ErrorAxisID := 1;
+            // Report directly to the shared fault queue, then hold (localError).
+            FC_ReportFault('FB_MotionStep_LoadBlock', 1, moverAxis1.ErrorID,
+                           'Axis 1 shift failed', E_MotionStep.SHIFT_TO_PROCESSING_AREA, subStep);
+            localError := TRUE;
         ELSIF moverAxis1.Done THEN
             moverAxis1(Execute := FALSE);  // Clear for next use
             subStep := 1;
         END_IF
 END_CASE
+
+// And — critically — flush every mover on disable so none is left latched:
+IF NOT Enable THEN
+    moverAxis1(Execute := FALSE, AxisRef := Axis_1);   // ← prevents phantom faults
+    // ... same for every other mover this FB owns ...
+END_IF
 ```
 
 Clean. Simple. The motion step focuses on *what* to do, not *how* to do it.
 
 ## Lessons Learned
+
+### The Phantom Fault (the big one)
+
+**Symptom:** The HMI shows `FAULTED` with a fault like *"Axis 10 raise failed", errorCode 0x7FFF* — but the ctrlX controller shows **no** drive error, the Logbook is clean, and the axis is physically fine. Reset, and it faults again at the same step the next cycle.
+
+**Root cause:** State 2 (DONE) and State 3 (ERROR) are *latches* that only clear on `Execute := FALSE`. The owning step FB reset itself on `Enable := FALSE` (cleared its substep counter, `localError`, etc.) **but never called its movers with `Execute := FALSE`**. So a mover left in State 3 from a real fault earlier in the session stayed in State 3. On the next cycle the step set `Execute := TRUE`, the mover was *already* in ERROR, and it re-emitted the **stale `ErrorID`** instantly — before any motion was even attempted. A ghost of a fault that was already cleared on the hardware.
+
+**The fix (two parts):**
+1. Every owner flushes its movers on disable:
+   ```iecst
+   IF NOT Enable THEN
+       moverAxis8(Execute := FALSE, AxisRef := Axis_8);
+       moverAxis10(Execute := FALSE, AxisRef := Axis_10);
+       // ... reset substep, stepStarted, localError ...
+   END_IF
+   ```
+   Applied in `FB_MotionStep_LoadBlock` and `FB_MotionStep_Unload`.
+2. `FB_MultiAxisMover` holds all 8 of its child movers at `Execute := FALSE` while idle (state 0), because it stops calling them in its own IDLE/ERROR states — same trap, one layer up.
+
+**How to recognize it live:** `FB_FaultMonitor.LogicFaultSuspected` (→ `GVL_HMI.HMI_LogicFaultSuspected`) is TRUE exactly for this case: an axis FB reported a PLCopen `ErrorID` while ctrlX's live drive-error count is 0. Real drive fault → ctrlX error count > 0. Phantom → count 0.
+
+**Lesson:** In PLCopen, *latched* outputs are only as good as the falling edge that clears them. Any FB that can freeze (stop being called) while latched must be explicitly driven low by whoever owns it. "Stop calling it" is **not** the same as "reset it."
 
 ### Bug We Fixed: Forgetting to Clear Execute
 
@@ -236,9 +273,11 @@ Higher-level FBs (like the motion steps) can implement timeouts if needed. FB_Ax
 
 3. **Clear Execute before transitioning** - Makes the FB ready for its next command
 
-4. **Name instances descriptively** - `moverAxis14` is better than `mover1`
+4. **Always flush on disable** - In the owner's `IF NOT Enable` (or reset) block, call every mover with `Execute := FALSE`. This is what prevents phantom faults — see Lessons Learned.
 
-5. **Let FB_AxisPower handle fault clearing** - FB_AxisMover just reports errors, it doesn't clear them
+5. **Name instances descriptively** - `moverAxis14` is better than `mover1`
+
+6. **Let FB_FaultMonitor handle drive fault clearing** - FB_AxisMover just reports its error and clears its own latch on `Execute := FALSE`. Drive-level recovery (MC_Reset, ctrlX confirm-errors, kin reset) is centralized in FB_FaultMonitor's RESETTING sequence.
 
 ## Interface Reference
 

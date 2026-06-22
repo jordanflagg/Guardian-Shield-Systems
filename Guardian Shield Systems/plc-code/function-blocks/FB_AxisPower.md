@@ -2,319 +2,140 @@
 
 ## The Story
 
-Imagine you're responsible for turning on and off the power to an entire city. Not just one house at a time - the whole city, all at once. And if there's a problem anywhere, you need to know exactly which block has the issue.
+Imagine you're responsible for turning power on and off to an entire city — not one house at a time, the whole city at once. And if there's a problem anywhere, you need to know exactly which block has the issue.
 
-Now multiply that complexity by the stakes: these aren't light bulbs, they're servo drives controlling precise motion. A power fault on axis 23 could mean a ruined product, or worse, equipment damage.
+Now multiply the stakes: these aren't light bulbs, they're servo drives controlling precise motion. A power fault on axis 23 could mean a ruined block, or worse, equipment damage.
 
-**FB_AxisPower is the master switch for 36 servo drives**. It handles two critical responsibilities:
-1. Powering all drives on and off as a coordinated unit
-2. Resetting faults across the entire system - from the PLC to the drives themselves
+**FB_AxisPower is the master switch for 36 servo drives.** In v3.0 its job is deliberately narrow:
 
-This isn't glamorous work, but it's foundational. Without solid power management, nothing else moves.
+1. Power all drives on/off as a coordinated unit.
+2. Establish the gantry (master/slave) connections once, at startup.
+3. Report power and gantry faults to the shared fault queue.
+
+> **What it does NOT do anymore:** fault *recovery*. There is no `Reset` input, no MC_Reset loop,
+> no `diagnosis/confirm/all-errors`, no `AllResetDone` output. All of that moved to
+> **`FB_FaultMonitor`** (the RESETTING sequence) in v3.0, so there's exactly one place that owns
+> hardware recovery. If you're looking for reset logic, it's there, not here.
 
 ## What It Does
 
-FB_AxisPower provides centralized control over all 36 axes:
-
-- **Power control** - Enable/disable all servo drives simultaneously
-- **Fault reset** - Clear errors at multiple levels (CXA Datalayer + individual MC_Reset)
-- **Status monitoring** - Know when all drives are ready
-- **Error identification** - Find which axis has a problem
+- **Power control** — `MC_Power` on all 36 axes, enabled together by `PowerOn`
+- **Gantry connection** — `ML_AxsAddToGantry` for all 18 slave→master pairs, once per PLC run
+- **Status** — `DrivesReady` is TRUE only when power is on, every drive reports ready, no drive
+  has an error, *and* the gantry is connected
+- **Fault reporting** — drive and gantry errors are pushed to `GVL_Faults` via `FC_ReportFault`
+  (self-clearing: the per-axis "reported" flag clears when the drive's error goes away)
 
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                           FB_AxisPower                                   │
+│                            FB_AxisPower                                  │
 │                                                                          │
-│  ┌─────────┐                                                            │
-│  │ INPUTS  │                                                            │
-│  │         │                                                            │
-│  │ PowerOn │───────────────────────────────┐                           │
-│  │ Reset   │─────────────────┐             │                           │
-│  └─────────┘                 │             │                           │
-│                              │             │                           │
-│                              ▼             ▼                           │
-│                    ┌─────────────────────────────────────────────┐     │
-│                    │         Reset State Machine                  │     │
-│                    │                                              │     │
-│                    │  0: IDLE                                     │     │
-│                    │  1: Clear all errors (CXA_Datalayer)        │     │
-│                    │  2: Execute MC_Reset on all axes            │     │
-│                    │  3: Wait for all axis resets                │     │
-│                    │                                              │     │
-│                    │  ┌─────────────────────────────────────┐    │     │
-│                    │  │ CXA_Datalayer.DL_WriteNode          │    │     │
-│                    │  │ 'diagnosis/confirm/all-errors'       │    │     │
-│                    │  └─────────────────────────────────────┘    │     │
-│                    └─────────────────────────────────────────────┘     │
+│  INPUT:  PowerOn                                                         │
 │                                                                          │
-│     ┌─────────────────────────────────────────────────────────────┐    │
-│     │              Power Control Loop (36 axes)                    │    │
-│     │                                                              │    │
-│     │   FOR i := 1 TO 36 DO                                       │    │
-│     │       fbPower[i](Enable := PowerOn, Axis := AXIF[i]);       │    │
-│     │       fbReset[i](Execute := Reset, Axis := AXIF[i]);        │    │
-│     │   END_FOR                                                    │    │
-│     └─────────────────────────────────────────────────────────────┘    │
+│  ┌────────────────────────────────────────────────────────────────┐     │
+│  │ DRIVE POWER (every scan)                                        │     │
+│  │   FOR i := MIN..MAX DO  fbPower[i](Enable := PowerOn, Axis…)    │     │
+│  │   build allReady / firstError                                   │     │
+│  │   report each drive error once via FC_ReportFault (self-clear)  │     │
+│  └────────────────────────────────────────────────────────────────┘     │
 │                                                                          │
-│  ┌───────────────────────────────────────────────────────────────────┐ │
-│  │                    Status Aggregation                              │ │
-│  │                                                                    │ │
-│  │   • DrivesReady = PowerOn AND (all Status TRUE) AND (no errors)  │ │
-│  │   • ErrorAxisID = first axis with fbPower[i].Error               │ │
-│  │   • AllResetDone = all fbReset[i].Done                            │ │
-│  └───────────────────────────────────────────────────────────────────┘ │
+│  ┌────────────────────────────────────────────────────────────────┐     │
+│  │ GANTRY CONNECTION (once, when drives first come ready)          │     │
+│  │   gantryState 0: fill 18 structs (slave name + master name)     │     │
+│  │              1: ML_AxsAddToGantry × 18                          │     │
+│  │              2: GantryConnected := TRUE; monitor for errors     │     │
+│  │   gantryState is NEVER reset — connections persist through      │     │
+│  │   drive power cycles; re-calling would fault "already connected"│     │
+│  └────────────────────────────────────────────────────────────────┘     │
 │                                                                          │
-│  ┌─────────┐                                                            │
-│  │ OUTPUTS │                                                            │
-│  │         │                                                            │
-│  │ Drives- │                                                            │
-│  │  Ready  │                                                            │
-│  │ AllReset│                                                            │
-│  │  Done   │                                                            │
-│  │ Error-  │                                                            │
-│  │ AxisID  │                                                            │
-│  └─────────┘                                                            │
+│  OUTPUTS: DrivesReady, ErrorAxisID                                      │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-## The Two-Layer Reset: A Deep Dive
+## Why gantry connection lives here (and runs only once)
 
-Here's where it gets interesting. This machine uses a Bosch Rexroth ctrlX CORE controller, which has a sophisticated error management system. Errors can exist at multiple levels:
-
-1. **System-level errors** in the ctrlX CORE's diagnostic system
-2. **Axis-level errors** in individual drive controllers
-
-A single MC_Reset won't clear system-level errors. You need to hit the CXA Datalayer first.
-
-### The Reset State Machine
-
-```
-        ┌─────────┐
-        │  IDLE   │◀──────────────────────────────────────┐
-        │(state 0)│                                        │
-        └────┬────┘                                        │
-             │ Reset rising edge                          │
-             ▼                                             │
-    ┌─────────────────┐                                   │
-    │ CLEARING ERRORS │                                   │
-    │    (state 1)    │                                   │
-    │                 │                                   │
-    │ DL_WriteNode to │                                   │
-    │ 'diagnosis/     │                                   │
-    │ confirm/all-    │                                   │
-    │ errors'         │                                   │
-    └────────┬────────┘                                   │
-             │ Done or Error                              │
-             ▼                                             │
-    ┌─────────────────┐                                   │
-    │ EXECUTE RESETS  │                                   │
-    │    (state 2)    │                                   │
-    │                 │                                   │
-    │ MC_Reset on all │                                   │
-    │ 36 axes         │                                   │
-    └────────┬────────┘                                   │
-             │                                             │
-             ▼                                             │
-    ┌─────────────────┐                                   │
-    │ WAIT FOR RESETS │                                   │
-    │    (state 3)    │                                   │
-    │                 │                                   │ Reset = FALSE
-    │ Check all       │───────────────────────────────────┘
-    │ fbReset[i].Done │
-    │                 │
-    │ AllResetDone =  │
-    │   TRUE when all │
-    │   complete      │
-    └─────────────────┘
-```
-
-### Why CXA Datalayer First?
-
-The CXA_Datalayer is Rexroth's data bus for the ctrlX CORE. When you write to `'diagnosis/confirm/all-errors'`, you're telling the controller: *"I acknowledge all current errors - clear them from the diagnostic system."*
-
-This is like resetting the master alarm before resetting individual breakers. The order matters.
+On ctrlX, `ML_AxsAddToGantry` is what actually binds a slave axis to its master at runtime.
+`MC_MoveAbsolute` on a gantry master won't drive the slaves until this is done. So FB_AxisPower
+performs it once, the first time `DrivesReady` conditions are met:
 
 ```iecst
-1: // Clear all errors via Datalayer
-    fbPLC_Reset(
-        Execute := TRUE,
-        NodeName := 'diagnosis/confirm/all-errors'
-    );
-
-    IF fbPLC_Reset.Done OR fbPLC_Reset.Error THEN
-        fbPLC_Reset(Execute := FALSE);
-        resetState := 2;  // Now do axis resets
-    END_IF
-```
-
-## The Power Control Philosophy
-
-### Why Array-Based Design?
-
-Notice the declaration:
-```iecst
-fbPower : ARRAY[MOTIF_CONFIG.MIN_AXIS_INDEX..MOTIF_CONFIG.MAX_AXIS_INDEX] OF MC_Power;
-fbReset : ARRAY[MOTIF_CONFIG.MIN_AXIS_INDEX..MOTIF_CONFIG.MAX_AXIS_INDEX] OF MC_Reset;
-```
-
-Using arrays with configuration constants means:
-1. **Scalability** - Change `MAX_AXIS_INDEX` and the code adapts
-2. **Consistency** - Same indexing as the axis references
-3. **Maintainability** - No hardcoded "36" scattered through the code
-
-### The DrivesReady Calculation
-
-```iecst
-DrivesReady := PowerOn AND allReady AND (firstError = 0);
-```
-
-This single line encapsulates the meaning of "ready":
-- Power must be commanded ON (`PowerOn`)
-- All drives must report status TRUE (`allReady`)
-- No drive can have an error (`firstError = 0`)
-
-All three conditions. No shortcuts. No "mostly ready."
-
-## How It Fits Into the Machine
-
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                     FB_MachineStateMachine                               │
-│                                                                          │
-│   ┌─────────────────────────────────────────────────────────────────┐  │
-│   │                         State Logic                              │  │
-│   │                                                                  │  │
-│   │   INIT ──▶ IDLE ──▶ RUNNING ──▶ STOPPING                       │  │
-│   │              │                      │                            │  │
-│   │              │         ┌────────────┴──────────────┐            │  │
-│   │              │         │                           │            │  │
-│   │              │         ▼                           ▼            │  │
-│   │              │      FAULTED ◀───────────────── E_STOPPED       │  │
-│   │              │         │                                        │  │
-│   │              │         │ resetButton                            │  │
-│   │              │         ▼                                        │  │
-│   │              └────▶ RESETTING                                   │  │
-│   └─────────────────────────────────────────────────────────────────┘  │
-│                              │                                          │
-│                              │ Uses                                     │
-│                              ▼                                          │
-│   ┌─────────────────────────────────────────────────────────────────┐  │
-│   │                      FB_AxisPower                                │  │
-│   │                                                                  │  │
-│   │   PowerOn ◀── (controlled by state machine)                     │  │
-│   │   Reset ◀── (resetButton while FAULTED/E_STOPPED)              │  │
-│   │                                                                  │  │
-│   │   DrivesReady ──▶ (gate for RUNNING state)                     │  │
-│   │   ErrorAxisID ──▶ (fault display)                              │  │
-│   └─────────────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────────────┘
-```
-
-The machine state machine uses FB_AxisPower as its power subsystem. It doesn't care about the details of MC_Power or CXA_Datalayer - it just says "power on" or "reset," and FB_AxisPower handles the rest.
-
-## The Edge Detection Pattern
-
-Notice the rising edge trigger for reset:
-```iecst
-rtrigReset(CLK := Reset);
-
-IF Reset THEN
-    CASE resetState OF
-        0: // Idle - start reset sequence on rising edge
-            IF rtrigReset.Q THEN
-                AllResetDone := FALSE;
-                resetState := 1;
-            END_IF
-```
-
-Why edge-triggered for reset but level-triggered for power?
-
-- **Power**: Should stay on as long as commanded - level makes sense
-- **Reset**: Is an action, not a state - you "do" a reset once, not continuously
-
-This matches human mental models. An operator holds the power switch but *presses* the reset button.
-
-## Lessons Learned
-
-### Bug We Fixed: Reset Not Completing
-
-Early versions had a bug where `AllResetDone` would never become TRUE. The problem? We were checking `fbReset[i].Done` before the FBs had time to execute.
-
-**Root cause**: State 2 was setting Execute TRUE and immediately transitioning to state 3, which checked Done before the first scan completed.
-
-**The fix**: State 2 now only sets up the resets, then state 3 continues calling them with Execute TRUE while waiting:
-
-```iecst
-3: // Wait for all axis resets to complete
-    // Keep calling MC_Reset with Execute TRUE
-    FOR i := MOTIF_CONFIG.MIN_AXIS_INDEX TO MOTIF_CONFIG.MAX_AXIS_INDEX DO
-        fbReset[i](
-            Execute := TRUE,  // Still executing!
-            Axis := AXIF_CONFIG_INDEXES[i]
-        );
-    END_FOR
-
-    // Check if all resets are done
-    allReset := TRUE;
-    FOR i := MOTIF_CONFIG.MIN_AXIS_INDEX TO MOTIF_CONFIG.MAX_AXIS_INDEX DO
-        IF NOT fbReset[i].Done THEN
-            allReset := FALSE;
-            EXIT;
-        END_IF
-    END_FOR
-```
-
-### Pitfall: Forgetting to Clear Reset Execute
-
-When Reset goes FALSE, you must clear all the MC_Reset Execute flags:
-
-```iecst
+IF PowerOn AND allReady AND (firstError = 0) THEN
+    CASE gantryState OF
+        0: // fill all 18 structs (AxisName = slave, MasterName = master)
+           ... ; gantryState := 1;
+        1: // call ML_AxsAddToGantry for all 18 pairs
+           ... ; gantryState := 2;
+        2: // connected — monitor each pair for errors
+           GantryConnected := TRUE; ...
+    END_CASE
 ELSE
-    // Reset not active - clear state and MC_Reset execute flags
-    resetState := 0;
-    fbPLC_Reset(Execute := FALSE);
-    FOR i := MOTIF_CONFIG.MIN_AXIS_INDEX TO MOTIF_CONFIG.MAX_AXIS_INDEX DO
-        fbReset[i](Execute := FALSE, Axis := AXIF_CONFIG_INDEXES[i]);
-    END_FOR
+    GantryConnected := FALSE;   // but gantryState is preserved, NOT reset to 0
 END_IF
 ```
 
-Without this cleanup, the reset would retrigger immediately on the next rising edge.
+The critical subtlety: **gantry connections survive a drive power cycle.** Slaves stay
+`GANTRY_SLAVE` even when masters go `DISABLED`. So `gantryState` must never roll back to 0 — if
+it did, the next power-on would call `ML_AxsAddToGantry` again and fault with "already connected."
 
-### Why Check firstError = 0?
+## The DrivesReady calculation
 
 ```iecst
-DrivesReady := PowerOn AND allReady AND (firstError = 0);
+DrivesReady := PowerOn AND allReady AND (firstError = 0) AND GantryConnected;
 ```
 
-You might think `allReady` implies no errors. Not quite:
-- A drive might report Status = TRUE but also have Error = TRUE
-- Some errors are warnings that don't prevent operation
-- The hardware behavior isn't always intuitive
+Four conditions, no shortcuts:
+- Power commanded ON
+- Every drive reports `Status` TRUE
+- No drive has an error
+- The gantry is connected (otherwise master moves wouldn't carry their slaves)
 
-Explicitly checking for zero errors removes ambiguity. Belt and suspenders.
+`DrivesReady` is the gate the state machine checks before it will enter RUNNING, HOMING, or MANUAL.
 
-## Best Practices
+## How faults are reported (self-clearing)
 
-### 1. Single Instance
-Only one FB_AxisPower should exist in the system. Multiple instances would create conflicting power commands.
+There's no error *latch* in here — that's `FB_FaultMonitor`'s job. FB_AxisPower just pushes a
+fault entry the first time a drive error appears, and re-arms when it clears:
 
-### 2. Call Every Scan
-Even when Reset is FALSE, the power loop needs to run to maintain `DrivesReady` status:
 ```iecst
-// Power all axes (runs regardless of reset state)
-FOR i := MOTIF_CONFIG.MIN_AXIS_INDEX TO MOTIF_CONFIG.MAX_AXIS_INDEX DO
-    fbPower[i](Enable := PowerOn, Axis := AXIF_CONFIG_INDEXES[i]);
-END_FOR
+IF NOT fbPower[i].Error THEN
+    powerErrorReported[i] := FALSE;          // re-arm once the drive is healthy
+END_IF
+IF fbPower[i].Error AND NOT powerErrorReported[i] THEN
+    FC_ReportFault('FB_AxisPower', i, DWORD#0, 'Drive power error',
+                   E_MotionStep.WAIT_FOR_LOAD, 0);
+    powerErrorReported[i] := TRUE;           // report once per occurrence
+END_IF
 ```
 
-### 3. Use ErrorAxisID for Diagnostics
-When `DrivesReady` is FALSE and `ErrorAxisID > 0`, you know exactly which axis to investigate first.
+This self-clearing pattern (the same one `FB_KinematicEnable` uses) is structurally immune to the
+"phantom fault" trap — there's no latched state that can get stuck. See `FAULT_TROUBLESHOOTING.md`.
 
-### 4. Complete Reset Sequence
-Don't shortcut the reset. Even if `AllResetDone` becomes TRUE quickly, let the full sequence complete. Some drives need time to stabilize.
+## In context
+
+```
+PowerOn  ──▶ ┌──────────────┐ ──▶ DrivesReady ──▶ gate for RUNNING / HOMING / MANUAL
+(GVL_HMI.    │ FB_AxisPower │ ──▶ ErrorAxisID ──▶ HMI diagnostics
+ btn_DriveOn)└──────────────┘ ──▶ FC_ReportFault ──▶ GVL_Faults ──▶ FB_FaultMonitor
+```
+
+`PLC_PRG` also force-drops `GVL_HMI.btn_DriveOn` to FALSE whenever the machine is faulted, so a
+fault automatically cuts drive power.
+
+## Lessons Learned
+
+### Why fault recovery was moved out
+Earlier versions did MC_Reset and `diagnosis/confirm/all-errors` inside FB_AxisPower. That split
+recovery across two FBs (power here, kinematics elsewhere) and made reset ordering hard to reason
+about. v3.0 consolidated **all** recovery into `FB_FaultMonitor`'s RESETTING sequence (confirm →
+reset slaves → reset masters → kin reset/enable → confirm → verify). FB_AxisPower got simpler and
+more single-purpose as a result.
+
+### Gantry state must persist
+The one genuinely surprising behavior: not resetting `gantryState` on power loss. It feels wrong
+("shouldn't I reconnect after powering back up?") but the connection is sticky on the controller,
+and re-adding faults. Power can cycle; the gantry binding stays.
 
 ## Interface Reference
 
@@ -322,22 +143,17 @@ Don't shortcut the reset. Even if `AllResetDone` becomes TRUE quickly, let the f
 | Name | Type | Description |
 |------|------|-------------|
 | PowerOn | BOOL | Enable power to all drives |
-| Reset | BOOL | Reset drive faults (rising edge triggers) |
 
 ### Outputs
 | Name | Type | Description |
 |------|------|-------------|
-| DrivesReady | BOOL | TRUE when all drives are powered and error-free |
-| AllResetDone | BOOL | TRUE when all resets have completed |
-| ErrorAxisID | UINT | First axis with an error (0 = none) |
+| DrivesReady | BOOL | TRUE when all drives are powered, error-free, and the gantry is connected |
+| ErrorAxisID | UINT | First axis with a power error (0 = none) |
+
+> No `Reset` input and no `AllResetDone` output — reset/recovery lives in `FB_FaultMonitor`.
 
 ## The Responsibility
 
-FB_AxisPower carries significant responsibility. It's the gatekeeper between the control system and 36 servo drives. Get it wrong and:
-- Drives don't power up → machine won't run
-- Resets don't complete → operators get frustrated
-- Errors get missed → faults cascade
-
-Get it right, and it's invisible. Operators press Start, drives come alive, production runs. That's the goal of infrastructure code - reliability so absolute that people forget it exists.
-
-This FB isn't exciting. It doesn't do the fancy carving or coordinated motion. But without it, nothing else works. It's the foundation that everything else stands on.
+FB_AxisPower is the gatekeeper between the control system and 36 servo drives. Get it right and
+it's invisible: operators press Drive On, the drives come alive, the gantries bind, production
+runs. That's the goal of infrastructure code — reliability so absolute people forget it exists.

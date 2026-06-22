@@ -8,7 +8,7 @@ Not maliciously - but mechanically. When you press a button, the contact doesn't
 
 To a fast PLC scanning at millisecond rates, that one button press looks like 5, 10, maybe 20 presses. Without proper handling, pressing "Start" might start the machine, stop it, start it again, and stop it - all from one physical press.
 
-**FB_ButtonManager is the interpreter between messy human input and clean machine commands.** It debounces, detects edges, prioritizes, and latches - transforming raw electrical signals into reliable operator intentions.
+**FB_ButtonManager is the interpreter between messy human input and clean machine commands.** It detects edges, debounces, and prioritizes - transforming raw electrical signals into a single clean one-scan command pulse per press.
 
 ## What It Does
 
@@ -17,31 +17,35 @@ FB_ButtonManager provides:
 - **Edge detection** - Detects button press moments (rising edges)
 - **Debouncing** - Ignores rapid signal bounces via R_TRIG
 - **Priority handling** - E-Stop > Stop > Start > Home > Manual > Reset
-- **Command latching** - Outputs stay TRUE until a different button is pressed
+- **One-scan command pulses** - Each press emits its output TRUE for exactly one scan
 - **Clean state management** - Only one command active at a time
 
-## The Latching Philosophy
+## The One-Scan Pulse Model
 
-Most button handling clears the output when you release the button. FB_ButtonManager doesn't:
+> **Behavior change (v3.0):** these outputs are **one-scan pulses**, not latches. Each command
+> output goes TRUE for exactly one scan on the button's rising edge, then returns to FALSE. The
+> state machine owns all mode persistence and latching now — the button manager just announces
+> "a press happened this scan." (E-Stop is the exception — see below.)
+
+Every scan the outputs are cleared, then the selected command's output is pulsed TRUE and
+`activeCommand` is immediately reset to `CMD_NONE`, so it lasts a single scan:
 
 ```iecst
-// Outputs STAY LATCHED until another button is pressed (no auto-clear)
-// This allows state machines to complete their full sequences
+btn_Start_Out := FALSE; btn_Stop_Out := FALSE; ... ;   // clear every scan
+
+CASE activeCommand OF
+    E_ActiveCommand.CMD_START:
+        btn_Start_Out := TRUE;
+        activeCommand := E_ActiveCommand.CMD_NONE;       // self-clearing → one-scan pulse
+    ...
+END_CASE
 ```
 
-Why? Because machine state transitions take time:
-
-1. Operator presses START
-2. State machine sees `btn_Start_Out = TRUE`
-3. State machine transitions to RUNNING
-4. Operator releases START
-5. If we auto-cleared, `btn_Start_Out = FALSE`
-6. State machine might misinterpret this
-
-With latching:
-- Press START → `btn_Start_Out = TRUE`, stays TRUE
-- Press STOP → `btn_Stop_Out = TRUE`, `btn_Start_Out = FALSE`
-- No ambiguity about which command is active
+Why pulses instead of latches? Because the supervisor (`FB_MachineStateMachine`) is the single
+source of truth for "what mode are we in." A momentary START *request* maps cleanly to a state
+transition; the state machine then holds RUNNING on its own. Keeping the button output latched too
+would create two competing notions of "are we started," which is exactly the kind of ambiguity
+that causes double-transitions. One press → one pulse → one transition.
 
 ## Architecture
 
@@ -303,7 +307,7 @@ But R_TRIG alone handles most cases.
 Between the operator's finger and the machine's response lies a translation layer. That finger press must become:
 - A clean edge, not a bouncy mess
 - A prioritized command, not a collision of signals
-- A latched state, not a fleeting moment
+- A single one-scan pulse the state machine can act on exactly once
 
 FB_ButtonManager performs that translation. It respects human intent while protecting against human imprecision. It prioritizes safety over convenience. It provides clear state to the state machine.
 

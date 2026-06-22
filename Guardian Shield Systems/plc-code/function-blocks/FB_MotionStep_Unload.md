@@ -76,11 +76,6 @@ FB_MotionStep_Unload executes 5 substeps:
 │                          FB_MotionStep_Unload                                │
 │                                                                              │
 │   ┌─────────────────────────────────────────────────────────────────────┐   │
-│   │                         BASE HANDLER                                 │   │
-│   │   base : FB_MotionStepBase                                          │   │
-│   └─────────────────────────────────────────────────────────────────────┘   │
-│                                                                              │
-│   ┌─────────────────────────────────────────────────────────────────────┐   │
 │   │                        AXIS MOVERS                                   │   │
 │   │                                                                      │   │
 │   │   moverAxis8  : FB_AxisMover   ─── Pusher (master, slave 9)        │   │
@@ -165,6 +160,27 @@ The recipe structure allows position sharing where appropriate while keeping uni
 
 ## Lessons Learned
 
+### Bug We Fixed: The Phantom "Axis 10 raise failed" Fault
+
+This is the fault that kicked off the whole review. The HMI showed `FAULTED` at `SHIFT_TO_UNLOAD_AREA / sub 0` with *"Axis 10 raise failed", errorCode 0x7FFF* — yet the ctrlX controller had **no** drive error and axis 10 was perfectly healthy.
+
+The cause was **not** in this file's logic — it was in how this file reset. The `IF NOT Enable` block cleared `subStep`, `stepStarted`, and `localError`, but it never called `moverAxis8`/`moverAxis10` with `Execute := FALSE`. An `FB_AxisMover` latched in its ERROR state from an earlier fault therefore stayed latched, and re-fired its stale `ErrorID` the instant substep 0 set `Execute := TRUE` again — before the table ever moved.
+
+**The fix:** flush both movers in the reset block:
+```iecst
+IF NOT Enable THEN
+    moverAxis8(Execute := FALSE, AxisRef := Axis_8);
+    moverAxis10(Execute := FALSE, AxisRef := Axis_10);
+    Done := FALSE; Busy := FALSE;
+    ActiveAxesMask := 0; CurrentSubStep := 0; StepDescription := '';
+    subStep := 0; stepStarted := FALSE; localError := FALSE;
+    RETURN;
+END_IF
+```
+
+See `FB_AxisMover.md → Lessons Learned → The Phantom Fault` for the full write-up and the
+`HMI_LogicFaultSuspected` flag that now flags this situation automatically.
+
 ### Bug We Fixed: Sequence Completion Flag
 
 Early code set `Done := TRUE` but forgot to set `Busy := FALSE`:
@@ -207,11 +223,13 @@ Our substep ordering enforces this.
 |------|------|-------------|
 | Done | BOOL | Step completed |
 | Busy | BOOL | Step in progress |
-| Error | BOOL | Step failed |
-| ErrorAxisID | UINT | Which axis caused error (8 or 10) |
 | CurrentSubStep | UINT | Current substep (0-4) |
 | ActiveAxesMask | LWORD | Bitmask of moving axes |
 | StepDescription | STRING[80] | Human-readable description |
+
+> **Note:** This FB has **no** `Error`/`ErrorAxisID` outputs. Faults are reported directly to the
+> shared fault queue via `FC_ReportFault(...)` (caught by `FB_FaultMonitor`), so there is no error
+> wiring to thread up through `FB_MotionSequence`. See the *Phantom Fault* note below.
 
 ## The Philosophy
 

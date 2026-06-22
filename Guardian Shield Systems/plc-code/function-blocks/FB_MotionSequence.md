@@ -2,426 +2,191 @@
 
 ## The Story
 
-Think of a ballet. The choreographer doesn't dance - they orchestrate. They know when the lead should enter, when the corps should move, when the set should change. They see the whole performance and ensure each part happens in the right order.
+Think of a ballet. The choreographer doesn't dance — they orchestrate. They know when the lead should enter, when the corps should move, when the set should change. They see the whole performance and ensure each part happens in the right order.
 
-**FB_MotionSequence is the choreographer for foam cutting.** It doesn't move axes directly - it knows which motion step should execute and when to hand off to the next one. Load the block, carve the studs, cut the windows, route the electrical troughs, unload the finished piece.
+**FB_MotionSequence is the choreographer for foam processing.** It doesn't move axes directly — it knows which motion step should execute and when to hand off to the next one: load the block, cut it (all wire cutting is G-code driven), unload the finished piece.
 
-It's the layer that transforms a collection of independent motion steps into a coherent manufacturing sequence.
+It's the layer that turns a handful of independent motion steps into one coherent production cycle.
 
 ## What It Does
 
 FB_MotionSequence orchestrates the motion flow:
 
-- **Recipe loading** - Loads position setpoints and motion parameters for selected product
-- **Step sequencing** - Progresses through motion steps in order
-- **Conditional execution** - Skips steps not enabled in the recipe
-- **Error aggregation** - Exposes errors from all steps for centralized handling
-- **Visualization** - Provides HMI-friendly status for real-time monitoring
+- **Step sequencing** — progresses through the four motion phases in order
+- **Gating the start** — won't begin a cycle until both a block is loaded *and* the Python pipeline has staged G-code for it
+- **Hand-off** — enables exactly one step FB at a time, disables it cleanly before moving on
+- **Visualization** — passes each step's substep / active-axes / description up to the HMI
+- **Reset** — on a hard reset, disables every step FB and parks at `WAIT_FOR_LOAD`
 
-## The Motion Sequence
+It does **not** own error handling. Each step FB reports faults directly to `GVL_Faults`
+via `FC_ReportFault`; `FB_FaultMonitor` catches them. There are no error outputs to wire.
+
+## The Motion Sequence (v3.0)
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                          MOTION SEQUENCE FLOW                                │
-│                                                                              │
-│   ┌─────────────────────────────────────────────────────────────────────┐   │
-│   │                      WAIT_FOR_LOAD                                   │   │
-│   │                                                                      │   │
-│   │   Waiting for foam block to be placed on load table                 │   │
-│   │   (blockLoaded sensor = TRUE)                                       │   │
-│   └─────────────────────────────────────────────────────────────────────┘   │
-│                              │                                               │
-│                              ▼                                               │
-│   ┌─────────────────────────────────────────────────────────────────────┐   │
-│   │                  SHIFT_TO_PROCESSING_AREA                            │   │
-│   │                                                                      │   │
-│   │   FB_MotionStep_LoadBlock                                           │   │
-│   │   - Shift block against wall                                        │   │
-│   │   - Lift and move to center                                         │   │
-│   │   - 11 substeps, axes 1,2,6,8,10                                   │   │
-│   └─────────────────────────────────────────────────────────────────────┘   │
-│                              │                                               │
-│                   ┌──────────┴──────────┐                                   │
-│            enableStuds?                 │                                   │
-│                   │                     │                                   │
-│              YES  │               NO    │                                   │
-│                   ▼                     │                                   │
-│   ┌───────────────────────────┐        │                                   │
-│   │          STUDS            │        │                                   │
-│   │                           │        │                                   │
-│   │   FB_MotionStep_Studs    │        │                                   │
-│   │   - 8 axis pairs carving │        │                                   │
-│   │   - 6 substeps           │        │                                   │
-│   └───────────────────────────┘        │                                   │
-│                   │                     │                                   │
-│                   └──────────┬──────────┘                                   │
-│                              │                                               │
-│                   ┌──────────┴──────────┐                                   │
-│          enableWindowsDoors?            │                                   │
-│                   │                     │                                   │
-│              YES  │               NO    │                                   │
-│                   ▼                     │                                   │
-│   ┌───────────────────────────┐        │                                   │
-│   │      WINDOWS_DOORS        │        │                                   │
-│   │                           │        │                                   │
-│   │FB_MotionStep_WindowsDoors│        │                                   │
-│   │   - Hot wire cutting     │        │                                   │
-│   │   - 6 substeps           │        │                                   │
-│   └───────────────────────────┘        │                                   │
-│                   │                     │                                   │
-│                   └──────────┬──────────┘                                   │
-│                              │                                               │
-│                   ┌──────────┴──────────┐                                   │
-│           enableElectrical?             │                                   │
-│                   │                     │                                   │
-│              YES  │               NO    │                                   │
-│                   ▼                     │                                   │
-│   ┌───────────────────────────┐        │                                   │
-│   │       ELECTRICAL          │        │                                   │
-│   │                           │        │                                   │
-│   │FB_MotionStep_Electrical  │        │                                   │
-│   │   - Trough routing       │        │                                   │
-│   │   - 6 substeps           │        │                                   │
-│   └───────────────────────────┘        │                                   │
-│                   │                     │                                   │
-│                   └──────────┬──────────┘                                   │
-│                              │                                               │
-│                              ▼                                               │
-│   ┌─────────────────────────────────────────────────────────────────────┐   │
-│   │                   SHIFT_TO_UNLOAD_AREA                               │   │
-│   │                                                                      │   │
-│   │   FB_MotionStep_Unload                                              │   │
-│   │   - Lift finished block                                             │   │
-│   │   - Shift to unload table                                           │   │
-│   │   - 5 substeps, axes 8,10                                           │   │
-│   └─────────────────────────────────────────────────────────────────────┘   │
-│                              │                                               │
-│                              ▼                                               │
-│   ┌─────────────────────────────────────────────────────────────────────┐   │
-│   │   SequenceComplete := TRUE                                           │   │
-│   │   Return to WAIT_FOR_LOAD for next cycle                            │   │
-│   └─────────────────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│                       MOTION SEQUENCE FLOW                           │
+│                                                                      │
+│   ┌───────────────────────────────────────────────────────────┐     │
+│   │                     WAIT_FOR_LOAD                          │     │
+│   │   Wait until BlockLoaded = TRUE  AND  FilesReady = TRUE.   │     │
+│   │   (block physically on the table AND Python has staged     │     │
+│   │    G-code for THIS block)                                  │     │
+│   └───────────────────────────────────────────────────────────┘     │
+│                              │                                       │
+│                              ▼                                       │
+│   ┌───────────────────────────────────────────────────────────┐     │
+│   │                 SHIFT_TO_PROCESSING_AREA                   │     │
+│   │   FB_MotionStep_LoadBlock — 12 substeps, axes 1,2,6,8,10   │     │
+│   │   Move the raw block from the load table to center.        │     │
+│   └───────────────────────────────────────────────────────────┘     │
+│                              │                                       │
+│                              ▼                                       │
+│   ┌───────────────────────────────────────────────────────────┐     │
+│   │                         CUTTING                            │     │
+│   │   FB_MotionStep_Cutting — G-code driven. Sets bBusy, waits │     │
+│   │   for the Python dispatcher to run all wire groups. The    │     │
+│   │   PLC does NOT command cutting axes here; the ctrlX G-code │     │
+│   │   runtime + wire kinematics do. (Studs, windows/doors, and │     │
+│   │   electrical troughs are all just wire scripts now.)       │     │
+│   └───────────────────────────────────────────────────────────┘     │
+│                              │                                       │
+│                              ▼                                       │
+│   ┌───────────────────────────────────────────────────────────┐     │
+│   │                  SHIFT_TO_UNLOAD_AREA                      │     │
+│   │   FB_MotionStep_Unload — 5 substeps, axes 8,10             │     │
+│   │   Lift finished block, shift to unload table, set down.    │     │
+│   └───────────────────────────────────────────────────────────┘     │
+│                              │                                       │
+│                              ▼                                       │
+│   SequenceComplete := TRUE  →  loop back to WAIT_FOR_LOAD            │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
-## Recipe Management
+> **Gone in v3.0:** the separate `STUDS`, `WINDOWS_DOORS`, and `ELECTRICAL` motion steps and
+> their `FB_MotionStep_*` FBs. All cutting — studs, window/door openings, electrical troughs —
+> is now produced by per-wire G-code scripts driven through the single `CUTTING` step. If you
+> see those old step names anywhere, they no longer exist.
 
-The sequence loads recipe data when RecipeID changes:
+## Where positions and cutting paths come from
+
+There is **no recipe system** anymore (the old `GVL_Recipes.RecipeLibrary[1..10]` was removed).
+The two step FBs that move PLC axes pull straight from `GVL_Machine`:
 
 ```iecst
-IF RecipeID <> lastRecipeID THEN
-    IF RecipeID >= 1 AND RecipeID <= 10 THEN
-        IF GVL_Recipes.RecipeLibrary[RecipeID].isActive THEN
-            // Load recipe data
-            positions := GVL_Recipes.RecipeLibrary[RecipeID].positions;
-            motionParams := GVL_Recipes.RecipeLibrary[RecipeID].motionParams;
-            enableStuds := GVL_Recipes.RecipeLibrary[RecipeID].enableStuds;
-            enableWindowsDoors := GVL_Recipes.RecipeLibrary[RecipeID].enableWindowsDoors;
-            enableElectrical := GVL_Recipes.RecipeLibrary[RecipeID].enableElectrical;
-
-            ActiveRecipeID := RecipeID;
-            RecipeLoadComplete := TRUE;
-            RecipeLoadError := FALSE;
-        ELSE
-            RecipeLoadError := TRUE;
-        END_IF
-    ELSE
-        RecipeLoadError := TRUE;
-    END_IF
-    lastRecipeID := RecipeID;
-END_IF
-```
-
-This pattern:
-1. Detects recipe change
-2. Validates range (1-10)
-3. Checks if recipe is active
-4. Copies all recipe data to local working variables
-5. Sets enable flags for optional steps
-
-The recipe contains:
-- **positions** - Target positions for all axes in all steps
-- **motionParams** - Velocity, acceleration, jerk settings
-- **enableStuds/WindowsDoors/Electrical** - Flags to skip certain operations
-
-## Conditional Step Execution
-
-Not every product needs every operation:
-
-```iecst
-E_MotionStep.SHIFT_TO_PROCESSING_AREA:
-    // ... execute load block step ...
-    IF stepLoadBlock.Done THEN
-        stepLoadBlock(Enable := FALSE);
-
-        // Determine next operation based on recipe
-        IF enableStuds THEN
-            motionStep := E_MotionStep.STUDS;
-        ELSIF enableWindowsDoors THEN
-            motionStep := E_MotionStep.WINDOWS_DOORS;
-        ELSIF enableElectrical THEN
-            motionStep := E_MotionStep.ELECTRICAL;
-        ELSE
-            motionStep := E_MotionStep.SHIFT_TO_UNLOAD_AREA;
-        END_IF
-    END_IF
-```
-
-Each step checks what's enabled and skips to the next relevant step. A product that only needs studs will skip windows/doors and electrical entirely.
-
-This flexibility comes from recipe data, not code changes. New product variants are configuration, not programming.
-
-## Architecture
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                            FB_MotionSequence                                 │
-│                                                                              │
-│   ┌─────────────────────────────────────────────────────────────────────┐   │
-│   │                         INPUTS                                       │   │
-│   │                                                                      │   │
-│   │   Enable : BOOL          - TRUE when machine in RUNNING state       │   │
-│   │   RecipeID : UINT        - Recipe number (1-10)                     │   │
-│   └─────────────────────────────────────────────────────────────────────┘   │
-│                              │                                               │
-│                              ▼                                               │
-│   ┌─────────────────────────────────────────────────────────────────────┐   │
-│   │                     RECIPE MANAGEMENT                                │   │
-│   │                                                                      │   │
-│   │   positions : ST_PositionSetpoints    ◀── Loaded from recipe        │   │
-│   │   motionParams : ST_MotionParameters  ◀── Loaded from recipe        │   │
-│   │   enableStuds, enableWindowsDoors, enableElectrical                 │   │
-│   └─────────────────────────────────────────────────────────────────────┘   │
-│                              │                                               │
-│                              ▼                                               │
-│   ┌─────────────────────────────────────────────────────────────────────┐   │
-│   │                    STEP ORCHESTRATION                                │   │
-│   │                                                                      │   │
-│   │   motionStep : E_MotionStep           Current step in sequence     │   │
-│   │                                                                      │   │
-│   │   ┌─────────────────────────────────────────────────────────────┐  │   │
-│   │   │ CASE motionStep OF                                           │  │   │
-│   │   │                                                              │  │   │
-│   │   │   WAIT_FOR_LOAD:                                            │  │   │
-│   │   │       Wait for blockLoaded sensor                           │  │   │
-│   │   │                                                              │  │   │
-│   │   │   SHIFT_TO_PROCESSING_AREA:                                 │  │   │
-│   │   │       stepLoadBlock(Enable := TRUE, Positions, MotionParams)│  │   │
-│   │   │       IF Done → next step (based on enables)                │  │   │
-│   │   │                                                              │  │   │
-│   │   │   STUDS:                                                    │  │   │
-│   │   │       stepStuds(Enable := TRUE, ...)                        │  │   │
-│   │   │       IF Done → next step                                   │  │   │
-│   │   │                                                              │  │   │
-│   │   │   ... other steps ...                                       │  │   │
-│   │   │                                                              │  │   │
-│   │   │   SHIFT_TO_UNLOAD_AREA:                                     │  │   │
-│   │   │       stepUnload(Enable := TRUE, ...)                       │  │   │
-│   │   │       IF Done → SequenceComplete, back to WAIT_FOR_LOAD    │  │   │
-│   │   │                                                              │  │   │
-│   │   └─────────────────────────────────────────────────────────────┘  │   │
-│   └─────────────────────────────────────────────────────────────────────┘   │
-│                              │                                               │
-│                              ▼                                               │
-│   ┌─────────────────────────────────────────────────────────────────────┐   │
-│   │                       OUTPUTS                                        │   │
-│   │                                                                      │   │
-│   │   SEQUENCING                        HMI VISUALIZATION               │   │
-│   │   ┌───────────────────────┐        ┌───────────────────────────┐   │   │
-│   │   │ SequenceComplete      │        │ CurrentSubStep            │   │   │
-│   │   │ CurrentStep           │        │ ActiveAxesMask            │   │   │
-│   │   │ ActiveRecipeID        │        │ StepDescription           │   │   │
-│   │   │ RecipeLoadComplete    │        │                           │   │   │
-│   │   │ RecipeLoadError       │        │                           │   │   │
-│   │   └───────────────────────┘        └───────────────────────────┘   │   │
-│   │                                                                      │   │
-│   │   ERROR EXPOSURE (for FB_ErrorHandler)                              │   │
-│   │   ┌─────────────────────────────────────────────────────────────┐  │   │
-│   │   │ LoadBlockError, LoadBlockErrorAxisID                         │  │   │
-│   │   │ StudsError, StudsErrorAxisID                                 │  │   │
-│   │   │ WindowsDoorsError, WindowsDoorsErrorAxisID                   │  │   │
-│   │   │ ElectricalError, ElectricalErrorAxisID                       │  │   │
-│   │   │ UnloadError, UnloadErrorAxisID                               │  │   │
-│   │   │ HasError, ErrorAxisID (aggregates)                           │  │   │
-│   │   └─────────────────────────────────────────────────────────────┘  │   │
-│   └─────────────────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-
-## The Visualization Outputs
-
-Each motion step provides visualization data that FB_MotionSequence passes through:
-
-```iecst
-E_MotionStep.STUDS:
-    stepStuds(Enable := TRUE, Positions := positions, MotionParams := motionParams);
-
-    // Pass through visualization outputs
-    CurrentSubStep := stepStuds.CurrentSubStep;
-    ActiveAxesMask := stepStuds.ActiveAxesMask;
-    StepDescription := stepStuds.StepDescription;
-```
-
-This allows the HMI to show:
-- **CurrentStep** - "STUDS"
-- **CurrentSubStep** - "2"
-- **StepDescription** - "Stud axes - horizontal extend"
-- **ActiveAxesMask** - Bits for axes 15, 19, 23, 27 lit up
-
-All without FB_MotionSequence needing to know the internal details of each step.
-
-## Error Exposure
-
-Errors bubble up through a clean interface:
-
-```iecst
-// At the end of the FB
-LoadBlockError := stepLoadBlock.Error;
-LoadBlockErrorAxisID := stepLoadBlock.ErrorAxisID;
-StudsError := stepStuds.Error;
-StudsErrorAxisID := stepStuds.ErrorAxisID;
-// ... etc ...
-
-// Aggregate for quick check
-HasError := LoadBlockError OR StudsError OR WindowsDoorsError
-            OR ElectricalError OR UnloadError;
-```
-
-The state machine's FB_ErrorHandler consumes these outputs:
-
-```iecst
-errorHandler(
-    LoadBlockError := motionSequence.LoadBlockError,
-    LoadBlockErrorAxisID := motionSequence.LoadBlockErrorAxisID,
-    // ...
+stepLoadBlock(
+    Enable       := TRUE,
+    Positions    := GVL_Machine.Positions,      // load/unload target positions
+    MotionParams := GVL_Machine.MotionParams    // velocity / accel / decel / jerk
 );
 ```
 
-This separation means:
-- Motion steps report their errors locally
-- FB_MotionSequence exposes them without processing
-- FB_ErrorHandler handles prioritization and latching
-- FB_MachineStateMachine reacts to errors
+The cutting path is **not** in `GVL_Machine` at all — it's staged by the Python pipeline into
+`GVL_GCode` (G-code files on the ctrlX filesystem). The `CUTTING` step just hands control to
+that pipeline and waits. See `GVL_GCode.txt` for the full handshake.
 
-Clean layering. Each component does one job.
+## Start gating (the WAIT_FOR_LOAD logic)
 
-## Disable Handling
-
-When Enable goes FALSE (machine stopped):
+A cycle needs two independent green lights before it moves a single axis:
 
 ```iecst
-IF NOT Enable THEN
-    // Disable all step FBs
+IF BlockLoaded AND FilesReady THEN
+    motionStep := E_MotionStep.SHIFT_TO_PROCESSING_AREA;   // go
+ELSIF BlockLoaded AND NOT FilesReady THEN
+    StepDescription := 'Waiting for G-code upload';        // block is here, cuts aren't
+ELSE
+    StepDescription := 'Waiting for block to load';        // nothing loaded yet
+END_IF
+```
+
+This is why pressing START with a block present but no G-code uploaded just sits there with a
+"waiting for G-code" message instead of faulting — it's not an error, it's a missing input.
+
+## Clean hand-off between steps
+
+The pattern for every step is: enable it, mirror its visualization, and **disable it the moment
+it reports Done** before advancing. Disabling is what lets the step reset itself (and flush its
+movers — see `FB_AxisMover.md → The Phantom Fault`) so it's clean for next cycle.
+
+```iecst
+E_MotionStep.SHIFT_TO_PROCESSING_AREA:
+    stepLoadBlock(Enable := TRUE, Positions := GVL_Machine.Positions,
+                  MotionParams := GVL_Machine.MotionParams);
+
+    CurrentSubStep  := stepLoadBlock.CurrentSubStep;
+    ActiveAxesMask  := stepLoadBlock.ActiveAxesMask;
+    StepDescription := stepLoadBlock.StepDescription;
+
+    IF stepLoadBlock.Done THEN
+        stepLoadBlock(Enable := FALSE);          // clean up BEFORE transitioning
+        motionStep := E_MotionStep.CUTTING;
+    END_IF
+```
+
+## Reset / disable handling
+
+Two different "stop" inputs, two different behaviors:
+
+```iecst
+IF ResetSequence THEN
+    // Hard reset (supervisor is in RESETTING): force every step FB off and park.
     stepLoadBlock(Enable := FALSE);
-    stepStuds(Enable := FALSE);
-    stepWindowsDoors(Enable := FALSE);
-    stepElectrical(Enable := FALSE);
+    stepCutting(Enable := FALSE);
     stepUnload(Enable := FALSE);
+    motionStep := E_MotionStep.WAIT_FOR_LOAD;
+    SequenceComplete := FALSE;
+    CurrentStep := motionStep;
+    StepDescription := 'Waiting for block to load';
+    RETURN;
+END_IF
 
-    // Clear error state
-    HasError := FALSE;
-    ErrorAxisID := 0;
-    // ... clear all error outputs ...
-
-    ActiveAxesMask := 0;
-    stepStarted := FALSE;
+IF NOT Enable THEN
+    // Plain disable (e.g. paused): freeze in place, keep motionStep so we can resume.
+    CurrentStep := motionStep;
     RETURN;
 END_IF
 ```
 
-This ensures:
-1. All motion steps stop
-2. Error states clear (actual errors handled by state machine)
-3. Visualization shows no activity
-4. Ready for clean restart
-
-## Lessons Learned
-
-### Bug We Fixed: Step Not Disabling After Completion
-
-Early versions didn't disable the completed step before transitioning:
-
-```iecst
-// WRONG
-IF stepLoadBlock.Done THEN
-    motionStep := E_MotionStep.STUDS;  // stepLoadBlock still enabled!
-END_IF
-```
-
-This caused issues when the sequence looped back to WAIT_FOR_LOAD - the LoadBlock step was still in a Done state.
-
-**The fix**: Always disable before transitioning:
-```iecst
-IF stepLoadBlock.Done THEN
-    stepLoadBlock(Enable := FALSE);  // Clean up first!
-    motionStep := E_MotionStep.STUDS;
-END_IF
-```
-
-### Pitfall: Not Handling Recipe Load Errors
-
-If `RecipeLoadError = TRUE`, the sequence shouldn't run. But early versions tried anyway with stale data.
-
-**Best practice**: Check recipe validity at the state machine level before entering RUNNING.
-
-### Why Not a FOR Loop Over Steps?
-
-You might think:
-```iecst
-FOR i := 1 TO NUM_STEPS DO
-    IF stepFBs[i].Done THEN
-        stepFBs[i].Enable := FALSE;
-        // Next step...
-    END_IF
-END_FOR
-```
-
-But:
-1. Step skipping logic (enableStuds, etc.) doesn't fit a simple loop
-2. Different steps have different FB types
-3. The explicit CASE makes the sequence readable
-4. Debugging is easier when you can set breakpoints on specific steps
+The distinction matters for resume-after-stop: a plain disable keeps `motionStep` where it was
+so the supervisor can pick the cycle back up; a `ResetSequence` wipes it back to the start.
 
 ## Interface Reference
 
 ### Inputs
 | Name | Type | Description |
 |------|------|-------------|
-| Enable | BOOL | TRUE when machine in RUNNING state |
-| RecipeID | UINT | Recipe number to load (1-10) |
+| Enable | BOOL | TRUE when the machine is in RUNNING state |
+| ResetSequence | BOOL | TRUE only when the supervisor wants a hard reset (RESETTING) |
+| BlockLoaded | BOOL | TRUE when the next foam block is physically in place |
+| FilesReady | BOOL | TRUE when the Python pipeline has staged G-code for the block |
 
 ### Outputs
 | Name | Type | Description |
 |------|------|-------------|
-| SequenceComplete | BOOL | Full cycle completed |
+| SequenceComplete | BOOL | Full cycle completed (one-scan-ish pulse as it loops) |
 | CurrentStep | E_MotionStep | Current motion phase |
-| ActiveRecipeID | UINT | Currently loaded recipe ID |
-| RecipeLoadComplete | BOOL | Recipe loaded successfully |
-| RecipeLoadError | BOOL | Recipe load failed |
-| CurrentSubStep | UINT | Current substep within motion step |
+| CurrentSubStep | UINT | Current substep within the active step |
 | ActiveAxesMask | LWORD | Bitmask of currently moving axes |
-| StepDescription | STRING[80] | Human-readable description |
-| LoadBlockError | BOOL | Load block step error |
-| LoadBlockErrorAxisID | UINT | Load block error axis |
-| StudsError | BOOL | Studs step error |
-| StudsErrorAxisID | UINT | Studs error axis |
-| WindowsDoorsError | BOOL | Windows/doors step error |
-| WindowsDoorsErrorAxisID | UINT | Windows/doors error axis |
-| ElectricalError | BOOL | Electrical step error |
-| ElectricalErrorAxisID | UINT | Electrical error axis |
-| UnloadError | BOOL | Unload step error |
-| UnloadErrorAxisID | UINT | Unload error axis |
-| HasError | BOOL | Any motion error occurred |
-| ErrorAxisID | UINT | Which axis caused first error |
+| StepDescription | STRING[80] | Human-readable description for the HMI |
+
+> No `Error` / `*ErrorAxisID` outputs and no recipe outputs — those belonged to the pre-v3.0
+> architecture. Faults flow through `GVL_Faults` / `FB_FaultMonitor` instead.
+
+## Lessons Learned
+
+### Always disable a step before transitioning
+If a completed step is left enabled, it's still sitting in its Done state when the sequence loops
+back — and (pre-fix) its movers were never flushed. Disabling before advancing is what gives each
+step FB the clean reset that prevents phantom faults. See `FAULT_TROUBLESHOOTING.md`.
+
+### Why a CASE statement instead of a FOR loop over steps
+The steps have different FB types and different inputs (the cutting step takes no positions), and
+the explicit `CASE` lets you set a breakpoint on exactly one phase. Readability beats cleverness
+here.
 
 ## The Philosophy
 
-FB_MotionSequence is a **thin orchestration layer**. It doesn't know how to carve studs or route electrical troughs. It knows *when* those things should happen and *what order* they go in.
-
-This separation creates:
-- **Testability** - Motion steps can be tested independently
-- **Flexibility** - New steps can be added without changing orchestration
-- **Clarity** - The sequence is readable as a high-level description of the process
-- **Recipe-driven** - Product variations are configuration, not code
-
-The choreographer doesn't need to know the steps to the dance - they need to know when each dancer should perform.
+FB_MotionSequence is a **thin orchestration layer**. It doesn't know how to carve a stud or route
+an electrical trough — that lives in G-code and the wire kinematics. It knows *when* each phase
+happens and *what order* they go in. The choreographer doesn't need to know the steps to the
+dance; they need to know when each dancer should perform.

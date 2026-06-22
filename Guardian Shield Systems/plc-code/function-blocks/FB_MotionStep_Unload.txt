@@ -36,6 +36,11 @@ END_VAR
 ///////////////////////////////////////////////////////////////////////////////
 
 IF NOT Enable THEN
+    // Drive movers to Execute := FALSE so MC_MoveAbsolute gets a rising edge on next enable.
+    // Without this, fbMove inside FB_AxisMover stays latched Execute=TRUE; the next call with
+    // Execute=TRUE produces no edge and reports the stale ErrorID (0x7FFF) as a phantom fault.
+    moverAxis8(Execute := FALSE, AxisRef := Axis_8);
+    moverAxis10(Execute := FALSE, AxisRef := Axis_10);
     Done := FALSE; Busy := FALSE;
     ActiveAxesMask := 0; CurrentSubStep := 0; StepDescription := '';
     subStep := 0; stepStarted := FALSE; localError := FALSE;

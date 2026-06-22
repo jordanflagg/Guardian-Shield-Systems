@@ -41,6 +41,12 @@ VAR_GLOBAL
     // (HMI_ActiveFault.description, .errorCode, .source, etc.)
     HMI_ActiveFault : ST_FaultReport;
 
+    // TRUE when the active fault looks like a stale PLC-logic ("phantom") fault
+    // rather than a real drive fault — i.e. an axis FB reported an ErrorID but
+    // ctrlX shows no active drive errors. Surface this on the fault panel so the
+    // operator knows to look at the PLC/reset path, not the drive or Logbook.
+    HMI_LogicFaultSuspected : BOOL := FALSE;
+
     // ═══════════════════════════════════════════════════════════════════════
     // ctrlX DIAGNOSTICS  (read by HMI — badge count and info strip)
     // ═══════════════════════════════════════════════════════════════════════

@@ -172,18 +172,20 @@ fbMoveGroup1(
 );
 ```
 
-### Pattern 2: Parallel Cutting
-FB_MotionStep_Studs moves all 8 stud axes together:
+### Pattern 2: Home All (non-kinematic masters)
+`FB_AxisHome` uses one `FB_MultiAxisMover` (`fbMoveNonKin`) to send the 6 non-kinematic
+master axes (1, 2, 6, 8, 10, 34) to position 0 simultaneously during a Home-All.
 
 ```iecst
-// All vertical axes to position 1
-moverAxis14(Execute := TRUE, ...);
-moverAxis18(Execute := TRUE, ...);
-moverAxis22(Execute := TRUE, ...);
-moverAxis26(Execute := TRUE, ...);
+fbMoveNonKin(
+    Execute := TRUE,
+    Enable1 := TRUE, Axis1 := AXIF_CONFIG_INDEXES[GVL_Axes.NON_KIN_MASTER_AXES[1]], Position1 := 0.0,
+    // ... slots 2..6 for the remaining non-kin masters ...
+);
 ```
 
-(Note: FB_MotionStep_Studs uses individual FB_AxisMover instances rather than FB_MultiAxisMover for finer control, but the parallel execution pattern is the same.)
+(Historical note: earlier versions had `FB_MotionStep_Studs/_WindowsDoors/_Electrical` that
+moved cutting axes in parallel. Those were removed in v3.0 — all cutting is now G-code driven.)
 
 ### Pattern 3: Selective Enabling
 Not all operations need all 8 slots:
@@ -246,6 +248,28 @@ state : UNIT := 0;  // TYPO! Should be UINT
 ```
 
 `UNIT` isn't a valid type - this was a typo for `UINT`. The compiler caught it, but it's a reminder that similar-looking identifiers can cause subtle issues.
+
+### Bug We Fixed: Idle Movers Re-Reporting Stale Errors (Phantom Faults)
+
+This FB stops calling its child `mover[1..8]` in its own IDLE (state 0) and ERROR (state 3) states. But `FB_AxisMover` only clears its latched ERROR on `Execute := FALSE`. So a child mover that errored on one run stayed stuck in ERROR, and the **next** `Execute` rising edge re-reported the **same stale `ErrorID`** — a phantom fault — even though the drive was fine. For Home-All, that meant a one-time axis fault could "stick" and re-trip every subsequent Home.
+
+**The fix:** hold every child mover at `Execute := FALSE` while idle, so each gets a clean falling edge and is ready for a fresh rising edge next time:
+
+```iecst
+0: // IDLE
+    Done := FALSE; Busy := FALSE; Error := FALSE; ActiveAxesMask := 0;
+
+    FOR i := 1 TO 8 DO
+        mover[i](Execute := FALSE);   // ← flush, or stale errors re-fire next run
+    END_FOR
+
+    IF executeRising THEN
+        state := 1;
+        Busy := TRUE;
+    END_IF
+```
+
+Same root cause as the `FB_MotionStep_Unload` phantom fault — see `FB_AxisMover.md → The Phantom Fault`. The rule: **a latched FB that stops being called is not the same as a reset FB.**
 
 ### Pitfall: Edge vs Level Triggering
 

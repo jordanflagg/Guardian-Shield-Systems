@@ -1,346 +1,208 @@
 # Guardian Shield Systems - Foam Block Carving Machine
 
-Automated foam block processing system with 36-axis motion control.
+Automated foam block processing system with 36-axis motion control on a Bosch ctrlX CORE.
+
+> **New here? Start with these three:**
+> 1. This README (architecture overview)
+> 2. [plc-code/FAULT_TROUBLESHOOTING.md](plc-code/FAULT_TROUBLESHOOTING.md) — how to diagnose a fault fast
+> 3. [CLAUDE.md](CLAUDE.md) — the authoritative, in-depth system overview
+>
+> Each function block also has a companion `.md` next to its `.txt` that tells its story in plain language.
 
 ## 📁 Project Structure
 
 ```
 Guardian Shield Systems/
 ├── plc-code/
-│   ├── function-blocks/       # PLC function blocks (FB_*)
-│   │   ├── FB_AxisGearing.txt       # Array-based gearing management (18 pairs)
-│   │   ├── FB_AxisMover.txt         # Generic single-axis move handler
-│   │   ├── FB_AxisPower.txt         # Drive power control for all 36 axes
-│   │   ├── FB_ButtonManager.txt     # Button input with auto-clear
-│   │   ├── FB_ErrorHandler.txt      # Centralized error handling
-│   │   ├── FB_MachineStateMachine.txt  # Top-level state control
-│   │   ├── FB_MotionSequence.txt    # Motion sequence orchestrator
-│   │   ├── FB_MotionStep_LoadBlock.txt    # Load step (11 substeps)
-│   │   ├── FB_MotionStep_Studs.txt        # Studs step (6 substeps)
-│   │   ├── FB_MotionStep_WindowsDoors.txt # Windows step (6 substeps)
-│   │   ├── FB_MotionStep_Electrical.txt   # Electrical step (6 substeps)
-│   │   ├── FB_MotionStep_Unload.txt       # Unload step (5 substeps)
-│   │   └── FB_MultiAxisMover.txt    # Multi-axis coordinated moves
+│   ├── function-blocks/       # PLC function blocks (FB_*) + a .md companion each
+│   │   ├── FB_AxisMover.txt           # Generic single-axis move (wraps MC_MoveAbsolute)
+│   │   ├── FB_MultiAxisMover.txt       # Up to 8 coordinated parallel moves
+│   │   ├── FB_AxisData.txt            # Reads position/velocity for the HMI
+│   │   ├── FB_AxisManual.txt          # Manual jog of a single master axis (MC_Jog)
+│   │   ├── FB_AxisHome.txt            # Homing — non-kin via moves, kin via G-code scripts
+│   │   ├── FB_ButtonManager.txt       # Button edge detection → one-scan command pulses
+│   │   ├── FB_AxisPower.txt           # Drive power (MC_Power ×36) + gantry connection
+│   │   ├── FB_KinematicEnable.txt     # 24/7 wire-kin enable / interrupt / opstate monitor
+│   │   ├── FB_FaultMonitor.txt        # Fault detection, latch, ctrlX diag poll, reset/recovery
+│   │   ├── FB_MotionStep_LoadBlock.txt # Load step (12 substeps, axes 1,2,6,8,10)
+│   │   ├── FB_MotionStep_Cutting.txt   # Cutting step (G-code driven — no PLC axis motion)
+│   │   ├── FB_MotionStep_Unload.txt    # Unload step (5 substeps, axes 8,10)
+│   │   ├── FB_MotionSequence.txt       # Motion phase orchestrator
+│   │   ├── FB_MachineStateMachine.txt  # Top-level state control + safety
+│   │   └── FB_ErrorHandler.txt         # DEPRECATED stub (replaced by FB_FaultMonitor)
 │   │
-│   ├── data-types/            # Data structures and enumerations
-│   │   ├── E_MachineState.txt       # Machine state enumeration (9 states)
-│   │   ├── E_MotionStep.txt         # Motion sequence phases (6 steps)
-│   │   ├── ST_AxisMoveCmd.txt       # Axis move command structure
-│   │   ├── ST_GearingPair.txt       # Gearing pair configuration
-│   │   ├── ST_MotionError.txt       # Motion error information
-│   │   ├── ST_MotionParameters.txt  # Velocity, acceleration, jerk
-│   │   ├── ST_PositionSetpoints.txt # All axis target positions
-│   │   └── ST_Recipe.txt            # Complete recipe structure
+│   ├── data-types/
+│   │   ├── E_MachineState.txt         # 9 machine states
+│   │   ├── E_MotionStep.txt           # Motion phases (WAIT_FOR_LOAD…SHIFT_TO_UNLOAD_AREA)
+│   │   ├── E_ActiveCommand.txt        # Button command enum
+│   │   ├── ST_MotionParameters.txt    # Velocity/accel/decel/jerk
+│   │   ├── ST_PositionSetpoints.txt   # Load/unload axis target positions
+│   │   └── ST_FaultReport.txt         # One fault record (source, axis, code, step…)
 │   │
-│   ├── global-variables/      # Global variable lists
-│   │   └── GVL_Recipes.txt          # Recipe library (10 recipes, 7 active)
+│   ├── global-variables/
+│   │   ├── GVL_Axes.txt               # Master/slave/kin axis constants (single source of truth)
+│   │   ├── GVL_Machine.txt            # Positions + motion params (replaces the old recipe lib)
+│   │   ├── GVL_GCode.txt              # G-code pipeline handshake (Python ↔ PLC)
+│   │   ├── GVL_Faults.txt             # activeFault + axisFlags[1..36] + systemFault
+│   │   └── GVL_HMI.txt                # All HMI read/write variables
 │   │
-│   ├── programs/              # Main PLC programs
-│   │   └── PLC_PRG.txt              # Main orchestrator program
+│   ├── helper functions/
+│   │   ├── FC_BuildAxisMask.txt       # Axis numbers → 64-bit HMI bitmask
+│   │   └── FC_ReportFault.txt         # One-liner any FB calls to post a fault
 │   │
-│   └── documentation/         # Technical documentation
-│       └── Project Overview.txt
+│   ├── programs/  PLC_PRG.txt          # Main orchestrator
+│   ├── FAULT_TROUBLESHOOTING.md        # ★ Field guide for diagnosing faults
+│   └── documentation/ Project Overview.txt
 │
-└── web-hmi/                   # Web-based HMI interface
-    ├── simple-version/
-    │   ├── index.html               # Gradient-styled web HMI
-    │   ├── index-industrial.html    # Industrial-styled web HMI (primary)
-    │   ├── index-industrial-36axis.html  # WIP: Enhanced 36-axis visualization
-    │   ├── recipes.html             # Recipe editor (gradient style)
-    │   ├── recipes-industrial.html  # Recipe editor (industrial style)
-    │   └── README-index-industrial.md  # JavaScript documentation
-    ├── react-version/         # React-based HMI (optional)
-    ├── ctrlx-api-guide.js    # API helper functions
-    └── README.md              # HMI documentation
+└── web-hmi/                   # Web-based HMI (browser ↔ ctrlX Data Layer)
+    └── simple-version/index-industrial.html   # Primary HMI
 ```
 
 ## 🎯 Project Overview
 
-**Machine Type:** Automated Foam Block Carving Machine
-**Controller:** Bosch ctrlX CORE PLC
-**Language:** IEC 61131-3 Structured Text
-**Total Axes:** 36 servo axes (18 masters, 18 geared slaves)
-**Operations:** Block loading, stud carving, window/door cutting, electrical trough, unloading
+| | |
+|---|---|
+| **Machine** | Automated foam block carving machine |
+| **Controller** | Bosch ctrlX CORE |
+| **Language** | IEC 61131-3 Structured Text |
+| **Axes** | 36 servo (18 masters + 18 gantry slaves), absolute encoders (no homing search) |
+| **Cutting** | Hot-wire, **G-code driven** by the ctrlX script runtime + wire kinematic groups |
+| **Operations** | Block load → cut (studs, windows/doors, electrical troughs) → unload |
+| **Version** | 3.0 — G-code pipeline + Bosch gantry groups |
 
-## 🚀 Quick Start
+### Two big architectural ideas (v3.0)
 
-### PLC Code
+1. **Gantry slaving is configured in the Bosch ctrlX web UI**, not in PLC code. The PLC only ever
+   commands the 18 master axes; the 18 slaves follow via hardware kinematic config. (There is no
+   `FB_AxisGearing` anymore.)
+2. **All cutting is G-code.** The Python pipeline generates per-wire `.npg` scripts, uploads them
+   to the ctrlX filesystem, and `trigger_dispatch.py` runs them on always-enabled wire kinematics.
+   The PLC does **not** command cutting-axis motion — `FB_MotionStep_Cutting` just runs a handshake
+   (`bFilesReady` → `bBusy` → `bJobDone`). The studs / windows / electrical motions are all just
+   wire scripts now, so the old `FB_MotionStep_Studs/_WindowsDoors/_Electrical` FBs are gone.
 
-1. **Import Data Types First:**
-   - `E_MachineState.txt`
-   - `E_MotionStep.txt`
-   - `ST_MotionParameters.txt`
-   - `ST_PositionSetpoints.txt`
-   - `ST_Recipe.txt`
+## 🚀 Quick Start — PLC import order
 
-2. **Import Global Variables:**
-   - `GVL_Recipes.txt` (recipe library with 10 pre-configured recipes)
+1. **Data types:** `E_MachineState`, `E_MotionStep`, `E_ActiveCommand`,
+   `ST_MotionParameters`, `ST_PositionSetpoints`, `ST_FaultReport`
+2. **Global variables:** `GVL_Axes` (constants), `GVL_Machine`, `GVL_GCode`, `GVL_Faults`, `GVL_HMI`
+3. **Helper functions:** `FC_BuildAxisMask`, `FC_ReportFault`
+4. **Function blocks (dependency order):**
+   `FB_AxisMover` → `FB_MultiAxisMover` → `FB_AxisData`, `FB_AxisManual`, `FB_AxisHome`,
+   `FB_ButtonManager`, `FB_AxisPower`, `FB_KinematicEnable`, `FB_FaultMonitor`,
+   `FB_MotionStep_LoadBlock`, `FB_MotionStep_Cutting`, `FB_MotionStep_Unload`,
+   `FB_MotionSequence`, `FB_MachineStateMachine`
+5. **Program:** `PLC_PRG`
 
-3. **Import Function Blocks (in order):**
-   - `FB_AxisMover.txt` (helper - no dependencies)
-   - `FB_MultiAxisMover.txt` (helper - depends on FB_AxisMover)
-   - `FB_ButtonManager.txt`
-   - `FB_AxisPower.txt`
-   - `FB_AxisGearing.txt`
-   - `FB_ErrorHandler.txt`
-   - `FB_MotionStep_LoadBlock.txt`
-   - `FB_MotionStep_Studs.txt`
-   - `FB_MotionStep_WindowsDoors.txt`
-   - `FB_MotionStep_Electrical.txt`
-   - `FB_MotionStep_Unload.txt`
-   - `FB_MotionSequence.txt` (depends on step FBs)
-   - `FB_MachineStateMachine.txt` (top-level)
-
-4. **Import Main Program:**
-   - `PLC_PRG.txt`
-
-### Web HMI
-
-See [web-hmi/README.md](web-hmi/README.md) for complete instructions.
-
-**Quick test:**
+### Web HMI quick test
 ```bash
 cd web-hmi/simple-version
-start index.html
+start index-industrial.html
 ```
 
-## 📖 Documentation
+## 📖 Function Blocks at a glance
 
-### PLC Code Documentation
+**FB_MachineStateMachine** (top-level) — INIT, IDLE, HOMING, MANUAL, RUNNING, STOPPING, FAULTED,
+E_STOPPED, RESETTING. E-Stop and `HasFault` (from FB_FaultMonitor) are checked before the main
+CASE. Handles wire-kinematic interrupt/continue and cycle pause/resume. **No** recipe lock or
+gearing engagement.
 
-- **[Project Overview](plc-code/documentation/Project%20Overview.txt)** - Comprehensive system documentation including:
-  - Machine description and specifications
-  - Program structure and architecture
-  - Axis configuration (all 36 axes)
-  - Motion sequence state machine
-  - Control flow and operation
-  - Data structures
-  - Future enhancements
-  - Debugging tips
+**FB_MotionSequence** (orchestrator) — `WAIT_FOR_LOAD → SHIFT_TO_PROCESSING_AREA → CUTTING →
+SHIFT_TO_UNLOAD_AREA`, enabling one step FB at a time. Positions come from `GVL_Machine`; the cut
+path comes from `GVL_GCode`.
 
-### Function Blocks
+**Motion step FBs**
+- `FB_MotionStep_LoadBlock` — 12 substeps; axes 1, 2, 6, 8, 10
+- `FB_MotionStep_Cutting` — G-code handshake only (PLC commands no cutting axes)
+- `FB_MotionStep_Unload` — 5 substeps; axes 8, 10
 
-**FB_MachineStateMachine** (Top-level)
-- High-level machine control
-- States: INIT, IDLE, HOMING, MANUAL, RUNNING, STOPPING, FAULTED, E_STOPPED, RESETTING
-- Manages safety (E-stop handling)
-- Coordinates button inputs with motion sequence
-- Manages gearing re-engagement after stops/faults
-- Outputs motion visualization data for HMI
-- Contains embedded FB_MotionSequence and FB_AxisGearing
+**FB_AxisMover / FB_MultiAxisMover** (helpers) — wrap `MC_MoveAbsolute` with a clean
+Done/Busy/Error state machine; the multi-mover coordinates up to 8 in parallel. ⚠️ Both must be
+flushed with `Execute := FALSE` on disable to avoid *phantom faults* — see
+[FAULT_TROUBLESHOOTING.md](plc-code/FAULT_TROUBLESHOOTING.md) and `FB_AxisMover.md`.
 
-**FB_MotionSequence** (Orchestrator)
-- Orchestrates modular motion step FBs
-- 6 main motion phases with recipe-driven conditional execution
-- Delegates each phase to dedicated step FB
-- Collects visualization data from active step
-- Recipe loading and validation
+**FB_AxisPower** — `MC_Power` on all 36 axes + one-time `ML_AxsAddToGantry` for the 18 pairs.
+`DrivesReady` gates RUNNING/HOMING/MANUAL. Reset/recovery is **not** here — it's in FB_FaultMonitor.
 
-**Motion Step FBs** (Modular)
-- `FB_MotionStep_LoadBlock` - 11 substeps: shift, lift, center block
-- `FB_MotionStep_Studs` - 6 substeps: 8-axis parallel stud carving
-- `FB_MotionStep_WindowsDoors` - 6 substeps: window/door cutting
-- `FB_MotionStep_Electrical` - 6 substeps: electrical trough cutting
-- `FB_MotionStep_Unload` - 5 substeps: move block to unload area
+**FB_KinematicEnable** — keeps the 5 wire kinematic groups enabled 24/7, handles interrupt/continue
+on E-Stop/Stop/Start, and polls each kin's opstate for `ERRORSTOP`.
 
-**FB_AxisMover** (Helper)
-- Generic single-axis move wrapper
-- Encapsulates MC_MoveAbsolute with state machine
-- Provides clean Done/Busy/Error interface
-- Reduces repetitive execute/done/error pattern
+**FB_FaultMonitor** — the heart of fault handling. Latches `HasFault` from either `GVL_Faults`
+(any FB's `FC_ReportFault`) or the 24/7 ctrlX diagnosis poll, and owns the full reset/recovery
+sequence (confirm errors → MC_Reset slaves → masters → kin reset/enable → verify). Also computes
+`LogicFaultSuspected` (phantom-fault hint).
 
-**FB_MultiAxisMover** (Helper)
-- Coordinates up to 8 parallel axis moves
-- Waits for all enabled moves to complete
-- Reports first error if any occur
+**FB_AxisHome / FB_AxisManual / FB_AxisData** — homing (non-kin via moves, kin via G-code home
+scripts), manual jog of master axes, and live position/velocity for the HMI.
 
-**FB_AxisGearing** (Array-based)
-- Centralized management of 18 gearing pairs via configuration array
-- Loop-based FB calls instead of 18 separate instances
-- Configurable via ST_GearingPair structure
-- ~150 lines reduced to ~30 lines
+**FB_ButtonManager** — R_TRIG edge detection → **one-scan** command pulses (the state machine owns
+mode persistence). Priority: E-Stop > Stop > Start > Home > Manual > Reset.
 
-**FB_AxisPower**
-- Centralized axis power control
-- Powers all 36 axes via MC_Power arrays
-- Aggregates DrivesReady status from all axes
-- Reports first error axis ID
-
-**FB_ErrorHandler**
-- Centralized error collection from all step FBs
-- Latches first error until reset
-- Provides ST_MotionError structure with full context
-- Error codes by category (power, gearing, motion steps)
-
-**FB_ButtonManager**
-- Button debouncing and edge detection (R_TRIG)
-- Auto-clear after one scan (one-shot behavior)
-- Priority: E-Stop > Stop > Start > Home > Manual > Reset
-- E-stop is level-sensitive (active while pressed)
-
-### Data Types
-
-**E_MachineState** - Machine state enumeration (9 states)
-**E_MotionStep** - Motion sequence phases (6 steps with substep comments)
-**ST_AxisMoveCmd** - Axis move command structure (axis, position, velocity, etc.)
-**ST_GearingPair** - Gearing pair configuration (master, slave, ratio)
-**ST_MotionError** - Error information (axis, code, step, description)
-**ST_MotionParameters** - Velocity, acceleration, deceleration, jerk, tolerance
-**ST_PositionSetpoints** - All axis target positions (60+ values)
-**ST_Recipe** - Complete recipe structure (ID, name, description, flags, positions, parameters)
-
-### Global Variables
-
-**GVL_Recipes** - Recipe library containing 10 recipes (7 active, 3 reserved):
-| Recipe | Name | Features |
-|--------|------|----------|
-| 1 | 8ft Standard Block | Studs, Windows, Electrical |
-| 2 | 10ft Studs Only | Studs only |
-| 3 | 8ft Windows Only | Windows only |
-| 4 | 8ft Electrical Only | Electrical only |
-| 5 | 12ft Full Block | All features (reduced velocity) |
-| 6 | 4ft Quick Test | All features (test speed) |
-| 7 | 8ft Studs+Windows | Studs and windows only |
-
-## 🔧 Development Workflow
-
-### Modifying PLC Code
-
-1. Edit files in `plc-code/` folders
-2. Test in simulation or on ctrlX CORE
-3. Commit changes to git
-4. Update documentation if needed
-
-### Modifying Web HMI
-
-1. Edit `web-hmi/simple-version/index.html` for UI changes
-2. Test locally in browser (mock mode)
-3. Connect to ctrlX Data Layer API for real testing
-4. Deploy to ctrlX web server
-
-## 🔄 Version Control
-
-This project uses Git for version control:
-
-```bash
-# View commit history
-git log --oneline
-
-# Create a commit
-git add .
-git commit -m "Description of changes"
-git push
-
-# Revert to previous version
-git reset --hard [commit-hash]
-```
-
-## 📊 System Architecture
+## 🧯 Fault handling (the short version)
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                           PLC_PRG (Main)                                 │
-├─────────────────────────────────────────────────────────────────────────┤
-│  ┌──────────────┐  ┌──────────────┐  ┌────────────────────────────────┐│
-│  │ FB_Button    │  │ FB_Axis      │  │ FB_MachineStateMachine         ││
-│  │ Manager      │  │ Power        │  │  ├─ FB_AxisGearing (array)     ││
-│  │ (auto-clear) │  │ (DrivesReady)│  │  └─ FB_MotionSequence          ││
-│  └──────────────┘  └──────────────┘  │       ├─ FB_MotionStep_LoadBlock│
-│         │                │           │       ├─ FB_MotionStep_Studs    ││
-│         ▼                ▼           │       ├─ FB_MotionStep_Windows  ││
-│   Button Inputs    MC_Power x36      │       ├─ FB_MotionStep_Electrical│
-│                    MC_Reset x36      │       ├─ FB_MotionStep_Unload   ││
-│                                      │       └─ FB_ErrorHandler        ││
-│                                      └────────────────────────────────┘│
-│                                                        │                │
-│   ┌────────────────────────────────────────────────────┘                │
-│   │                                                                     │
-│   ▼                                                                     │
-│  ┌─────────────┐    ┌──────────────────┐    ┌─────────────┐            │
-│  │ GVL_Recipes │    │ FB_AxisMover x N │    │ 18 Slaves   │            │
-│  │ (10 recipes)│───▶│ (per step FB)    │───▶│ Geared 1:1  │            │
-│  └─────────────┘    └──────────────────┘    └─────────────┘            │
-└─────────────────────────────────────────────────────────────────────────┘
-         │                                         │
-         ▼                                         ▼
-    ctrlX CORE                                Web HMI
-    Data Layer ◄────────────────────────────► (Browser)
-         │
-         ▼
-   HMI Variables:
-   - MACHINE_STATE, HMI_MotionStep, HMI_ActiveAxesMask
-   - HMI_StepDescription, Recipe info, Error info
+Any FB → FC_ReportFault → GVL_Faults.activeFault + axisFlags[n]
+                                  │
+ctrlX 24/7 diag poll ─────────────┤
+                                  ▼
+                          FB_FaultMonitor (latches HasFault, runs recovery on RESET)
+                                  ▼
+                       FB_MachineStateMachine → FAULTED → (reset) → RESETTING → IDLE
+                                  ▼
+                       HMI: HMI_HasFault, HMI_ActiveFault, HMI_LogicFaultSuspected
 ```
 
-## 🛠️ Hardware Configuration
+`HMI_LogicFaultSuspected = TRUE` means "an axis FB reported an error but ctrlX sees no drive fault"
+— a stale/phantom logic fault, so look at the PLC, not the drive. Full guide:
+[FAULT_TROUBLESHOOTING.md](plc-code/FAULT_TROUBLESHOOTING.md).
 
-**Controller:** Bosch ctrlX CORE
-**Motion Library:** PLCopen Motion Control
-**Drive System:** EtherCAT servo drives
-**I/O:** Digital inputs for buttons, safety circuits
-**Network:** Industrial Ethernet
+## 🛠️ Axis Configuration
 
-**Axes (36 total: 18 masters, 18 geared slaves):**
+18 masters receive commands; 18 slaves follow via Bosch ctrlX gantry groups (1:1).
 
-| Axes | Function | Type |
+| Axes | Function | Role |
 |------|----------|------|
-| 1 | Block shift left/right | Independent |
-| 2-5 | Load table lift (2=master, 3-5=slaves) | Geared group |
-| 6-7 | Shift center (6=master, 7=slave) | Geared pair |
-| 8-9 | Unload pusher (8=master, 9=slave) | Geared pair |
-| 10-13 | Unload table lift (10=master, 11-13=slaves) | Geared group |
-| 14-29 | Stud carving - 8 pairs (even=master, odd=slave) | 8 geared pairs |
-| 30-33 | Window/door cutting (30-31=masters, 32-33=slaves) | 2 geared pairs |
-| 34 | Electrical approach | Independent |
-| 35-36 | Electrical cutting (35=master, 36=slave) | Geared pair |
+| 1 | Block shift to left wall | Independent master |
+| 2 (3,4,5) | Load table lift | Master + 3 gantry slaves |
+| 6 (7) | Load pusher / center shift | Master + slave |
+| 8 (9) | Process/unload pusher | Master + slave |
+| 10 (11,12,13) | Process/unload table lift | Master + 3 slaves |
+| 14,15 (16,17) | Stud station 1 (vert/horiz) | Kinematic (Wire1) |
+| 18,19 (20,21) | Stud station 2 | Kinematic (Wire2) |
+| 22,23 (24,25) | Stud station 3 | Kinematic (Wire3) |
+| 26,27 (28,29) | Stud station 4 | Kinematic (Wire4) |
+| 30,31 (32,33) | Window/door (horiz R&P / vert) | Kinematic (Wire5_6) |
+| 34 | Unload table shift wall | Independent master |
+| 35,36 | Electrical trough cutters | Kinematic (Wire5_6) |
 
-## 🚦 Machine Operation States
+Kinematic masters live inside always-enabled wire groups and can't take `MC_MoveAbsolute` while
+enabled — they're homed via G-code home scripts (`FB_AxisHome`). Non-kin masters (1, 2, 6, 8, 10,
+34) home with direct moves.
 
-1. **INIT** → **IDLE** - Power up sequence
-2. **IDLE** → **HOMING** - Home all axes (if needed)
-3. **IDLE** → **RUNNING** - Start automatic sequence
-4. **RUNNING** - Execute motion sequence
-5. **STOPPING** - Controlled shutdown
-6. **FAULTED** - Error condition, requires reset
-7. **E_STOPPED** - Emergency stop active
-8. **MANUAL** - Manual jog mode
+## 🚦 Machine States
+
+`INIT → IDLE`, then from IDLE: `HOMING`, `MANUAL`, or `RUNNING` (needs `DrivesReady` + staged
+G-code). `STOPPING` is a *pause* (resumable via Start). `FAULTED` / `E_STOPPED` require Reset, which
+runs `RESETTING` (FB_FaultMonitor recovery) before returning to IDLE.
 
 ## 🔐 Safety Features
 
-- Emergency stop handling
-- State machine-based safety logic
-- Drive power management
-- Error detection and handling
-- Recipe locking during operation
+- E-Stop interrupts any state (highest priority), `MC_Halt` on all axes, wire kins interrupted
+- Fault interrupts any state via `HasFault`; drives auto-power-off on fault
+- Centralized fault detection, latch, and recovery in FB_FaultMonitor
+- 24/7 ctrlX diagnosis polling catches drive faults even if no FB noticed
 
 ## 📝 Future Enhancements
 
-- [x] Recipe management system (10 recipes with flexible operation flags)
-- [x] Centralized gearing management (FB_AxisGearing - now array-based)
-- [x] Active axes visualization for HMI (bitmask + step descriptions)
-- [x] Industrial-styled web HMI with real-time PLC communication
-- [x] Modular motion step FBs for maintainability
-- [x] Centralized error handling (FB_ErrorHandler)
-- [x] Generic axis mover helper (FB_AxisMover)
-- [ ] Complete 36-axis HMI visualization with gearing group highlights
+- [ ] Suction cup I/O (enable output + vacuum-confirm input)
 - [ ] Hot wire PWM temperature control
-- [ ] Advanced error recovery
-- [ ] Production tracking and statistics
-- [ ] Alarm logging and trending
-- [ ] Automated block loading/unloading
-- [ ] Integration with StrutSoft design software
-- [ ] Homing sequence implementation (currently stub)
-- [ ] Manual jog mode implementation (currently stub)
-
-## 📞 Support
-
-**Controller:** Bosch ctrlX CORE
-**Language:** IEC 61131-3 Structured Text
-**Development Environment:** Bosch IDE / ctrlX WORKS
+- [ ] Multiple window/door openings per block
+- [ ] Fault history ring buffer + timestamps (see FAULT_TROUBLESHOOTING.md §6)
+- [ ] Surface `HMI_LogicFaultSuspected` on the HMI fault card
+- [ ] Production tracking, alarm logging, and trending
 
 ---
 
-**Project:** Guardian Shield Systems - Foam Block Carving Machine
+**Project:** Guardian Shield Systems — Foam Block Carving Machine
 **Company:** Integrated ControlWorks, LLC
-**Last Updated:** January 2026
-**Version:** 2.0 (Modular Architecture Refactor)
+**Version:** 3.0 (G-Code Pipeline + Bosch Gantry Groups)

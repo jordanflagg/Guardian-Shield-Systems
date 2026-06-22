@@ -1663,6 +1663,116 @@
         .cle-type.info  { color:#4caf50; }
         .cle-msg { color:#aaa; flex:1; word-break:break-all; }
 
+        /* ── Job Queue page ────────────────────────────────────────── */
+        .queue-layout {
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            gap: 15px;
+            padding: 15px;
+            min-height: calc(100vh - 130px);
+            align-items: start;
+        }
+
+        .drop-zone {
+            border: 2px dashed #aaa;
+            border-radius: 6px;
+            padding: 28px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.2s, background 0.2s;
+            background: #fafafa;
+            user-select: none;
+        }
+        .drop-zone:hover, .drop-zone.drag-over {
+            border-color: #f7941d;
+            background: #fff8f0;
+        }
+        .drop-zone-icon  { font-size: 38px; margin-bottom: 8px; }
+        .drop-zone-main  { font-size: 14px; font-weight: 600; color: #444; margin-bottom: 4px; }
+        .drop-zone-sub   { font-size: 11px; color: #999; }
+
+        .queue-progress-wrap { margin-top: 14px; }
+        .queue-progress-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: #555;
+            margin-bottom: 5px;
+        }
+        .queue-progress-track {
+            height: 8px;
+            background: #ddd;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .queue-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #43a047, #66bb6a);
+            border-radius: 4px;
+            transition: width 0.5s ease;
+            min-width: 0;
+        }
+
+        .queue-job-list {
+            overflow-y: auto;
+            max-height: calc(100vh - 220px);
+        }
+        .queue-empty-msg {
+            padding: 40px 20px;
+            text-align: center;
+            color: #999;
+            font-size: 13px;
+        }
+        .queue-job-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 9px 12px;
+            border-bottom: 1px solid #eee;
+            font-size: 13px;
+            transition: background 0.2s;
+        }
+        .queue-job-row:last-child { border-bottom: none; }
+        .queue-job-row.qr-cutting { background: #fff8e1; }
+
+        .qji {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .qji-pending    { background: #bbb; }
+        .qji-processing { background: #f7941d; }
+        .qji-staged     { background: #1976d2; }
+        .qji-cutting    { background: #e91e63; animation: q-pulse 0.8s infinite; }
+        .qji-complete   { background: #43a047; }
+        .qji-error      { background: #e53935; }
+
+        @keyframes q-pulse {
+            0%, 100% { opacity: 1; }
+            50%       { opacity: 0.35; }
+        }
+
+        .queue-job-num  { color: #bbb; font-size: 11px; min-width: 22px; text-align: right; flex-shrink: 0; }
+        .queue-job-name { flex: 1; font-weight: 500; color: #333; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+        .qbadge {
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            min-width: 76px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+        .qb-pending    { background: #eee;    color: #666; }
+        .qb-processing { background: #fff3e0; color: #e65100; }
+        .qb-staged     { background: #e3f2fd; color: #1565c0; }
+        .qb-cutting    { background: #fce4ec; color: #880e4f; animation: q-pulse 0.8s infinite; }
+        .qb-complete   { background: #e8f5e9; color: #2e7d32; }
+        .qb-error      { background: #ffebee; color: #c62828; }
+
     </style>
 </head>
 <body>
@@ -1676,6 +1786,7 @@
                     <button class="nav-tab" onclick="switchPage('homing')">Homing</button>
                     <button class="nav-tab" onclick="switchPage('manual')">Manual</button>
                     <button class="nav-tab" onclick="switchPage('program')">GCode</button>
+                    <button class="nav-tab" onclick="switchPage('queue')">Queue</button>
                     <button class="nav-tab" onclick="switchPage('cutting')">Cutting</button>
                     <button class="nav-tab" onclick="switchPage('debug')" style="border-color:#f44336; color:#ffcdd2;">Debug</button>
                 </div>
@@ -2131,6 +2242,88 @@
                     </div>
 
                 </div>
+            </div>
+        </div>
+
+        <!-- QUEUE PAGE -->
+        <!-- ================================================================== -->
+        <div id="page-queue" class="page-content">
+            <div class="queue-layout">
+
+                <!-- ── Left column: drop zone + controls ── -->
+                <div>
+                    <!-- Drop zone panel -->
+                    <div class="panel">
+                        <div class="panel-title">Load Job Folder</div>
+                        <div class="panel-body">
+                            <div id="qDropZone" class="drop-zone"
+                                 onclick="qPickFolder()">
+                                <div class="drop-zone-icon">📁</div>
+                                <p class="drop-zone-main">Click to select a job folder</p>
+                                <p class="drop-zone-sub">choose the folder of STEP files</p>
+                            </div>
+                            <input type="file" id="qFolderInput" webkitdirectory multiple
+                                   accept=".step,.stp" style="display:none"
+                                   onchange="qHandleInput(this.files)">
+
+                            <!-- Feedrate setting -->
+                            <div style="display:flex; align-items:center; gap:8px; margin-top:12px;">
+                                <label for="qFeedRate" style="font-size:12px; color:#555; white-space:nowrap; min-width:62px;">Feedrate</label>
+                                <input type="number" id="qFeedRate"
+                                       min="50" max="5000" step="50" value="500"
+                                       style="width:88px; padding:5px 8px; border:1px solid #ccc; border-radius:4px; font-size:13px; font-family:Consolas,monospace; text-align:right;"
+                                       oninput="localStorage.setItem('qFeedRate', this.value)"
+                                       onchange="localStorage.setItem('qFeedRate', this.value)">
+                                <span style="font-size:12px; color:#888;">mm/min</span>
+                            </div>
+
+                            <!-- Progress bar -->
+                            <div id="qProgressWrap" class="queue-progress-wrap" style="display:none">
+                                <div class="queue-progress-label">
+                                    <span>Progress</span>
+                                    <span><span id="qDoneCount">0</span> / <span id="qTotalCount">0</span> blocks</span>
+                                </div>
+                                <div class="queue-progress-track">
+                                    <div id="qProgressFill" class="queue-progress-fill" style="width:0%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Controls (shown once queue is loaded) -->
+                    <div id="qControlPanel" class="panel" style="display:none; margin-top:10px;">
+                        <div class="panel-title">Queue Controls</div>
+                        <div class="panel-body" style="display:flex; gap:8px; flex-wrap:wrap;">
+                            <button id="btnQueuePause" class="btn btn-stop"
+                                    style="flex:1; padding:10px; font-size:13px;"
+                                    onclick="qTogglePause()">Pause</button>
+                            <button class="btn"
+                                    style="flex:1; padding:10px; font-size:13px; background:#666; color:white; border-color:#555;"
+                                    onclick="qClear()">Clear Queue</button>
+                        </div>
+                    </div>
+
+                    <!-- Connection indicator -->
+                    <div class="panel" style="margin-top:10px;">
+                        <div class="panel-title">Pipeline Server</div>
+                        <div class="panel-body" style="display:flex; align-items:center; gap:8px; font-size:12px; color:#555;">
+                            <div id="qServerLed" class="conn-led"></div>
+                            <span id="qServerStatus">Checking localhost:8001…</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── Right column: job list ── -->
+                <div class="panel" style="height:100%;">
+                    <div class="panel-title" style="display:flex; justify-content:space-between; align-items:center;">
+                        <span>Job Queue</span>
+                        <span id="qCountBadge" style="font-size:11px; font-weight:normal; color:#aaa;"></span>
+                    </div>
+                    <div id="qJobList" class="queue-job-list">
+                        <div class="queue-empty-msg">No jobs loaded — click above to select a job folder</div>
+                    </div>
+                </div>
+
             </div>
         </div>
 
@@ -3999,7 +4192,9 @@
             // Parse stud slots from comment lines: // Slot N: Z zBot-zTop mm  depth X=xDepth
             function parseStudSlots(text) {
                 if (!text) return { slots: [], face: null, blockThickness: null, blockHeight: null };
-                const thickM  = text.match(/Machine X:.*?([\d.]+)=face B/i);
+                // Datum = Face B at machine X=0; Face A floats at X=block_thickness.
+                // Header comment reads "0.000=face B (datum)  <thickness>=face A".
+                const thickM  = text.match(/Machine X:.*?([\d.]+)=face A/i);
                 const heightM = text.match(/Machine Z:.*?([\d.]+)=block top/i);
                 const faceM   = text.match(/WIRE\s+\d+\s+-\s+FACE\s+([AB])/i);
                 const blockThickness = thickM  ? parseFloat(thickM[1])  : null;
@@ -4012,7 +4207,8 @@
                         const zBot   = parseFloat(m[1]);
                         const zTop   = parseFloat(m[2]);
                         const xDepth = parseFloat(m[3]);
-                        const xEntry = (face === 'B' && blockThickness != null) ? blockThickness : 0;
+                        // Face B enters at the datum (X=0); Face A enters at X=thickness.
+                        const xEntry = (face === 'A' && blockThickness != null) ? blockThickness : 0;
                         slots.push({ zBot, zTop, xEntry, xDepth });
                     }
                 }
@@ -4280,6 +4476,15 @@
             }
         }
 
+        // An idle kinematic reports ipo/pos = (0,0) — the uninitialized origin
+        // (Face B / bottom corner). Drawing a dot there stacks every wire in the
+        // corner and makes the first real reading look like a sweep across the
+        // block. Suppress the dot at the origin; real cut and park positions are
+        // always off-origin, so the dot appears only where the wire actually is.
+        function _dotAtOrigin(a, b) {
+            return Math.abs(a || 0) < 0.1 && Math.abs(b || 0) < 0.1;
+        }
+
         // ── Cross-section (end view) — shows slot rectangles from all 4 stud wires ──
         // npgData: result from fetchNpgPositions; cfg: {heightMm, depthMm, lengthMm}
         function renderCrossSection(cfg, npgData, isBusy, w5Active, w6Active, posMap) {
@@ -4292,20 +4497,54 @@
             const drawH = vh - pad.top  - pad.bottom;
 
             // Geometry from parsed NPG data (prefer) or cfg inputs (fallback)
-            const blockThick  = npgData?.blockThickness ?? cfg.depthMm;
             const blockHeight = npgData?.blockHeight    ?? cfg.heightMm;
             const wireSlots   = npgData?.wireSlots      ?? [[], [], [], []];
 
-            // Coordinate mappers: X = thickness axis, Y = height axis
-            const toX = (mx) => pad.left + (mx / blockThick) * drawW;
+            // Block thickness: prefer parsed NPG geometry. On the idle placeholder
+            // (no job loaded yet) infer it from the parked wire positions so the
+            // block fits between the crosshairs — Face A wires park PARK_CLEARANCE mm
+            // beyond Face A, so blockThick ≈ max(parked X) − clearance. Falls back to
+            // cfg.depthMm if no valid parked positions are available.
+            const PARK_CLEARANCE = 50;   // mm wires park outside each face (matches pipeline)
+            let blockThick = npgData?.blockThickness ?? null;
+            if (blockThick == null) {
+                let maxParkX = null;
+                if (posMap) {
+                    CUT_WIRES.slice(0, 4).forEach((w) => {
+                        const p = posMap[w.kinGroup];
+                        if (p && p.length >= 2 && !_dotAtOrigin(p[0], p[1])) {
+                            maxParkX = maxParkX == null ? p[0] : Math.max(maxParkX, p[0]);
+                        }
+                    });
+                }
+                blockThick = (maxParkX != null && maxParkX - PARK_CLEARANCE > 10)
+                    ? maxParkX - PARK_CLEARANCE
+                    : cfg.depthMm;
+            }
+
+            // Coordinate mappers: X = thickness axis, Y = height axis.
+            // Datum = Face B at machine X=0, drawn on the RIGHT (matches operator POV:
+            // the block feeds in from the right and seats Face B against the fixed stop).
+            // +X runs into the block toward Face A on the left, so X increases right→left.
+            //
+            // The X domain is block thickness plus a FIXED "park zone" on each face,
+            // so homed wires (parked ~50 mm outside a face) are always visible. It
+            // depends ONLY on block thickness — never on live positions — so the scale
+            // stays rock-steady during a cut and never zooms in/out as the wires move.
+            const PARK_MARGIN = 70;                       // mm of view beyond each face
+            const xMin  = -PARK_MARGIN;
+            const xSpan = blockThick + 2 * PARK_MARGIN;
+            const toX = (mx) => pad.left + (1 - (mx - xMin) / xSpan) * drawW;
             const toY = (mz) => pad.top  + (1 - mz / blockHeight) * drawH;
 
             const L = [];
             L.push(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${vw} ${vh}" style="width:100%;display:block;">`);
             L.push(`<rect width="${vw}" height="${vh}" fill="#0f0f0f"/>`);
 
-            // Foam block rectangle
-            const bx0 = toX(0), bx1 = toX(blockThick);
+            // Foam block rectangle. With the right→left X mapping, Face A (X=blockThick)
+            // is the pixel-left edge and Face B (X=0) is the pixel-right edge, so bx0/bx1
+            // stay left/right and every downstream bx0/bx1 use remains valid.
+            const bx0 = toX(blockThick), bx1 = toX(0);
             const by0 = toY(blockHeight), by1 = toY(0);
             L.push(`<rect x="${bx0.toFixed(1)}" y="${by0.toFixed(1)}" width="${(bx1-bx0).toFixed(1)}" height="${(by1-by0).toFixed(1)}" fill="#3d2b10" stroke="#d4841a" stroke-width="2"/>`);
 
@@ -4318,7 +4557,7 @@
                 L.push(`<text x="${(bx0-6).toFixed(1)}" y="${(sy+3.5).toFixed(1)}" text-anchor="end" fill="#c09060" font-size="9" font-family="Consolas,monospace">${z}</text>`);
             }
 
-            // Face labels (Face A = left/X=0, Face B = right/X=blockThick)
+            // Face labels (Face A = left/X=blockThick floats, Face B = right/X=0 datum)
             L.push(`<text x="${bx0.toFixed(1)}" y="${(pad.top-6).toFixed(1)}" text-anchor="middle" fill="#9a8060" font-size="9" font-family="Consolas,monospace">A</text>`);
             L.push(`<text x="${bx1.toFixed(1)}" y="${(pad.top-6).toFixed(1)}" text-anchor="middle" fill="#9a8060" font-size="9" font-family="Consolas,monospace">B</text>`);
 
@@ -4330,8 +4569,10 @@
                 const color = CUT_WIRES[wi].color;
                 const op    = hasSlots ? (isBusy ? 1 : 0.85) : 0.15;
                 slots.forEach(slot => {
-                    const sx0 = toX(Math.min(slot.xEntry, slot.xDepth));
-                    const sx1 = toX(Math.max(slot.xEntry, slot.xDepth));
+                    // toX is right→left, so map both X ends then take pixel min/max.
+                    const pxA = toX(slot.xEntry), pxB = toX(slot.xDepth);
+                    const sx0 = Math.min(pxA, pxB);
+                    const sx1 = Math.max(pxA, pxB);
                     const sy0 = toY(slot.zTop);
                     const sy1 = toY(slot.zBot);
                     const rw  = sx1 - sx0, rh = sy1 - sy0;
@@ -4365,6 +4606,7 @@
                 CUT_WIRES.slice(0, 4).forEach((w) => {
                     const pos = posMap[w.kinGroup];
                     if (!pos || pos.length < 2) return;
+                    if (_dotAtOrigin(pos[0], pos[1])) return;   // skip idle (0,0) — no corner stack
                     const cx = toX(pos[0]);
                     const cy = toY(pos[1]);
                     const c  = w.color;
@@ -4434,7 +4676,7 @@
             // Live wire 5 position dot (face view: Wire5_6 ipo/pos = [..., Y_length(idx1), Z_height(idx2)])
             if (posMap) {
                 const pos = posMap['Wire5_6'];
-                if (pos && pos.length >= 3) {
+                if (pos && pos.length >= 3 && !_dotAtOrigin(pos[1], pos[2])) {
                     const cx = toX(pos[1]);
                     const cy = toY(pos[2]);
                     const c  = CUT_WIRES[4].color;
@@ -4494,7 +4736,7 @@
             // Wire5_6 shares the kin group; pos[0]/pos[1] ordering may need swap based on axis config
             if (posMap) {
                 const pos = posMap['Wire5_6'];
-                if (pos && pos.length >= 2) {
+                if (pos && pos.length >= 2 && !_dotAtOrigin(pos[0], pos[1])) {
                     const cx = toX(pos[0]);
                     const cy = toY(pos[1]);
                     const c  = CUT_WIRES[5].color;
@@ -5469,6 +5711,17 @@
             }
         }
 
+        async function dbgSetBlockLoaded(loaded) {
+            try {
+                await writePLCVariable('GVL_HMI.HMI_BlockLoaded', loaded);
+                const el = document.getElementById('dbgBlockLoaded');
+                if (el) el.innerHTML = `<span style="color:${loaded ? '#4caf50' : '#f44336'}">${loaded ? 'TRUE' : 'FALSE'}</span>`;
+                console.log('Debug: HMI_BlockLoaded =', loaded);
+            } catch (e) {
+                showError('Block Loaded toggle failed: ' + e.message);
+            }
+        }
+
         // ── Connection log ────────────────────────────────────────────────
         function logConn(type, label, msg) {
             const ts = new Date().toTimeString().slice(0,8);
@@ -5653,17 +5906,23 @@
 
             if (currentDbgTab === 'kintest' || currentDbgTab === 'gcode') {
                 try {
-                    const [dbgInterrupt, filesReady, busy, jobDone, gcodeErr, gcodeStatus] = await Promise.all([
+                    const [dbgInterrupt, filesReady, busy, jobDone, gcodeErr, gcodeStatus, blockLoaded] = await Promise.all([
                         readPLCVariable('GVL_HMI.HMI_DbgInterruptKins'),
                         readPLCVariable('GVL_GCode.bFilesReady'),
                         readPLCVariable('GVL_GCode.bBusy'),
                         readPLCVariable('GVL_GCode.bJobDone'),
                         readPLCVariable('GVL_GCode.bError'),
                         readPLCVariable('GVL_GCode.sStatus'),
+                        readPLCVariable('GVL_HMI.HMI_BlockLoaded'),
                     ]);
                     function boolSpan(val) {
                         const b = val === true || val === 'true' || val === 'TRUE';
                         return `<span style="color:${b ? '#f44336' : '#4caf50'}">${b ? 'TRUE' : 'FALSE'}</span>`;
+                    }
+                    // HMI_BlockLoaded: green when TRUE (ready-to-run intent), not red — it's a normal input, not a fault
+                    function loadedSpan(val) {
+                        const b = val === true || val === 'true' || val === 'TRUE';
+                        return `<span style="color:${b ? '#4caf50' : '#f44336'}">${b ? 'TRUE' : 'FALSE'}</span>`;
                     }
                     document.getElementById('dbgInterruptVal').innerHTML = boolSpan(dbgInterrupt);
                     document.getElementById('dbgFilesReady').innerHTML = boolSpan(filesReady);
@@ -5671,6 +5930,8 @@
                     document.getElementById('dbgJobDone').innerHTML = boolSpan(jobDone);
                     document.getElementById('dbgGcodeError').innerHTML = boolSpan(gcodeErr);
                     document.getElementById('dbgGcodeStatus').textContent = gcodeStatus || '--';
+                    const blEl = document.getElementById('dbgBlockLoaded');
+                    if (blEl) blEl.innerHTML = loadedSpan(blockLoaded);
                 } catch (e) { /* silent */ }
                 const machineStateEl = document.getElementById('dbgMachineState');
                 const headerMode = document.getElementById('headerMachineMode');
@@ -5688,6 +5949,223 @@
                 renderConnLog();
             }
         }
+
+        // ================================================================
+        // JOB QUEUE
+        // ================================================================
+
+        const PIPELINE_API   = 'http://localhost:8001';
+        let   qPollTimer     = null;
+        let   qServerOnline  = false;
+        let   qIsPaused      = false;
+        let   qQueueState    = 'empty'; // 'empty' | 'active' | 'complete'
+        let   qDoneVal       = 0;
+        let   qTotalVal      = 0;
+
+        // ── Folder selection (file browser) ──────────────────────────────
+
+        // Blank the input before opening the picker. With webkitdirectory the
+        // change event only fires when the value differs from last time, so
+        // without this a second selection (esp. the same folder) is silently
+        // ignored and nothing happens until the page is refreshed.
+        function qPickFolder() {
+            const input = document.getElementById('qFolderInput');
+            input.value = '';
+            input.click();
+        }
+
+        function qHandleInput(fileList) {
+            const files = Array.from(fileList).filter(f => /\.(step|stp)$/i.test(f.name));
+            if (files.length > 0) qSubmit(files);
+            else showError('No .step / .stp files found in selected folder.');
+        }
+
+        // ── Submit to server ─────────────────────────────────────────────
+
+        function qResetUI() {
+            document.getElementById('qProgressWrap').style.display  = 'none';
+            document.getElementById('qControlPanel').style.display  = 'none';
+            document.getElementById('qCountBadge').textContent = '';
+            document.getElementById('qJobList').innerHTML =
+                '<div class="queue-empty-msg">No jobs loaded — click above to select a job folder</div>';
+            qQueueState = 'empty';
+            qDoneVal    = 0;
+            qTotalVal   = 0;
+        }
+
+        async function qSubmit(files) {
+            // Guard: warn or auto-clear if a queue already exists
+            if (qQueueState === 'complete') {
+                // All done — silently clear and replace with the new folder
+                try { await fetch(`${PIPELINE_API}/queue`, { method: 'DELETE' }); } catch (_) {}
+                qResetUI();
+            } else if (qQueueState === 'active') {
+                const msg = `The queue is still running (${qDoneVal} of ${qTotalVal} blocks complete).\n\nReplace with the new folder?`;
+                if (!confirm(msg)) return;
+                try { await fetch(`${PIPELINE_API}/queue`, { method: 'DELETE' }); } catch (_) {}
+                qResetUI();
+            }
+
+            // Natural numeric sort before upload
+            files.sort((a, b) =>
+                a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
+            );
+
+            const form = new FormData();
+            for (const f of files) form.append('files', f, f.name);
+
+            const qParams = new URLSearchParams({
+                feed_rate:      document.getElementById('qFeedRate').value,
+            });
+
+            try {
+                const resp = await fetch(`${PIPELINE_API}/queue/load?${qParams}`, { method: 'POST', body: form });
+                if (!resp.ok) {
+                    const err = await resp.json().catch(() => ({}));
+                    throw new Error(err.detail || `HTTP ${resp.status}`);
+                }
+                await resp.json();
+                document.getElementById('qControlPanel').style.display = 'block';
+                document.getElementById('qProgressWrap').style.display = 'block';
+                qStartPolling();
+                await qPoll();
+            } catch (e) {
+                showError('Failed to load queue: ' + e.message);
+            }
+        }
+
+        // ── Polling ──────────────────────────────────────────────────────
+
+        function qStartPolling() {
+            if (qPollTimer) return;
+            qPollTimer = setInterval(qPoll, 2000);
+        }
+
+        async function qPoll() {
+            try {
+                const resp = await fetch(`${PIPELINE_API}/queue`);
+                qServerOnline = resp.ok;
+                if (resp.ok) qRender(await resp.json());
+            } catch (e) {
+                qServerOnline = false;
+            }
+            qUpdateServerLed();
+        }
+
+        async function qHealthCheck() {
+            try {
+                const r = await fetch(`${PIPELINE_API}/health`, { signal: AbortSignal.timeout(3000) });
+                qServerOnline = r.ok;
+            } catch { qServerOnline = false; }
+            qUpdateServerLed();
+        }
+
+        function qUpdateServerLed() {
+            const led = document.getElementById('qServerLed');
+            const txt = document.getElementById('qServerStatus');
+            if (qServerOnline) {
+                led.className = 'conn-led online';
+                txt.textContent = 'localhost:8001 — connected';
+            } else {
+                led.className = 'conn-led offline';
+                txt.textContent = 'localhost:8001 — not reachable';
+            }
+        }
+
+        // ── Render ───────────────────────────────────────────────────────
+
+        function qRender(data) {
+            const { jobs = [], total = 0, complete = 0, errors = 0, paused = false } = data;
+            qIsPaused  = paused;
+            qDoneVal   = complete;
+            qTotalVal  = total;
+            qQueueState = total === 0 ? 'empty'
+                        : (complete + errors >= total) ? 'complete'
+                        : 'active';
+
+            // Progress bar
+            if (total > 0) {
+                document.getElementById('qProgressWrap').style.display  = 'block';
+                document.getElementById('qControlPanel').style.display  = 'block';
+            }
+            document.getElementById('qDoneCount').textContent  = complete;
+            document.getElementById('qTotalCount').textContent = total;
+            const pct = total > 0 ? Math.round(complete / total * 100) : 0;
+            document.getElementById('qProgressFill').style.width = pct + '%';
+
+            // Pause button label
+            document.getElementById('btnQueuePause').textContent = paused ? 'Resume' : 'Pause';
+
+            // Header badge
+            const badge = document.getElementById('qCountBadge');
+            badge.textContent = total > 0
+                ? `${complete}/${total} done${errors > 0 ? '  ·  ' + errors + ' error' + (errors > 1 ? 's' : '') : ''}`
+                : '';
+
+            // Job list
+            const list = document.getElementById('qJobList');
+            if (jobs.length === 0) {
+                list.innerHTML = '<div class="queue-empty-msg">No jobs loaded — click above to select a job folder</div>';
+                return;
+            }
+
+            const STATUS_LABEL = {
+                pending:    'Pending',
+                processing: 'Generating',
+                staged:     'Staged',
+                cutting:    'Cutting…',
+                complete:   'Done',
+                error:      'Error',
+            };
+
+            list.innerHTML = jobs.map((j, i) => {
+                const label   = STATUS_LABEL[j.status] || j.status;
+                const tooltip = j.error ? ` title="${j.error.replace(/"/g, '&quot;')}"` : '';
+                const active  = j.status === 'cutting' ? ' qr-cutting' : '';
+                return `
+                    <div class="queue-job-row${active}">
+                        <div class="queue-job-num">${i + 1}</div>
+                        <div class="qji qji-${j.status}"></div>
+                        <div class="queue-job-name" title="${j.filename}">${j.filename}</div>
+                        <div class="qbadge qb-${j.status}"${tooltip}>${label}</div>
+                    </div>`;
+            }).join('');
+
+            // Scroll active row into view
+            const activeRow = list.querySelector('.qr-cutting');
+            if (activeRow) activeRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        // ── Controls ─────────────────────────────────────────────────────
+
+        async function qTogglePause() {
+            const endpoint = qIsPaused ? '/queue/resume' : '/queue/pause';
+            try {
+                await fetch(`${PIPELINE_API}${endpoint}`, { method: 'POST' });
+                await qPoll();
+            } catch (e) { showError('Queue control failed: ' + e.message); }
+        }
+
+        async function qClear() {
+            if (!confirm('Clear all jobs from the queue?')) return;
+            try {
+                await fetch(`${PIPELINE_API}/queue`, { method: 'DELETE' });
+                qResetUI();
+            } catch (e) { showError('Failed to clear queue: ' + e.message); }
+        }
+
+        // Restore feedrate from localStorage
+        (function () {
+            const saved = localStorage.getItem('qFeedRate');
+            if (saved) document.getElementById('qFeedRate').value = saved;
+        })();
+
+        // Start health-checking the pipeline server on page load
+        qHealthCheck();
+        setInterval(qHealthCheck, 10000);
+        // Start polling queue status (even if on another tab, so status stays fresh)
+        qStartPolling();
+
     </script>
 
     <!-- ================================================================== -->
@@ -5863,8 +6341,23 @@
                             <div style="display:flex; justify-content:space-between; margin-bottom:6px;"><span style="color:#aaa;">bBusy</span><span id="dbgBusy" style="font-weight:bold;">--</span></div>
                             <div style="display:flex; justify-content:space-between; margin-bottom:6px;"><span style="color:#aaa;">bJobDone</span><span id="dbgJobDone" style="font-weight:bold;">--</span></div>
                             <div style="display:flex; justify-content:space-between; margin-bottom:6px;"><span style="color:#aaa;">bError</span><span id="dbgGcodeError" style="font-weight:bold;">--</span></div>
-                            <div style="display:flex; justify-content:space-between;"><span style="color:#aaa;">sStatus</span><span id="dbgGcodeStatus" style="font-weight:bold; font-size:11px; max-width:220px; text-align:right; word-break:break-word;">--</span></div>
+                            <div style="display:flex; justify-content:space-between; margin-bottom:6px;"><span style="color:#aaa;">sStatus</span><span id="dbgGcodeStatus" style="font-weight:bold; font-size:11px; max-width:220px; text-align:right; word-break:break-word;">--</span></div>
+                            <div style="display:flex; justify-content:space-between; border-top:1px solid #3a3a3a; padding-top:6px; margin-top:2px;"><span style="color:#aaa;">HMI_BlockLoaded</span><span id="dbgBlockLoaded" style="font-weight:bold;">--</span></div>
                         </div>
+
+                        <!-- Block Loaded test toggle -->
+                        <div style="margin-top:14px; border:1px solid #3a3a3a; border-radius:4px; padding:10px 12px;">
+                            <p style="font-size:11px; color:#aaa; margin-bottom:8px; text-transform:uppercase; letter-spacing:.4px;">Block Loaded — Test Input</p>
+                            <p style="font-size:11px; color:#666; margin-bottom:10px;">
+                                Simulates the "foam block is on the table" signal that gates <code>WAIT_FOR_LOAD</code>.
+                                Set <strong style="color:#eee;">TRUE</strong> (with G-code staged) to let a cycle start without the real sensor.
+                            </p>
+                            <div style="display:flex; gap:6px;">
+                                <button class="btn" style="background:#2e7d32; color:white; flex:1; padding:10px; font-size:12px; font-weight:bold;" onclick="dbgSetBlockLoaded(true)">Block Loaded: ON</button>
+                                <button class="btn" style="background:#444; color:#ccc; flex:1; padding:10px; font-size:12px; font-weight:bold;" onclick="dbgSetBlockLoaded(false)">OFF</button>
+                            </div>
+                        </div>
+
                         <div style="margin-top:14px;">
                             <button class="btn" style="background:#555; color:white; width:100%; padding:10px; font-size:12px;" onclick="dbgForceClearGCode()">
                                 Clear bBusy + bFilesReady + bError

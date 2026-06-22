@@ -22,11 +22,12 @@ FB_AxisManual provides manual jog control for a single axis at a time:
 
 ## The Master-Slave Protection
 
-Here's the critical safety feature: **this machine has 18 master-slave gearing pairs.**
+Here's the critical safety feature: **this machine has 18 master-slave gantry pairs** (configured
+as kinematic gantry groups in the Bosch ctrlX web UI, not in PLC code).
 
-If you jog a slave axis directly while it's geared to a master, you create a fight between:
+If you jog a slave axis directly while it's gantry-slaved to a master, you create a fight between:
 - The jog command trying to move the slave
-- The gearing command trying to hold the slave in sync with the master
+- The gantry coupling trying to hold the slave in sync with its master
 
 That fight destroys things. Best case: drive fault. Worst case: mechanical damage.
 
